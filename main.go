@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
@@ -23,6 +24,8 @@ type config struct {
 	GatewayIP   string
 	GatewayPort int
 	DialTimeout time.Duration
+	ScanTimeout time.Duration
+	ScanWorkers int
 	BufferSize  int
 	Verbose     bool
 }
@@ -32,6 +35,8 @@ func defaultConfig() config {
 		ListenAddr:  "127.0.0.1:1080",
 		GatewayPort: 1080,
 		DialTimeout: 5 * time.Second,
+		ScanTimeout: 250 * time.Millisecond,
+		ScanWorkers: max(64, runtime.GOMAXPROCS(0)*32),
 		BufferSize:  32 * 1024,
 	}
 }
@@ -64,6 +69,8 @@ func buildApp() *cmd.App {
 			f.StringVar(&cfg.GatewayIP, "gateway-ip", cfg.GatewayIP, "gateway IP; empty means auto-detect", "")
 			f.IntVar(&cfg.GatewayPort, "gateway-port", cfg.GatewayPort, "gateway mixed proxy port", "p")
 			f.DurationVar(&cfg.DialTimeout, "dial-timeout", cfg.DialTimeout, "upstream dial timeout", "")
+			f.DurationVar(&cfg.ScanTimeout, "scan-timeout", cfg.ScanTimeout, "per-IP timeout when scanning local IPv4 networks", "")
+			f.IntVar(&cfg.ScanWorkers, "scan-workers", cfg.ScanWorkers, "parallel workers used for IPv4 network scanning", "")
 			f.IntVar(&cfg.BufferSize, "buffer-size", cfg.BufferSize, "per-direction copy buffer size in bytes", "")
 			f.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable connection logs", "v")
 		},
@@ -99,17 +106,19 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) error {
 	if cfg.GatewayPort <= 0 || cfg.GatewayPort > 65535 {
 		return fmt.Errorf("invalid gateway port: %d", cfg.GatewayPort)
 	}
+	if cfg.ScanTimeout <= 0 {
+		cfg.ScanTimeout = defaultConfig().ScanTimeout
+	}
+	if cfg.ScanWorkers <= 0 {
+		cfg.ScanWorkers = defaultConfig().ScanWorkers
+	}
 	if cfg.BufferSize < 4096 {
 		cfg.BufferSize = 4096
 	}
 
-	gatewayIP := net.ParseIP(cfg.GatewayIP)
-	if gatewayIP == nil {
-		ip, err := discoverDefaultGateway()
-		if err != nil {
-			return fmt.Errorf("discover gateway IP: %w", err)
-		}
-		gatewayIP = ip
+	gatewayIP, err := resolveGatewayIP(ctx, cfg, log)
+	if err != nil {
+		return err
 	}
 
 	target := net.JoinHostPort(gatewayIP.String(), strconv.Itoa(cfg.GatewayPort))
@@ -164,6 +173,35 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) error {
 		tempDelay = 0
 		go server.handle(ctx, conn)
 	}
+}
+
+func resolveGatewayIP(ctx context.Context, cfg config, log io.Writer) (net.IP, error) {
+	if cfg.GatewayIP != "" {
+		gatewayIP := net.ParseIP(cfg.GatewayIP)
+		if gatewayIP == nil {
+			return nil, fmt.Errorf("invalid gateway IP: %s", cfg.GatewayIP)
+		}
+		return gatewayIP, nil
+	}
+
+	gatewayIP, err := discoverDefaultGateway()
+	if err == nil {
+		if canConnect(ctx, gatewayIP, cfg.GatewayPort, cfg.ScanTimeout) {
+			return gatewayIP, nil
+		}
+		fmt.Fprintf(log, "gateway %s:%d is not reachable, scanning local IPv4 networks\n", gatewayIP, cfg.GatewayPort)
+	} else {
+		fmt.Fprintf(log, "discover gateway IP failed: %v; scanning local IPv4 networks\n", err)
+	}
+
+	ip, err := scanLocalIPv4(ctx, cfg.GatewayPort, cfg.ScanTimeout, cfg.ScanWorkers, gatewayIP)
+	if err != nil {
+		if gatewayIP != nil {
+			return nil, fmt.Errorf("gateway %s:%d is unreachable and scan found no reachable proxy: %w", gatewayIP, cfg.GatewayPort, err)
+		}
+		return nil, fmt.Errorf("scan local IPv4 networks: %w", err)
+	}
+	return ip, nil
 }
 
 func (s *proxyServer) handle(ctx context.Context, client net.Conn) {
