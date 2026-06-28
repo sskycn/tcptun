@@ -6,6 +6,7 @@ import (
 	"net"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -21,8 +22,12 @@ func canConnect(ctx context.Context, ip net.IP, port int, timeout time.Duration)
 	if ip == nil {
 		return false
 	}
+	return canConnectTarget(ctx, net.JoinHostPort(ip.String(), strconv.Itoa(port)), timeout)
+}
+
+func canConnectTarget(ctx context.Context, target string, timeout time.Duration) bool {
 	dialer := net.Dialer{Timeout: timeout}
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(ip.String(), strconv.Itoa(port)))
+	conn, err := dialer.DialContext(ctx, "tcp", target)
 	if err != nil {
 		return false
 	}
@@ -161,6 +166,33 @@ func localIPv4Networks(gatewayHint net.IP) ([]ipv4Network, error) {
 	})
 
 	return networks, nil
+}
+
+func localIPv4Signature() (string, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+
+	ips := make([]string, 0, len(interfaces))
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return "", err
+		}
+		for _, addr := range addrs {
+			ip, _, ok := ipv4AddrNetwork(addr)
+			if !ok {
+				continue
+			}
+			ips = append(ips, ip.String())
+		}
+	}
+	sort.Strings(ips)
+	return strings.Join(ips, ","), nil
 }
 
 func ipv4AddrNetwork(addr net.Addr) (net.IP, *net.IPNet, bool) {

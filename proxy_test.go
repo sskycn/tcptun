@@ -562,6 +562,78 @@ func TestResolveConfigPathUsesExecutableDirectory(t *testing.T) {
 	}
 }
 
+func TestUpstreamRefreshSkipsDiscoveryWhenLocalIPUnchanged(t *testing.T) {
+	upstream, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := upstream.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close upstream listener: %v", err)
+		}
+	})
+	hit := make(chan struct{}, 1)
+	go acceptSignal(upstream, hit)
+
+	signature, err := localIPv4Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var log bytes.Buffer
+	resolver := &upstreamResolver{
+		cfg: config{
+			GatewayIP:   "not-an-ip",
+			GatewayPort: upstream.Addr().(*net.TCPAddr).Port,
+			DialTimeout: time.Second,
+			ScanTimeout: time.Nanosecond,
+			ScanWorkers: 1,
+			Verbose:     true,
+		},
+		log:              &log,
+		currentTarget:    upstream.Addr().String(),
+		localIPSignature: signature,
+	}
+
+	if err := resolver.refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := resolver.target(), upstream.Addr().String(); got != want {
+		t.Fatalf("target = %s, want %s", got, want)
+	}
+	if log.Len() != 0 {
+		t.Fatalf("log = %q, want empty", log.String())
+	}
+	select {
+	case <-hit:
+		t.Fatal("current upstream was probed without local IP change")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestUpstreamRefreshRunsWhenLocalIPChanged(t *testing.T) {
+	resolver := &upstreamResolver{
+		cfg: config{
+			GatewayIP:   "127.0.0.1",
+			GatewayPort: 1080,
+			DialTimeout: time.Second,
+			Verbose:     true,
+		},
+		log:              io.Discard,
+		currentTarget:    "192.0.2.1:1080",
+		localIPSignature: "old-local-ip",
+	}
+
+	if err := resolver.refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := resolver.target(), "127.0.0.1:1080"; got != want {
+		t.Fatalf("target = %s, want %s", got, want)
+	}
+	if resolver.localSignature() == "old-local-ip" {
+		t.Fatal("local IP signature was not updated")
+	}
+}
+
 func dialHTTPConnect(t *testing.T, proxyAddr string, targetAddr string) net.Conn {
 	t.Helper()
 	client, err := net.DialTimeout("tcp", proxyAddr, time.Second)

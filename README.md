@@ -93,7 +93,7 @@ When `--gateway-ip` is not set, startup works like this:
 
 Manual `--gateway-ip` disables scanning and uses the provided IP directly.
 
-While running, the proxy refreshes the reachable upstream every `--refresh-interval`. Existing connections continue on their current upstream; new connections use the refreshed target.
+While running, the proxy checks local IPv4 addresses every `--refresh-interval`. Gateway discovery and local-network scanning only run when the local IPv4 address set changes. Existing connections continue on their current upstream; new connections use the refreshed target after a change is detected.
 
 ## Internal Address Bypass
 
@@ -141,7 +141,7 @@ UDP is supported through SOCKS5 UDP ASSOCIATE. The TCP mixed proxy port negotiat
 --gateway-ip <string>       gateway IP; empty means auto-detect
 -p, --gateway-port <int>    gateway mixed proxy port [default: 1080]
 -l, --listen <string>       local listen address [default: "127.0.0.1:1080"]
---refresh-interval <duration> interval for refreshing the reachable upstream; 0 disables refresh [default: 5s]
+--refresh-interval <duration> interval for checking local IPv4 changes; 0 disables refresh [default: 5s]
 --scan-timeout <duration>   per-IP timeout when scanning local IPv4 networks [default: 250ms]
 --scan-workers <int>        parallel workers used for IPv4 network scanning
 -v, --verbose               enable connection logs

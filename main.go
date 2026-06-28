@@ -78,7 +78,7 @@ func buildApp() *cmd.App {
 			f.IntVar(&cfg.GatewayPort, "gateway-port", cfg.GatewayPort, "gateway mixed proxy port", "p")
 			f.StringVar(&cfg.ConfigPath, "config", cfg.ConfigPath, "JSON route config path; empty disables config loading", "c")
 			f.DurationVar(&cfg.DialTimeout, "dial-timeout", cfg.DialTimeout, "upstream dial timeout", "")
-			f.DurationVar(&cfg.RefreshInterval, "refresh-interval", cfg.RefreshInterval, "interval for refreshing the reachable upstream; 0 disables refresh", "")
+			f.DurationVar(&cfg.RefreshInterval, "refresh-interval", cfg.RefreshInterval, "interval for checking local IPv4 changes; 0 disables refresh", "")
 			f.DurationVar(&cfg.ScanTimeout, "scan-timeout", cfg.ScanTimeout, "per-IP timeout when scanning local IPv4 networks", "")
 			f.IntVar(&cfg.ScanWorkers, "scan-workers", cfg.ScanWorkers, "parallel workers used for IPv4 network scanning", "")
 			f.IntVar(&cfg.BufferSize, "buffer-size", cfg.BufferSize, "per-direction copy buffer size in bytes", "")
@@ -158,6 +158,9 @@ func (c *directCache) upstreamOnlyHosts() []string {
 func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	if cfg.GatewayPort <= 0 || cfg.GatewayPort > 65535 {
 		return fmt.Errorf("invalid gateway port: %d", cfg.GatewayPort)
+	}
+	if cfg.DialTimeout <= 0 {
+		cfg.DialTimeout = defaultConfig().DialTimeout
 	}
 	if cfg.ScanTimeout <= 0 {
 		cfg.ScanTimeout = defaultConfig().ScanTimeout
@@ -288,15 +291,19 @@ func resolveGatewayIP(ctx context.Context, cfg config, log io.Writer) (net.IP, e
 
 	gatewayIP, err := discoverDefaultGateway()
 	if err == nil {
-		if canConnect(ctx, gatewayIP, cfg.GatewayPort, cfg.ScanTimeout) {
+		if canConnect(ctx, gatewayIP, cfg.GatewayPort, cfg.DialTimeout) {
 			return gatewayIP, nil
 		}
-		if err := logf(log, "gateway %s:%d is not reachable, scanning local IPv4 networks\n", gatewayIP, cfg.GatewayPort); err != nil {
-			return nil, err
+		if cfg.Verbose {
+			if err := logf(log, "gateway %s:%d is not reachable, scanning local IPv4 networks\n", gatewayIP, cfg.GatewayPort); err != nil {
+				return nil, err
+			}
 		}
 	} else {
-		if err := logf(log, "discover gateway IP failed: %v; scanning local IPv4 networks\n", err); err != nil {
-			return nil, err
+		if cfg.Verbose {
+			if err := logf(log, "discover gateway IP failed: %v; scanning local IPv4 networks\n", err); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -311,21 +318,27 @@ func resolveGatewayIP(ctx context.Context, cfg config, log io.Writer) (net.IP, e
 }
 
 type upstreamResolver struct {
-	cfg           config
-	log           io.Writer
-	mu            sync.RWMutex
-	currentTarget string
+	cfg              config
+	log              io.Writer
+	mu               sync.RWMutex
+	currentTarget    string
+	localIPSignature string
 }
 
 func newUpstreamResolver(ctx context.Context, cfg config, log io.Writer) (*upstreamResolver, error) {
+	signature, err := localIPv4Signature()
+	if err != nil {
+		return nil, err
+	}
 	ip, err := resolveGatewayIP(ctx, cfg, log)
 	if err != nil {
 		return nil, err
 	}
 	return &upstreamResolver{
-		cfg:           cfg,
-		log:           log,
-		currentTarget: net.JoinHostPort(ip.String(), strconv.Itoa(cfg.GatewayPort)),
+		cfg:              cfg,
+		log:              log,
+		currentTarget:    net.JoinHostPort(ip.String(), strconv.Itoa(cfg.GatewayPort)),
+		localIPSignature: signature,
 	}, nil
 }
 
@@ -339,6 +352,18 @@ func (r *upstreamResolver) setTarget(target string) {
 	r.mu.Lock()
 	r.currentTarget = target
 	r.mu.Unlock()
+}
+
+func (r *upstreamResolver) setLocalIPSignature(signature string) {
+	r.mu.Lock()
+	r.localIPSignature = signature
+	r.mu.Unlock()
+}
+
+func (r *upstreamResolver) localSignature() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.localIPSignature
 }
 
 func (r *upstreamResolver) start(ctx context.Context) <-chan error {
@@ -370,16 +395,32 @@ func (r *upstreamResolver) start(ctx context.Context) <-chan error {
 }
 
 func (r *upstreamResolver) refresh(ctx context.Context) error {
-	ip, err := resolveGatewayIP(ctx, r.cfg, r.log)
+	signature, err := localIPv4Signature()
 	if err != nil {
-		if logErr := logf(r.log, "refresh upstream failed: %v; keeping %s\n", err, r.target()); logErr != nil {
-			return logErr
+		if r.cfg.Verbose {
+			if logErr := logf(r.log, "refresh local IP check failed: %v; keeping %s\n", err, r.target()); logErr != nil {
+				return logErr
+			}
+		}
+		return nil
+	}
+	if signature == r.localSignature() {
+		return nil
+	}
+	r.setLocalIPSignature(signature)
+
+	ip, err := resolveGatewayIP(ctx, r.cfg, r.log)
+	current := r.target()
+	if err != nil {
+		if r.cfg.Verbose {
+			if logErr := logf(r.log, "refresh upstream failed: %v; keeping %s\n", err, current); logErr != nil {
+				return logErr
+			}
 		}
 		return nil
 	}
 
 	next := net.JoinHostPort(ip.String(), strconv.Itoa(r.cfg.GatewayPort))
-	current := r.target()
 	if next == current {
 		return nil
 	}

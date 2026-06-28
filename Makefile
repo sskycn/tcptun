@@ -56,7 +56,7 @@ run:
 	$(GO_ENV) $(GO) run . --listen $(LISTEN) --gateway-port $(GATEWAY_PORT) --config $(CONFIG) $(if $(GATEWAY_IP),--gateway-ip $(GATEWAY_IP),)
 
 clean:
-	rm -f $(BINARY)
+	rm -rf $(dir $(BINARY))
 	rm -rf $(DIST_DIR)
 	rm -rf $(GOCACHE)
 
