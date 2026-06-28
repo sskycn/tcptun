@@ -1,5 +1,5 @@
 GO ?= go
-BINARY ?= proxy
+BINARY ?= bin/proxy
 LISTEN ?= 127.0.0.1:1080
 GATEWAY_IP ?=
 GATEWAY_PORT ?= 1080

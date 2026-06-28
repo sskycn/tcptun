@@ -1,5 +1,5 @@
 # Binaries and build output
-/proxy
+/bin
 *.exe
 *.test
 
