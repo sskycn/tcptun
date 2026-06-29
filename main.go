@@ -19,33 +19,39 @@ import (
 	"pkg.gostartkit.com/cmd"
 )
 
-const version = "v0.1.0"
+const (
+	version                = "v0.1.0"
+	upstreamProtocolSOCKS5 = "socks5"
+	upstreamProtocolMixed  = "mixed"
+)
 
 var errListenerClosedByContext = errors.New("listener closed after context cancellation")
 
 type config struct {
-	ListenAddr      string
-	GatewayIP       string
-	GatewayPort     int
-	ConfigPath      string
-	DialTimeout     time.Duration
-	RefreshInterval time.Duration
-	ScanTimeout     time.Duration
-	ScanWorkers     int
-	BufferSize      int
-	Verbose         bool
+	ListenAddr       string
+	GatewayIP        string
+	GatewayPort      int
+	UpstreamProtocol string
+	ConfigPath       string
+	DialTimeout      time.Duration
+	RefreshInterval  time.Duration
+	ScanTimeout      time.Duration
+	ScanWorkers      int
+	BufferSize       int
+	Verbose          bool
 }
 
 func defaultConfig() config {
 	return config{
-		ListenAddr:      "127.0.0.1:1080",
-		GatewayPort:     1080,
-		ConfigPath:      "config.json",
-		DialTimeout:     5 * time.Second,
-		RefreshInterval: 5 * time.Second,
-		ScanTimeout:     250 * time.Millisecond,
-		ScanWorkers:     max(64, runtime.GOMAXPROCS(0)*32),
-		BufferSize:      32 * 1024,
+		ListenAddr:       "127.0.0.1:1080",
+		GatewayPort:      1080,
+		UpstreamProtocol: upstreamProtocolSOCKS5,
+		ConfigPath:       "config.json",
+		DialTimeout:      5 * time.Second,
+		RefreshInterval:  5 * time.Second,
+		ScanTimeout:      250 * time.Millisecond,
+		ScanWorkers:      max(64, runtime.GOMAXPROCS(0)*32),
+		BufferSize:       32 * 1024,
 	}
 }
 
@@ -59,23 +65,26 @@ func main() {
 
 func buildApp() *cmd.App {
 	cfg := defaultConfig()
+	upstreamProtocolFlag := ""
 
 	app := cmd.NewApp("proxy")
 	app.Short = "Local mixed proxy forwarder"
 	app.Root = &cmd.Command{
 		UsageLine: "proxy [flags]",
-		Short:     "forward local mixed proxy traffic through the gateway SOCKS5 port",
+		Short:     "forward local mixed proxy traffic through the gateway proxy port",
 		Long: "Starts a local TCP listener for mixed proxy clients and forwards each connection " +
-			"through the default gateway's SOCKS5-compatible proxy port.",
+			"through the default gateway's proxy port. Upstream protocol defaults to SOCKS5.",
 		Examples: []string{
 			"proxy",
 			"proxy --listen 127.0.0.1:1081 --gateway-port 1080",
 			"proxy --gateway-ip 192.168.1.1",
+			"proxy --upstream-protocol mixed",
 		},
 		SetFlags: func(f *cmd.FlagSet) {
 			f.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "local listen address", "l")
 			f.StringVar(&cfg.GatewayIP, "gateway-ip", cfg.GatewayIP, "gateway IP; empty means auto-detect", "")
-			f.IntVar(&cfg.GatewayPort, "gateway-port", cfg.GatewayPort, "gateway SOCKS5-compatible proxy port", "p")
+			f.IntVar(&cfg.GatewayPort, "gateway-port", cfg.GatewayPort, "gateway proxy port", "p")
+			f.StringVar(&upstreamProtocolFlag, "upstream-protocol", upstreamProtocolFlag, "upstream protocol: socks5 or mixed [default: socks5]", "")
 			f.StringVar(&cfg.ConfigPath, "config", cfg.ConfigPath, "JSON route config path; empty disables config loading", "c")
 			f.DurationVar(&cfg.DialTimeout, "dial-timeout", cfg.DialTimeout, "upstream dial timeout", "")
 			f.DurationVar(&cfg.RefreshInterval, "refresh-interval", cfg.RefreshInterval, "interval for checking local IPv4 changes; 0 disables refresh", "")
@@ -87,6 +96,11 @@ func buildApp() *cmd.App {
 		Run: func(ctx context.Context, c *cmd.Command, args []string) error {
 			if len(args) != 0 {
 				return fmt.Errorf("unexpected args: %v", args)
+			}
+			if strings.TrimSpace(upstreamProtocolFlag) != "" {
+				cfg.UpstreamProtocol = upstreamProtocolFlag
+			} else {
+				cfg.UpstreamProtocol = ""
 			}
 			return runProxy(ctx, cfg, os.Stderr)
 		},
@@ -181,6 +195,18 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	}
 	cfg.ConfigPath = configPath
 
+	if strings.TrimSpace(cfg.UpstreamProtocol) == "" {
+		protocol, err := loadConfiguredUpstreamProtocol(cfg.ConfigPath)
+		if err != nil {
+			return err
+		}
+		cfg.UpstreamProtocol = protocol
+	}
+	cfg.UpstreamProtocol, err = normalizeUpstreamProtocol(cfg.UpstreamProtocol)
+	if err != nil {
+		return err
+	}
+
 	routes, err := loadRouteRules(cfg.ConfigPath)
 	if err != nil {
 		return err
@@ -224,7 +250,7 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 		}
 	}()
 
-	if err := logf(log, "listening on %s, forwarding mixed traffic to %s\n", listener.Addr(), resolver.target()); err != nil {
+	if err := logf(log, "listening on %s, forwarding mixed traffic to %s via %s\n", listener.Addr(), resolver.target(), cfg.UpstreamProtocol); err != nil {
 		return err
 	}
 
@@ -277,6 +303,17 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 		}
 		tempDelay = 0
 		go server.handle(ctx, conn)
+	}
+}
+
+func normalizeUpstreamProtocol(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", upstreamProtocolSOCKS5:
+		return upstreamProtocolSOCKS5, nil
+	case upstreamProtocolMixed:
+		return upstreamProtocolMixed, nil
+	default:
+		return "", fmt.Errorf("invalid upstream protocol %q; supported values: %s, %s", value, upstreamProtocolSOCKS5, upstreamProtocolMixed)
 	}
 }
 

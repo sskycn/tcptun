@@ -12,7 +12,8 @@ import (
 )
 
 type routeConfigFile struct {
-	ForceUpstream forceUpstreamConfig `json:"force_upstream"`
+	UpstreamProtocol string              `json:"upstream_protocol,omitempty"`
+	ForceUpstream    forceUpstreamConfig `json:"force_upstream"`
 }
 
 type forceUpstreamConfig struct {
@@ -54,6 +55,20 @@ func loadRouteRules(path string) (*routeRules, error) {
 	}
 	rules.forceUpstream = compiled
 	return rules, nil
+}
+
+func loadConfiguredUpstreamProtocol(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", nil
+	}
+	cfg, err := readRouteConfig(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", err
+	}
+	return cfg.UpstreamProtocol, nil
 }
 
 func resolveConfigPath(path string) (string, error) {

@@ -2,16 +2,16 @@
 
 Local mixed proxy forwarder written in Go.
 
-This tool opens a local mixed proxy port and forwards upstream traffic through the gateway using SOCKS5. It is designed for low overhead: connection forwarding uses pooled copy buffers, while HTTP and SOCKS5 requests are parsed only enough to choose direct or SOCKS5 upstream routing.
+This tool opens a local mixed proxy port and forwards upstream traffic through the gateway. The upstream protocol is configurable and defaults to SOCKS5. It is designed for low overhead: connection forwarding uses pooled copy buffers, while HTTP and SOCKS5 requests are parsed only enough to choose direct or upstream routing.
 
 English | [简体中文](README.zh-CN.md)
 
 ## Features
 
 - Listens locally on `127.0.0.1:1080` by default.
-- Forwards to the gateway SOCKS5-compatible port `1080` by default.
+- Forwards to the gateway proxy port `1080` by default.
 - Accepts mixed local proxy traffic such as SOCKS5, HTTP proxy, and HTTP CONNECT.
-- Converts all upstream TCP and UDP traffic with a parsed target to SOCKS5.
+- Uses SOCKS5 for upstream traffic by default; `mixed` upstream mode is also supported.
 - Supports SOCKS5 UDP ASSOCIATE for UDP relay traffic.
 - Prints compact terminal access logs; direct connections omit the proxy field.
 - Auto-detects the default gateway IP.
@@ -72,10 +72,16 @@ Use a known gateway IP:
 bin/proxy --gateway-ip 192.168.1.1
 ```
 
-Use a different gateway SOCKS5 port:
+Use a different gateway proxy port:
 
 ```sh
 bin/proxy --gateway-port 7890
+```
+
+Use a mixed upstream gateway instead of the default SOCKS5 upstream:
+
+```sh
+bin/proxy --upstream-protocol mixed
 ```
 
 Use a different route config:
@@ -91,7 +97,7 @@ When `--gateway-ip` is not set, startup works like this:
 1. Detect the system default gateway IP.
 2. Try to connect to `<gateway-ip>:<gateway-port>`.
 3. If that connection fails, scan local IPv4 networks for a host with `<gateway-port>` open.
-4. Use the first reachable host as the upstream SOCKS5 proxy.
+4. Use the first reachable host as the upstream proxy.
 
 Manual `--gateway-ip` disables scanning and uses the provided IP directly.
 
@@ -101,6 +107,14 @@ While running, the proxy checks local IPv4 addresses every `--refresh-interval`.
 
 For SOCKS5, SOCKS5 UDP ASSOCIATE, HTTP CONNECT, and HTTP proxy requests, the proxy inspects the requested target. Force-upstream rules in `config.json` have the highest priority. Otherwise, TCP targets are tried directly first. If direct TCP connection fails, that target is remembered as upstream-only and later connections skip the direct attempt. UDP targets keep the conservative rule: internal targets go direct, other targets go upstream.
 
+## Upstream Protocol
+
+The upstream protocol can be configured with `--upstream-protocol` or the top-level `upstream_protocol` field in `config.json`. Supported values are `socks5` and `mixed`; the default is `socks5`.
+
+In `socks5` mode, SOCKS5 and HTTP proxy traffic with a parsed target is converted to SOCKS5 before going upstream. Unknown mixed traffic is rejected because it has no parsed target.
+
+In `mixed` mode, HTTP proxy traffic and unknown mixed traffic are forwarded to the gateway unchanged. SOCKS5 TCP and UDP still use SOCKS5 negotiation, so the upstream mixed port must support SOCKS5.
+
 ## Route Config
 
 By default the proxy tries to read `config.json` next to the executable. Relative `--config` paths are resolved from the executable directory; absolute paths are used as provided. The included `config.json` sends `x.com`, `twitter.com`, and related subdomains upstream. If that file does not exist, the proxy runs without custom route rules and creates it before exit when new direct failures are learned. Use `--config <path>` to choose another file, or `--config ""` to disable config loading and write-back.
@@ -109,6 +123,7 @@ Example:
 
 ```json
 {
+  "upstream_protocol": "socks5",
   "force_upstream": {
     "domains": ["x.com", "twitter.com"],
     "domain_prefixes": ["api.", "pbs.twimg."],
@@ -151,11 +166,12 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 -c, --config <string>       JSON route config path; empty disables config loading [default: "config.json"]
 --dial-timeout <duration>   upstream dial timeout [default: 5s]
 --gateway-ip <string>       gateway IP; empty means auto-detect
--p, --gateway-port <int>    gateway SOCKS5-compatible proxy port [default: 1080]
+-p, --gateway-port <int>    gateway proxy port [default: 1080]
 -l, --listen <string>       local listen address [default: "127.0.0.1:1080"]
 --refresh-interval <duration> interval for checking local IPv4 changes; 0 disables refresh [default: 5s]
 --scan-timeout <duration>   per-IP timeout when scanning local IPv4 networks [default: 250ms]
 --scan-workers <int>        parallel workers used for IPv4 network scanning
+--upstream-protocol <string> upstream protocol: socks5 or mixed [default: socks5]
 -v, --verbose               enable debug logs
 ```
 
@@ -176,6 +192,7 @@ make clean    # Remove build output and local Go cache
 make run LISTEN=127.0.0.1:1081 GATEWAY_PORT=7890
 make run GATEWAY_IP=192.168.1.1
 make run CONFIG=/path/to/config.json
+make run UPSTREAM_PROTOCOL=mixed
 ```
 
 ## Development

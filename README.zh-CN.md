@@ -2,16 +2,16 @@
 
 本地 mixed 代理转发程序，使用 Go 编写。
 
-这个工具会在本机打开一个 mixed 代理端口，并把需要走上游的流量统一通过 SOCKS5 转发到网关。它偏性能优先设计：连接转发使用复用缓冲区，HTTP 和 SOCKS5 请求只解析到足够完成直连/上游路由选择。
+这个工具会在本机打开一个 mixed 代理端口，并把需要走上游的流量转发到网关。上游协议可配置，默认使用 SOCKS5。它偏性能优先设计：连接转发使用复用缓冲区，HTTP 和 SOCKS5 请求只解析到足够完成直连/上游路由选择。
 
 [English](README.md) | 简体中文
 
 ## 功能
 
 - 默认监听本机 `127.0.0.1:1080`。
-- 默认转发到网关兼容 SOCKS5 的端口 `1080`。
+- 默认转发到网关代理端口 `1080`。
 - 本地支持 mixed 代理流量，包括 SOCKS5、HTTP 代理、HTTP CONNECT。
-- 所有已解析出目标的 TCP 和 UDP 上游流量都会转换成 SOCKS5。
+- 默认使用 SOCKS5 作为上游协议，也支持 `mixed` 上游模式。
 - 支持 SOCKS5 UDP ASSOCIATE，可转发 UDP 流量。
 - 在终端输出紧凑访问日志；直连日志会省略代理字段。
 - 自动发现默认网关 IP。
@@ -72,10 +72,16 @@ bin/proxy --listen 127.0.0.1:1081
 bin/proxy --gateway-ip 192.168.1.1
 ```
 
-指定网关 SOCKS5 端口：
+指定网关代理端口：
 
 ```sh
 bin/proxy --gateway-port 7890
+```
+
+使用 mixed 上游网关，而不是默认 SOCKS5 上游：
+
+```sh
+bin/proxy --upstream-protocol mixed
 ```
 
 指定路由配置文件：
@@ -91,7 +97,7 @@ bin/proxy --config ./config.json
 1. 自动发现系统默认网关 IP。
 2. 尝试连接 `<网关IP>:<gateway-port>`。
 3. 如果连接失败，扫描本机所在 IPv4 网段，寻找打开了 `<gateway-port>` 的主机。
-4. 使用第一个可连通的地址作为上游 SOCKS5 代理。
+4. 使用第一个可连通的地址作为上游代理。
 
 手动设置 `--gateway-ip` 时，不会扫描网段，会直接使用该 IP。
 
@@ -101,6 +107,14 @@ bin/proxy --config ./config.json
 
 对于 SOCKS5、SOCKS5 UDP ASSOCIATE、HTTP CONNECT 和 HTTP 代理请求，程序会解析请求目标。`config.json` 中的强制走上游规则优先级最高。否则，TCP 目标会优先直连；如果直连失败，会记住该目标为仅走上游，后续连接跳过直连尝试。UDP 目标保持保守规则：内网目标直连，其他目标走上游。
 
+## 上游协议
+
+上游协议可以通过 `--upstream-protocol` 设置，也可以写在 `config.json` 顶层的 `upstream_protocol` 字段里。支持的值是 `socks5` 和 `mixed`，默认是 `socks5`。
+
+在 `socks5` 模式下，已解析出目标的 SOCKS5 和 HTTP 代理流量会转换成 SOCKS5 后再发往上游。未知 mixed 流量因为无法解析目标，会被拒绝。
+
+在 `mixed` 模式下，HTTP 代理流量和未知 mixed 流量会原样发往网关。SOCKS5 TCP 和 UDP 仍使用 SOCKS5 协商，因此上游 mixed 端口需要支持 SOCKS5。
+
 ## 路由配置
 
 程序默认读取可执行文件所在目录下的 `config.json`。相对路径形式的 `--config` 会按可执行文件所在目录解析，绝对路径会原样使用。仓库自带的 `config.json` 已经将 `x.com`、`twitter.com` 及相关子域名设置为强制走上游。如果该文件不存在，会先按无自定义规则运行，并在退出前发现新的直连失败目标时自动创建。可以使用 `--config <path>` 指定其他文件，或使用 `--config ""` 禁用配置加载和写回。
@@ -109,6 +123,7 @@ bin/proxy --config ./config.json
 
 ```json
 {
+  "upstream_protocol": "socks5",
   "force_upstream": {
     "domains": ["x.com", "twitter.com"],
     "domain_prefixes": ["api.", "pbs.twimg."],
@@ -151,11 +166,12 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 -c, --config <string>       JSON 路由配置文件路径；为空表示禁用配置加载 [默认: "config.json"]
 --dial-timeout <duration>   连接上游超时时间 [默认: 5s]
 --gateway-ip <string>       网关 IP；为空表示自动发现
--p, --gateway-port <int>    网关兼容 SOCKS5 的代理端口 [默认: 1080]
+-p, --gateway-port <int>    网关代理端口 [默认: 1080]
 -l, --listen <string>       本机监听地址 [默认: "127.0.0.1:1080"]
 --refresh-interval <duration> 检查本机 IPv4 变化的间隔；0 表示禁用刷新 [默认: 5s]
 --scan-timeout <duration>   扫描 IPv4 网段时每个 IP 的探测超时 [默认: 250ms]
 --scan-workers <int>        IPv4 网段扫描并发数
+--upstream-protocol <string> 上游协议：socks5 或 mixed [默认: socks5]
 -v, --verbose               输出调试日志
 ```
 
@@ -176,6 +192,7 @@ make clean    # 删除构建产物和本地 Go 缓存
 make run LISTEN=127.0.0.1:1081 GATEWAY_PORT=7890
 make run GATEWAY_IP=192.168.1.1
 make run CONFIG=/path/to/config.json
+make run UPSTREAM_PROTOCOL=mixed
 ```
 
 ## 开发

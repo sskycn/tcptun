@@ -68,11 +68,21 @@ func (s *proxyServer) routeMixed(ctx context.Context, client net.Conn, reader *b
 		if err == nil {
 			return s.handleHTTPProxy(ctx, client, reader, req)
 		}
+		if errors.Is(err, errHTTPMalformedRequest) && s.cfg.UpstreamProtocol == upstreamProtocolMixed {
+			var initial []byte
+			if req != nil {
+				initial = req.raw
+			}
+			return s.proxyViaUpstreamRaw(ctx, client, reader, initial, "mixed", "unknown")
+		}
 		if !errors.Is(err, errHTTPMalformedRequest) {
 			return err
 		}
 	}
 
+	if s.cfg.UpstreamProtocol == upstreamProtocolMixed {
+		return s.proxyViaUpstreamRaw(ctx, client, reader, nil, "mixed", "unknown")
+	}
 	return accessLog(s.log, accessSource("mixed", client.RemoteAddr()), "", "unknown", "unsupported mixed traffic")
 }
 
@@ -171,6 +181,9 @@ func (s *proxyServer) handleSocks5Connect(ctx context.Context, client net.Conn, 
 func (s *proxyServer) handleHTTPProxy(ctx context.Context, client net.Conn, reader *bufio.Reader, req *httpProxyRequest) error {
 	host, port, err := requestHostPort(req)
 	if err != nil {
+		if s.cfg.UpstreamProtocol == upstreamProtocolMixed {
+			return s.proxyViaUpstreamRaw(ctx, client, reader, req.raw, "http", "unknown")
+		}
 		return err
 	}
 	targetHost := trimHostBrackets(host)
@@ -232,6 +245,9 @@ func (s *proxyServer) handleHTTPProxy(ctx context.Context, client net.Conn, read
 		}
 	}
 
+	if s.cfg.UpstreamProtocol == upstreamProtocolMixed {
+		return s.proxyViaUpstreamRaw(ctx, client, reader, req.raw, "http", directTarget)
+	}
 	return s.handleHTTPUpstreamSocks5(ctx, client, reader, req, targetHost, port, directTarget)
 }
 
@@ -316,6 +332,33 @@ func (s *proxyServer) handleHTTPUpstreamSocks5(ctx context.Context, client net.C
 		return err
 	}
 	return accessLog(s.log, accessSource("http", client.RemoteAddr()), upstreamTarget, target, "ok")
+}
+
+func (s *proxyServer) proxyViaUpstreamRaw(ctx context.Context, client net.Conn, reader *bufio.Reader, initial []byte, protocol string, target string) error {
+	upstream, upstreamTarget, err := s.connectUpstreamRaw(ctx)
+	if err != nil {
+		if logErr := accessLog(s.log, accessSource(protocol, client.RemoteAddr()), upstreamTarget, target, err.Error()); logErr != nil {
+			return errors.Join(err, logErr)
+		}
+		return err
+	}
+	defer closeConnWithLog(upstream, s.log, "upstream mixed "+upstreamTarget)
+
+	if len(initial) > 0 {
+		if err := writeAll(upstream, initial); err != nil {
+			if logErr := accessLog(s.log, accessSource(protocol, client.RemoteAddr()), upstreamTarget, target, err.Error()); logErr != nil {
+				return errors.Join(err, logErr)
+			}
+			return err
+		}
+	}
+	if err := s.bridge(upstream, client, reader); err != nil {
+		if logErr := accessLog(s.log, accessSource(protocol, client.RemoteAddr()), upstreamTarget, target, err.Error()); logErr != nil {
+			return errors.Join(err, logErr)
+		}
+		return err
+	}
+	return accessLog(s.log, accessSource(protocol, client.RemoteAddr()), upstreamTarget, target, "ok")
 }
 
 func socksRequestFromHostPort(host string, port string) (socksRequest, error) {
@@ -520,11 +563,11 @@ func readHTTPProxyRequest(reader *bufio.Reader) (*httpProxyRequest, error) {
 	if err != nil {
 		return nil, err
 	}
+	raw := []byte(firstLine)
 	if !looksLikeHTTPRequestLine(firstLine) {
-		return nil, errHTTPMalformedRequest
+		return &httpProxyRequest{raw: raw}, errHTTPMalformedRequest
 	}
 
-	raw := []byte(firstLine)
 	headerRaw := make([]byte, 0, 512)
 	host := ""
 	for {
@@ -547,7 +590,7 @@ func readHTTPProxyRequest(reader *bufio.Reader) (*httpProxyRequest, error) {
 
 	parts := strings.SplitN(strings.TrimRight(firstLine, "\r\n"), " ", 3)
 	if len(parts) != 3 {
-		return nil, errHTTPMalformedRequest
+		return &httpProxyRequest{raw: raw}, errHTTPMalformedRequest
 	}
 	return &httpProxyRequest{
 		raw:       raw,
