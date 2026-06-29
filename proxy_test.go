@@ -551,6 +551,26 @@ func TestApplyRuntimeConfigDefaultsLoadsModeOnlyWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestApplyModeListenDefault(t *testing.T) {
+	cfg := config{Mode: proxyModeServer}
+	applyModeListenDefault(&cfg)
+	if cfg.ListenAddr != "0.0.0.0:9443" {
+		t.Fatalf("server listen addr = %q", cfg.ListenAddr)
+	}
+
+	cfg = config{Mode: proxyModeClient}
+	applyModeListenDefault(&cfg)
+	if cfg.ListenAddr != defaultConfig().ListenAddr {
+		t.Fatalf("client listen addr = %q", cfg.ListenAddr)
+	}
+
+	cfg = config{Mode: proxyModeServer, ListenAddr: "127.0.0.1:19090"}
+	applyModeListenDefault(&cfg)
+	if cfg.ListenAddr != "127.0.0.1:19090" {
+		t.Fatalf("explicit listen addr = %q", cfg.ListenAddr)
+	}
+}
+
 func TestResolveConfigPathUsesExecutableDirectory(t *testing.T) {
 	executable, err := os.Executable()
 	if err != nil {

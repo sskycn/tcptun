@@ -116,6 +116,20 @@ func defaultConfig() Config {
 	}
 }
 
+func applyModeListenDefault(cfg *config) {
+	if cfg == nil {
+		return
+	}
+	if strings.TrimSpace(cfg.ListenAddr) != "" {
+		return
+	}
+	if cfg.Mode == proxyModeServer {
+		cfg.ListenAddr = "0.0.0.0:9443"
+		return
+	}
+	cfg.ListenAddr = defaultConfig().ListenAddr
+}
+
 type proxyServer struct {
 	cfg        config
 	resolver   *upstreamResolver
@@ -209,6 +223,7 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	if err != nil {
 		return err
 	}
+	applyModeListenDefault(&cfg)
 	cfg.UpstreamProtocol, err = normalizeUpstreamProtocol(cfg.UpstreamProtocol)
 	if err != nil {
 		return err

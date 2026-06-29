@@ -9,8 +9,13 @@
 coverage.out
 *.coverprofile
 
+# Generated/local proxy configs
+/client.json
+/server.json
+
 # Local caches
 .gocache/
 
 # OS/editor noise
 .DS_Store
+*.json

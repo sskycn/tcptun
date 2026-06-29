@@ -233,6 +233,8 @@ bin/proxy client --server-addr proxy.example.com:9443 --transport h3 --tunnel-pa
 
 `proxy client` 保持本地 mixed 代理入口，但会把已解析出目标的 TCP 和 UDP 上游流量封装到隧道服务端。使用 `--server-addr` 指定服务端地址，`--token` 需要和服务端一致。
 
+默认情况下，`proxy server` 会读取可执行文件旁边的 `server.json`，`proxy client` 会读取可执行文件旁边的 `client.json`。显式传入 `--config <path>` 仍会覆盖这些模式默认值；传入 `--config ""` 可以禁用配置加载和写回。
+
 `proxy config` 用于生成可直接编辑的 JSON 配置文件，不会启动代理。默认同时写出 `server.json` 和 `client.json`，两端共享同一个自动生成的 token，并支持通过 `--protocol custom|vless|vmess|trojan` 指定协议。
 
 ```sh
@@ -302,7 +304,7 @@ bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-pat
 
 ## 路由配置
 
-程序默认读取可执行文件所在目录下的 `config.json`。相对路径形式的 `--config` 会按可执行文件所在目录解析，绝对路径会原样使用。仓库自带的 `config.json` 已经将 `x.com`、`twitter.com` 及相关子域名设置为强制走上游。如果该文件不存在，会先按无自定义规则运行，并在退出前发现新的直连失败目标时自动创建。可以使用 `--config <path>` 指定其他文件，或使用 `--config ""` 禁用配置加载和写回。
+默认情况下，local 模式和不带子命令的 `proxy` 会读取可执行文件所在目录下的 `config.json`，`proxy server` 会读取 `server.json`，`proxy client` 会读取 `client.json`。相对路径形式的 `--config` 会按可执行文件所在目录解析，绝对路径会原样使用。仓库自带的 `config.json` 已经将 `x.com`、`twitter.com` 及相关子域名设置为强制走上游。如果选中的配置文件不存在，会先按无自定义规则运行，并在退出前发现新的直连失败目标时自动创建。可以使用 `--config <path>` 指定其他文件，或使用 `--config ""` 禁用配置加载和写回。
 
 示例：
 
@@ -374,7 +376,7 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 
 ```text
 --buffer-size <int>         每个方向的拷贝缓冲区大小，单位字节 [默认: 32768]
--c, --config <string>       JSON 路由配置文件路径；为空表示禁用配置加载 [默认: "config.json"]
+-c, --config <string>       JSON 路由配置文件路径；默认按模式选择；为空表示禁用配置加载 [默认: "config.json"]
 --dial-timeout <duration>   连接上游超时时间 [默认: 5s]
 --gateway-ip <string>       网关 IP；为空表示自动发现
 -p, --gateway-port <int>    网关代理端口 [默认: 1080]

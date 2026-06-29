@@ -13,6 +13,7 @@ import (
 
 func buildApp() *cmd.App {
 	cfg := proxypkg.DefaultConfig()
+	configPathSet := false
 	upstreamProtocolFlag := ""
 
 	app := cmd.NewApp("proxy")
@@ -36,7 +37,7 @@ func buildApp() *cmd.App {
 			f.StringVar(&cfg.GatewayIP, "gateway-ip", cfg.GatewayIP, "gateway IP; empty means auto-detect", "")
 			f.IntVar(&cfg.GatewayPort, "gateway-port", cfg.GatewayPort, "gateway proxy port", "p")
 			f.StringVar(&upstreamProtocolFlag, "upstream-protocol", upstreamProtocolFlag, "upstream protocol: socks5 or mixed [default: socks5]", "")
-			f.StringVar(&cfg.ConfigPath, "config", cfg.ConfigPath, "JSON route config path; empty disables config loading", "c")
+			f.Var(trackedStringValue{value: &cfg.ConfigPath, set: &configPathSet}, "config", "JSON route config path; defaults: config.json, client.json, or server.json by mode; empty disables config loading", "c")
 			f.DurationVar(&cfg.DialTimeout, "dial-timeout", cfg.DialTimeout, "upstream dial timeout", "")
 			f.DurationVar(&cfg.RefreshInterval, "refresh-interval", cfg.RefreshInterval, "interval for checking local IPv4 changes; 0 disables refresh", "")
 			f.DurationVar(&cfg.ScanTimeout, "scan-timeout", cfg.ScanTimeout, "per-IP timeout when scanning local IPv4 networks", "")
@@ -60,7 +61,49 @@ func buildApp() *cmd.App {
 			return proxypkg.RunProxy(ctx, cfg, os.Stderr)
 		},
 	}
-	app.AddCommands(buildLocalCommand(&cfg, &upstreamProtocolFlag), buildClientCommand(&cfg), buildServerCommand(&cfg), buildConfigCommand(), buildVersionCommand())
+	app.AddCommands(buildLocalCommand(&cfg, &upstreamProtocolFlag), buildClientCommand(&cfg, &configPathSet), buildServerCommand(&cfg, &configPathSet), buildConfigCommand(), buildVersionCommand())
 
 	return app
+}
+
+type trackedStringValue struct {
+	value *string
+	set   *bool
+}
+
+func (v trackedStringValue) Set(value string) error {
+	if v.value != nil {
+		*v.value = value
+	}
+	if v.set != nil {
+		*v.set = true
+	}
+	return nil
+}
+
+func (v trackedStringValue) String() string {
+	if v.value == nil {
+		return ""
+	}
+	return *v.value
+}
+
+func (v trackedStringValue) Get() any {
+	return v.String()
+}
+
+func boolValue(value *bool) bool {
+	return value != nil && *value
+}
+
+func applyModeConfigPathDefault(cfg *proxypkg.Config, configPathSet bool, defaultPath string) {
+	if cfg == nil {
+		return
+	}
+	if configPathSet {
+		return
+	}
+	if strings.TrimSpace(cfg.ConfigPath) == proxypkg.DefaultConfig().ConfigPath {
+		cfg.ConfigPath = defaultPath
+	}
 }

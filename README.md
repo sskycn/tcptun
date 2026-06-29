@@ -233,6 +233,8 @@ Running `proxy` without a subcommand defaults to local mode. If `config.json` co
 
 `proxy client` keeps the local mixed proxy listener, but upstream TCP and UDP traffic with a parsed target is encapsulated to the tunnel server. Use `--server-addr` for the server address and the same `--token` value used by the server.
 
+By default, `proxy server` reads `server.json` next to the executable and `proxy client` reads `client.json` next to the executable. Passing `--config <path>` still overrides those mode defaults; passing `--config ""` disables config loading and write-back.
+
 `proxy config` generates ready-to-edit JSON config files without starting the proxy. By default it writes both `server.json` and `client.json`, shares one generated token between them, and accepts `--protocol custom|vless|vmess|trojan`.
 
 ```sh
@@ -302,7 +304,7 @@ bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-pat
 
 ## Route Config
 
-By default the proxy tries to read `config.json` next to the executable. Relative `--config` paths are resolved from the executable directory; absolute paths are used as provided. The included `config.json` sends `x.com`, `twitter.com`, and related subdomains upstream. If that file does not exist, the proxy runs without custom route rules and creates it before exit when new direct failures are learned. Use `--config <path>` to choose another file, or `--config ""` to disable config loading and write-back.
+By default, local mode and `proxy` without a subcommand read `config.json` next to the executable, `proxy server` reads `server.json`, and `proxy client` reads `client.json`. Relative `--config` paths are resolved from the executable directory; absolute paths are used as provided. The included `config.json` sends `x.com`, `twitter.com`, and related subdomains upstream. If the selected config file does not exist, the proxy runs without custom route rules and creates it before exit when new direct failures are learned. Use `--config <path>` to choose another file, or `--config ""` to disable config loading and write-back.
 
 Example:
 
@@ -374,7 +376,7 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 
 ```text
 --buffer-size <int>         per-direction copy buffer size in bytes [default: 32768]
--c, --config <string>       JSON route config path; empty disables config loading [default: "config.json"]
+-c, --config <string>       JSON route config path; defaults by mode; empty disables config loading [default: "config.json"]
 --dial-timeout <duration>   upstream dial timeout [default: 5s]
 --gateway-ip <string>       gateway IP; empty means auto-detect
 -p, --gateway-port <int>    gateway proxy port [default: 1080]
