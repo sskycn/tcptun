@@ -145,4 +145,4 @@ bin/proxy server
 bin/proxy client
 ```
 
-如果需要 UDP relay 或 tunnel mux，请使用 `custom` 协议。
+如果需要 UDP relay 或 tunnel mux，请使用 `native` 协议。

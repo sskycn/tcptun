@@ -24,13 +24,13 @@ func buildServerCommand(cfg *proxypkg.Config) *cmd.Command {
 		Name:      "server",
 		Aliases:   []string{"s", "srv"},
 		UsageLine: "proxy server [flags]",
-		Short:     "run a custom tunnel server",
+		Short:     "run a native tunnel server",
 		Examples: []string{
 			"proxy server --listen 0.0.0.0:9443 --token change-me",
 		},
 		SetFlags: func(f *cmd.FlagSet) {
 			f.StringVar(&tokenFlag, "token", tokenFlag, "shared token, VLESS/VMess UUID, or Trojan password", "")
-			f.StringVar(&protocolFlag, "tunnel-protocol", protocolFlag, "tunnel protocol: custom, vless, vmess, or trojan [default: custom]", "")
+			f.StringVar(&protocolFlag, "tunnel-protocol", protocolFlag, "tunnel protocol: native, vless, vmess, or trojan [default: native]", "")
 			f.StringVar(&transportFlag, "transport", transportFlag, "tunnel transport: raw, ws, h2, or h3 [default: raw]", "")
 			f.StringVar(&securityFlag, "tunnel-security", securityFlag, "tunnel security: none or reality [default: none]", "")
 			f.StringVar(&flowFlag, "flow", flowFlag, "VLESS flow, for example xtls-rprx-vision", "")

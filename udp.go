@@ -37,7 +37,7 @@ type udpRelay struct {
 	conn       *net.UDPConn
 	clientAddr *net.UDPAddr
 	upstream   *udpUpstream
-	custom     *customUDPUpstream
+	native     *nativeUDPUpstream
 	mu         sync.Mutex
 }
 
@@ -246,14 +246,14 @@ func (r *udpRelay) currentUpstream() *udpUpstream {
 func (r *udpRelay) closeUpstream() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.custom != nil {
-		if err := r.custom.tcp.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			if logErr := logf(r.server.log, "close tunnel udp upstream %s: %v\n", r.custom.label, err); logErr != nil {
-				r.custom = nil
+	if r.native != nil {
+		if err := r.native.tcp.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			if logErr := logf(r.server.log, "close tunnel udp upstream %s: %v\n", r.native.label, err); logErr != nil {
+				r.native = nil
 				return
 			}
 		}
-		r.custom = nil
+		r.native = nil
 	}
 	if r.upstream == nil {
 		return
@@ -291,22 +291,22 @@ func (r *udpRelay) handleClientPacketTunnel(ctx context.Context, addr *net.UDPAd
 	return accessLog(r.server.log, accessSource("socks5-udp", addr), upstream.label, targetText, "ok")
 }
 
-func (r *udpRelay) ensureTunnelUpstream(ctx context.Context) (*customUDPUpstream, error) {
+func (r *udpRelay) ensureTunnelUpstream(ctx context.Context) (*nativeUDPUpstream, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.custom != nil {
-		return r.custom, nil
+	if r.native != nil {
+		return r.native, nil
 	}
 	upstream, err := r.server.connectViaTunnelUDP(ctx)
 	if err != nil {
 		return nil, err
 	}
-	r.custom = upstream
+	r.native = upstream
 	go r.forwardTunnelUDPResponses(upstream)
 	return upstream, nil
 }
 
-func (r *udpRelay) forwardTunnelUDPResponses(upstream *customUDPUpstream) {
+func (r *udpRelay) forwardTunnelUDPResponses(upstream *nativeUDPUpstream) {
 	for {
 		frame, err := readTunnelUDPFrame(upstream.reader)
 		if err != nil {

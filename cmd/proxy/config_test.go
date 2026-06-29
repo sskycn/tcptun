@@ -147,7 +147,7 @@ func TestRunInteractiveConfigGeneratesBothConfigs(t *testing.T) {
 	dir := t.TempDir()
 	opts := generateConfigOptions{
 		target:       configTargetBoth,
-		protocol:     proxypkg.TunnelProtocolCustom,
+		protocol:     proxypkg.TunnelProtocolNative,
 		transport:    proxypkg.TunnelTransportRaw,
 		outDir:       ".",
 		serverOutput: "server.json",
@@ -215,7 +215,7 @@ func TestRunInteractiveConfigRealityAutoGeneratesKeys(t *testing.T) {
 	dir := t.TempDir()
 	opts := generateConfigOptions{
 		target:       configTargetBoth,
-		protocol:     proxypkg.TunnelProtocolCustom,
+		protocol:     proxypkg.TunnelProtocolNative,
 		transport:    proxypkg.TunnelTransportRaw,
 		outDir:       ".",
 		serverOutput: "server.json",

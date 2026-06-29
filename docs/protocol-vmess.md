@@ -145,4 +145,4 @@ bin/proxy server
 bin/proxy client
 ```
 
-Use `custom` when you need UDP relay or tunnel mux.
+Use `native` when you need UDP relay or tunnel mux.

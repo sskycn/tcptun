@@ -114,4 +114,4 @@ bin/proxy server
 bin/proxy client
 ```
 
-Trojan currently carries TCP only. Use `custom` when you need UDP relay or tunnel mux.
+Trojan currently carries TCP only. Use `native` when you need UDP relay or tunnel mux.

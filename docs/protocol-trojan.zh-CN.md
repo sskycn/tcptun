@@ -114,4 +114,4 @@ bin/proxy server
 bin/proxy client
 ```
 
-Trojan 当前只承载 TCP。需要 UDP relay 或 tunnel mux 时请选择 `custom` 协议。
+Trojan 当前只承载 TCP。需要 UDP relay 或 tunnel mux 时请选择 `native` 协议。

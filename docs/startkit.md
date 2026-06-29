@@ -6,7 +6,7 @@ This startkit explains the client/server tunnel protocols supported by this proj
 
 Protocol pages:
 
-- [Custom protocol](protocol-custom.md)
+- [Native protocol](protocol-native.md)
 - [VLESS protocol](protocol-vless.md)
 - [VMess protocol](protocol-vmess.md)
 - [Trojan protocol](protocol-trojan.md)
@@ -24,7 +24,7 @@ bin/proxy config
 Generate configs non-interactively:
 
 ```sh
-bin/proxy config --protocol custom --server-addr proxy.example.com:9443
+bin/proxy config --protocol native --server-addr proxy.example.com:9443
 bin/proxy config --protocol vless --server-addr proxy.example.com:9443
 bin/proxy config --protocol vmess --server-addr proxy.example.com:9443
 bin/proxy config --protocol trojan --server-addr proxy.example.com:443 --tls --tls-server-name proxy.example.com
@@ -38,9 +38,11 @@ By default, config generation writes three files:
 
 Runtime config defaults:
 
-- `proxy server` reads `server.json` next to the executable.
-- `proxy client` reads `client.json` next to the executable.
-- `proxy` and `proxy local` read `config.json` next to the executable.
+- `proxy server` reads `server.json`.
+- `proxy client` reads `client.json`.
+- `proxy` and `proxy local` read `config.json`.
+- Relative config paths are searched in this order: executable directory, current working directory, then `~/.config/proxy`.
+- If no file exists, write-back uses the executable directory.
 - `--config <path>` overrides the mode default.
 - `--config ""` disables runtime config loading.
 - `--route-config <path>` overrides the default `route.json` route file.
@@ -74,8 +76,8 @@ bin/proxy client --config /etc/proxy/client.json
 | `mode` | server/client/local | Runtime mode. `server` accepts tunnel connections, `client` opens the local mixed proxy and forwards through a tunnel server, and `local` discovers a gateway proxy. |
 | `listen_addr` | server/client/local | Local listen address. Servers commonly use `0.0.0.0:9443`; clients commonly use `127.0.0.1:1080`. |
 | `server_addr` | client | Tunnel server address in `host:port` form. |
-| `token` | server/client | Authentication material. For `custom` it is a shared token, for VLESS/VMess it is a UUID, and for Trojan it is the password. |
-| `tunnel_protocol` | server/client | Tunnel protocol: `custom`, `vless`, `vmess`, or `trojan`. |
+| `token` | server/client | Authentication material. For `native` it is a shared token, for VLESS/VMess it is a UUID, and for Trojan it is the password. |
+| `tunnel_protocol` | server/client | Tunnel protocol: `native`, `vless`, `vmess`, or `trojan`. |
 | `tunnel_transport` | server/client | Carrier transport: `raw`, `ws`, `h2`, or `h3`. |
 | `tunnel_path` | server/client | HTTP/WebSocket path for `ws`, `h2`, and `h3`; raw transport usually ignores it. |
 | `tunnel_tls` | client | Whether the client uses TLS for raw/ws/h2 transport. HTTP/3 always uses QUIC/TLS. |
@@ -85,7 +87,7 @@ bin/proxy client --config /etc/proxy/client.json
 | `tunnel_tls_insecure` | client | Skip TLS certificate verification. Use only for tests. |
 | `tunnel_security` | server/client | Extra security layer. Currently used for VLESS REALITY with value `reality`. |
 | `tunnel_flow` | server/client | VLESS flow, for example `xtls-rprx-vision`. |
-| `tunnel_mux` | server/client | Enables this project's tunnel multiplexing. Currently supported by `custom`. |
+| `tunnel_mux` | server/client | Enables this project's tunnel multiplexing. Currently supported by `native`. |
 | `upstream_protocol` | client/local | Upstream protocol used for parsed proxy traffic: `socks5` or `mixed`. |
 | `socks5_username` | client/local | Local SOCKS5 username. Setting username or password enables username/password auth for SOCKS5 clients. |
 | `socks5_password` | client/local | Local SOCKS5 password. |
@@ -98,7 +100,7 @@ Route fields live in `route.json`, not in `server.json`, `client.json`, or `conf
 
 | Field | Modes | Meaning |
 | --- | --- | --- |
-| `force_upstream` | client/local | Force-upstream routing rules by domain, prefix, suffix, IP, CIDR, or IP range. |
+| `force_upstream` | client/local | Force-upstream routing rules by domain, domain regex, suffix, IP, CIDR, or IP range. |
 
 ## Transport Choices
 
@@ -113,14 +115,14 @@ Route fields live in `route.json`, not in `server.json`, `client.json`, or `conf
 
 | Protocol | TCP | SOCKS5 UDP relay | Tunnel mux | TLS | REALITY/Vision | Xray compatibility target |
 | --- | --- | --- | --- | --- | --- | --- |
-| custom | yes | yes | yes | yes | no | Not applicable |
+| native | yes | yes | yes | yes | no | Not applicable |
 | vless | yes | no | no | yes | yes | VLESS TCP, REALITY/Vision |
 | vmess | yes | no | no | yes | no | VMess AEAD TCP, security none |
 | trojan | yes | no | no | recommended | no | Trojan TCP |
 
 ## Which Protocol Should I Use?
 
-- Use `custom` when both sides run this project and you want the best feature coverage.
+- Use `native` when both sides run this project and you want the best feature coverage.
 - Use `vless` when you need VLESS or Xray REALITY/Vision compatibility.
 - Use `vmess` when you need Xray VMess AEAD TCP compatibility with `security: "none"`.
 - Use `trojan` when you need Trojan TCP compatibility, usually with raw TLS.

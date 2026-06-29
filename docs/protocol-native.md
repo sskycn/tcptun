@@ -1,8 +1,8 @@
-# Custom Protocol
+# Native Protocol
 
-Chinese version: [protocol-custom.zh-CN.md](protocol-custom.zh-CN.md)
+Chinese version: [protocol-native.zh-CN.md](protocol-native.zh-CN.md)
 
-`custom` is this project's native tunnel protocol and the default protocol. It is designed for project-owned client/server deployments where low overhead and full feature coverage matter more than compatibility with external proxy stacks.
+`native` is this project's native tunnel protocol and the default protocol. It is designed for project-owned client/server deployments where low overhead and full feature coverage matter more than compatibility with external proxy stacks.
 
 ## Best For
 
@@ -27,10 +27,10 @@ Chinese version: [protocol-custom.zh-CN.md](protocol-custom.zh-CN.md)
 
 | Field | Side | Meaning |
 | --- | --- | --- |
-| `tunnel_protocol: "custom"` | server/client | Enables the native protocol. |
+| `tunnel_protocol: "native"` | server/client | Enables the native protocol. |
 | `token` | server/client | Shared authentication token. Production deployments should always set it. |
 | `tunnel_transport` | server/client | Carrier transport. `raw` is the default and has the lowest overhead. |
-| `tunnel_mux` | server/client | Enables multiplexing. Recommended for `custom`. |
+| `tunnel_mux` | server/client | Enables multiplexing. Recommended for `native`. |
 | `tunnel_path` | server/client | Path used by WebSocket/HTTP transports. Raw transport can keep the default. |
 | `tunnel_tls` | client | Enables TLS from client to server. |
 | `tunnel_tls_cert` / `tunnel_tls_key` | server | TLS certificate and private key for the server. |
@@ -46,14 +46,14 @@ bin/proxy config
 Non-interactive:
 
 ```sh
-bin/proxy config --protocol custom --server-addr proxy.example.com:9443
+bin/proxy config --protocol native --server-addr proxy.example.com:9443
 ```
 
 WebSocket over TLS:
 
 ```sh
 bin/proxy config \
-  --protocol custom \
+  --protocol native \
   --transport ws \
   --server-addr proxy.example.com:443 \
   --tunnel-path /proxy \
@@ -68,7 +68,7 @@ bin/proxy config \
   "mode": "server",
   "listen_addr": "0.0.0.0:9443",
   "token": "CHANGE_ME_RANDOM_TOKEN",
-  "tunnel_protocol": "custom",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
   "tunnel_mux": true
@@ -83,7 +83,7 @@ bin/proxy config \
   "listen_addr": "127.0.0.1:1080",
   "server_addr": "proxy.example.com:9443",
   "token": "CHANGE_ME_RANDOM_TOKEN",
-  "tunnel_protocol": "custom",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
   "tunnel_mux": true,
@@ -100,7 +100,7 @@ Server:
   "mode": "server",
   "listen_addr": "0.0.0.0:443",
   "token": "CHANGE_ME_RANDOM_TOKEN",
-  "tunnel_protocol": "custom",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_tls_cert": "/etc/proxy/server.crt",
   "tunnel_tls_key": "/etc/proxy/server.key"
@@ -115,7 +115,7 @@ Client:
   "listen_addr": "127.0.0.1:1080",
   "server_addr": "proxy.example.com:443",
   "token": "CHANGE_ME_RANDOM_TOKEN",
-  "tunnel_protocol": "custom",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_tls": true,
   "tunnel_tls_server_name": "proxy.example.com"
@@ -124,7 +124,7 @@ Client:
 
 ## Multiplexing
 
-`custom` supports tunnel multiplexing. With mux enabled, the client keeps one shared tunnel transport connection and opens one logical stream per proxied TCP connection or UDP relay.
+`native` supports tunnel multiplexing. With mux enabled, the client keeps one shared tunnel transport connection and opens one logical stream per proxied TCP connection or UDP relay.
 
 Recommendations:
 

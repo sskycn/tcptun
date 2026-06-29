@@ -22,10 +22,10 @@ func TestApplyModeConfigPathDefault(t *testing.T) {
 	}
 
 	cfg = proxypkg.DefaultConfig()
-	cfg.ConfigPath = "/tmp/custom.json"
+	cfg.ConfigPath = "/tmp/explicit.json"
 	applyModeConfigPathDefault(&cfg, "server.json")
-	if cfg.ConfigPath != "/tmp/custom.json" {
-		t.Fatalf("custom config path = %q", cfg.ConfigPath)
+	if cfg.ConfigPath != "/tmp/explicit.json" {
+		t.Fatalf("explicit config path = %q", cfg.ConfigPath)
 	}
 
 	cfg = proxypkg.DefaultConfig()

@@ -14,7 +14,7 @@ English | [简体中文](README.zh-CN.md)
 - Supports username/password authentication for the local SOCKS5 listener.
 - Uses SOCKS5 for upstream traffic by default; `mixed` upstream mode is also supported.
 - Supports username/password authentication when dialing an upstream SOCKS5 gateway.
-- Supports `proxy`, `proxy local`, `proxy client`, and `proxy server` commands with configurable tunnel protocols: `custom`, `vless`, `vmess`, and `trojan`.
+- Supports `proxy`, `proxy local`, `proxy client`, and `proxy server` commands with configurable tunnel protocols: `native`, `vless`, `vmess`, and `trojan`.
 - Carries the client/server tunnel over raw TCP, WebSocket, HTTP/2, or HTTP/3 transport.
 - Multiplexes client/server tunnel streams by default, so many TCP connections and UDP relays can share one upstream tunnel transport connection.
 - Supports SOCKS5 UDP ASSOCIATE for UDP relay traffic.
@@ -25,7 +25,7 @@ English | [简体中文](README.zh-CN.md)
 - Periodically refreshes the reachable upstream so new connections follow network changes.
 - Connects directly to private, loopback, link-local, `localhost`, and `.local` targets instead of forwarding them upstream.
 - Tries direct TCP connections first; if a target cannot be reached directly, remembers that target and sends later connections upstream immediately.
-- Supports `route.json` force-upstream rules by exact domain, domain prefix, domain suffix, exact IP, and IP CIDR/range.
+- Supports `route.json` force-upstream rules by exact domain, domain regex, domain suffix, exact IP, and IP CIDR/range.
 - Writes learned direct-failure targets back to `route.json` before exit, creating the file when needed and deduplicating existing rules.
 - Uses `pkg.gostartkit.com/cmd v0.2.1` for the command-line interface.
 
@@ -221,7 +221,7 @@ While running, the proxy checks local IPv4 addresses every `--refresh-interval`.
 
 ## Internal Address Bypass
 
-For SOCKS5, SOCKS5 UDP ASSOCIATE, HTTP CONNECT, and HTTP proxy requests, the proxy inspects the requested target. Force-upstream rules in `route.json` have the highest priority. Otherwise, TCP targets are tried directly first. If direct TCP connection fails, that target is remembered as upstream-only and later connections skip the direct attempt. UDP targets keep the conservative rule: internal targets go direct, other targets go upstream.
+For SOCKS5, SOCKS5 UDP ASSOCIATE, HTTP CONNECT, and HTTP proxy requests, the proxy inspects the requested target. Force-upstream rules in `route.json` have the highest priority. Otherwise, TCP targets are tried directly first. If direct TCP connection fails, that target is remembered as upstream-only and later connections skip the direct attempt. Plain HTTP requests that normally have no request body also require a first response byte within `direct_probe_timeout`; this prevents targets that accept TCP but never return content from stalling the request. UDP targets keep the conservative rule: internal targets go direct, other targets go upstream.
 
 ## Upstream Protocol
 
@@ -233,7 +233,7 @@ In `mixed` mode, HTTP proxy traffic and unknown mixed traffic are forwarded to t
 
 ## Client/Server Commands
 
-Detailed protocol startkit docs are available in [docs/startkit.md](docs/startkit.md), with separate pages for `custom`, `vless`, `vmess`, and `trojan`.
+Detailed protocol startkit docs are available in [docs/startkit.md](docs/startkit.md), with separate pages for `native`, `vless`, `vmess`, and `trojan`.
 
 Running `proxy` without a subcommand defaults to local mode. If `config.json` contains top-level `"mode": "client"`, `"mode": "server"`, or `"mode": "local"`, that mode is used instead. Explicit `proxy local`, `proxy client`, and `proxy server` subcommands always take priority over the config mode.
 
@@ -245,11 +245,11 @@ Running `proxy` without a subcommand defaults to local mode. If `config.json` co
 
 By default, `proxy server` reads `server.json` next to the executable and `proxy client` reads `client.json` next to the executable. Passing `--config <path>` still overrides those mode defaults; passing `--config ""` disables runtime config loading.
 
-`proxy config` generates ready-to-edit JSON config files without starting the proxy. Running it without flags starts an interactive wizard backed by the command runtime; press Enter to accept defaults, or enter values for the fields you want to customize. Passing flags keeps non-interactive generation for scripts. By default it writes `server.json`, `client.json`, and `route.json`, shares one generated token between server/client configs, and accepts `--protocol custom|vless|vmess|trojan`.
+`proxy config` generates ready-to-edit JSON config files without starting the proxy. Running it without flags starts an interactive wizard backed by the command runtime; press Enter to accept defaults, or enter values for the fields you want to adjust. Passing flags keeps non-interactive generation for scripts. By default it writes `server.json`, `client.json`, and `route.json`, shares one generated token between server/client configs, and accepts `--protocol native|vless|vmess|trojan`.
 
 ```sh
 bin/proxy config
-bin/proxy config --protocol custom --server-addr proxy.example.com:9443
+bin/proxy config --protocol native --server-addr proxy.example.com:9443
 bin/proxy config --protocol vmess --server-addr proxy.example.com:9443
 bin/proxy config --protocol trojan --transport raw --tls --tls-cert server.crt --tls-key server.key --tls-server-name proxy.example.com
 bin/proxy config --target client --output client.json --protocol vless --server-addr proxy.example.com:9443
@@ -274,7 +274,7 @@ Raw transport can also run inside TLS: use client `--tls` and server `--tls-cert
 
 The tunnel protocol is selected with `--tunnel-protocol` or `tunnel_protocol` in `config.json`:
 
-- `custom`: this project's compact protocol. This is the default, supports TCP, SOCKS5 UDP relay, and tunnel multiplexing.
+- `native`: this project's compact protocol. This is the default, supports TCP, SOCKS5 UDP relay, and tunnel multiplexing.
 - `vless`: VLESS-style TCP request framing. `--token` must be a UUID.
 - `trojan`: standard Trojan TCP request framing. `--token` is used as the Trojan password. For common Xray Trojan deployments, use raw transport with client `--tls` and server `--tls-cert` plus `--tls-key`.
 - `vmess`: Xray-compatible VMess AEAD TCP request framing. `--token` must be a UUID and is used as the VMess user id. The compatibility target is `security: "none"` with AEAD header and Xray's default chunk stream/chunk masking options; AES-GCM, ChaCha20-Poly1305, VMess UDP, mux command, global padding, and authenticated length are not supported.
@@ -283,7 +283,7 @@ For Xray REALITY/Vision client compatibility, use `proxy client` with `--transpo
 
 For Xray REALITY/Vision server compatibility, use `proxy server` with `--transport raw`, `--tunnel-protocol vless`, `--tunnel-security reality`, and `--flow xtls-rprx-vision`. REALITY server mode requires `--reality-private-key`, `--reality-server-names`, and a fallback `--reality-dest` such as `example.com:443`. `proxy config` can auto-generate `reality_private_key` and derive the matching client `reality_public_key`. `--reality-short-ids` can restrict allowed shortIds; if omitted, the empty shortId is allowed. The Xray client must use the matching public key, server name, shortId, UUID, and flow.
 
-Only `custom` currently supports SOCKS5 UDP relay and tunnel multiplexing. `vless`, `vmess`, and `trojan` carry TCP streams over the selected transport.
+Only `native` currently supports SOCKS5 UDP relay and tunnel multiplexing. `vless`, `vmess`, and `trojan` carry TCP streams over the selected transport.
 
 Tunnel multiplexing is enabled by default. With multiplexing enabled, `proxy client` keeps a shared tunnel transport connection to `proxy server`, then opens one logical stream for each proxied TCP connection or UDP relay. This reduces WebSocket/HTTP/2/HTTP/3 handshakes and works better behind HTTP/CDN infrastructure. Use `--mux=false` or `"tunnel_mux": false` to fall back to one tunnel transport connection per proxied stream.
 
@@ -315,7 +315,7 @@ bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-pat
 
 ## Route Config
 
-Runtime configuration and route rules live in separate files. By default, local mode and `proxy` without a subcommand read runtime settings from `config.json`, `proxy server` reads runtime settings from `server.json`, and `proxy client` reads runtime settings from `client.json`. Route rules are always read from `route.json` next to the executable unless `--route-config <path>` is provided. Use `--route-config ""` to disable route loading and write-back.
+Runtime configuration and route rules live in separate files. By default, local mode and `proxy` without a subcommand read runtime settings from `config.json`, `proxy server` reads runtime settings from `server.json`, and `proxy client` reads runtime settings from `client.json`. Route rules use `route.json` unless `--route-config <path>` is provided. Relative config paths are searched in this order: executable directory, current working directory, then `~/.config/proxy`. If no file exists, write-back uses the executable directory. Use `--route-config ""` to disable route loading and write-back.
 
 Runtime config example:
 
@@ -328,7 +328,8 @@ Runtime config example:
   "socks5_password": "",
   "upstream_socks5_username": "",
   "upstream_socks5_password": "",
-  "tunnel_protocol": "custom",
+  "direct_probe_timeout": "500ms",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_security": "none",
   "tunnel_path": "/proxy",
@@ -342,7 +343,7 @@ Route config example:
 {
   "force_upstream": {
     "domains": ["x.com", "twitter.com"],
-    "domain_prefixes": ["api.", "pbs.twimg."],
+    "domain_regexes": ["^api\\.", "^pbs\\.twimg\\."],
     "domain_suffixes": ["x.com", "twitter.com"],
     "ips": ["8.8.8.8"],
     "ip_cidrs": ["1.1.1.0/24", "2001:4860:4860::/48"],
@@ -354,12 +355,12 @@ Route config example:
 Rule behavior:
 
 - `domains`: exact host match.
-- `domain_prefixes`: host starts with the configured value.
+- `domain_regexes`: Go/RE2 regular expressions matched against the normalized lowercase host.
 - `domain_suffixes`: matches the domain itself and its subdomains.
 - `ips`: exact IP match.
 - `ip_cidrs` and `ip_ranges`: CIDR prefix match. `ip_ranges` is an alias for CIDR-style ranges.
 
-Before exit, learned direct TCP failures are merged into `route.json` or the configured `--route-config` file. Failed domain targets are appended to `domains`, and failed IP targets are appended to `ips`. If an existing exact domain, domain prefix, domain suffix, exact IP, or IP CIDR/range already covers the target, nothing is added.
+Before exit, learned direct TCP failures are merged into `route.json` or the configured `--route-config` file. Failed domain targets are appended to `domains`, and failed IP targets are appended to `ips`. If an existing exact domain, domain regex, domain suffix, exact IP, or IP CIDR/range already covers the target, nothing is added. When more than three subdomains under the same registrable domain appear in `domains`, that registrable domain is promoted to `domain_suffixes`, covered `domains` entries are removed, and `domain_suffixes` is deduplicated and sorted.
 
 ## UDP Support
 
@@ -382,6 +383,7 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 -c, --config <string>       JSON runtime config path; defaults by mode; empty disables runtime config loading [default: "config.json"]
 --route-config <string>     JSON route config path; empty disables route loading and write-back [default: "route.json"]
 --dial-timeout <duration>   upstream dial timeout [default: 5s]
+--direct-probe-timeout <duration> timeout waiting for the first byte from a direct HTTP target before falling back upstream [default: 500ms]
 --gateway-ip <string>       gateway IP; empty means auto-detect
 -p, --gateway-port <int>    gateway proxy port [default: 1080]
 -l, --listen <string>       local listen address [default: "127.0.0.1:1080"]
@@ -399,9 +401,9 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 `proxy client` adds:
 
 ```text
---server-addr <string>      custom tunnel server address
+--server-addr <string>      tunnel server address
 --token <string>            shared token, VLESS/VMess UUID, or Trojan password
---tunnel-protocol <string>  tunnel protocol: custom, vless, vmess, or trojan [default: custom]
+--tunnel-protocol <string>  tunnel protocol: native, vless, vmess, or trojan [default: native]
 --tunnel-security <string>  tunnel security: none or reality [default: none]
 --flow <string>             VLESS flow, for example xtls-rprx-vision
 --transport <string>        tunnel transport: raw, ws, h2, or h3 [default: raw]
@@ -421,7 +423,7 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 
 ```text
 --token <string>            shared token, VLESS/VMess UUID, or Trojan password
---tunnel-protocol <string>  tunnel protocol: custom, vless, vmess, or trojan [default: custom]
+--tunnel-protocol <string>  tunnel protocol: native, vless, vmess, or trojan [default: native]
 --tunnel-security <string>  tunnel security: none or reality [default: none]
 --flow <string>             VLESS flow, for example xtls-rprx-vision
 --transport <string>        tunnel transport: raw, ws, h2, or h3 [default: raw]

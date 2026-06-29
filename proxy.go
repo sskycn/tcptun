@@ -26,7 +26,7 @@ const (
 	TunnelTransportWS      = "ws"
 	TunnelTransportH2      = "h2"
 	TunnelTransportH3      = "h3"
-	TunnelProtocolCustom   = "custom"
+	TunnelProtocolNative   = "native"
 	TunnelProtocolVLESS    = "vless"
 	TunnelProtocolVMess    = "vmess"
 	TunnelProtocolTrojan   = "trojan"
@@ -43,7 +43,7 @@ const (
 	tunnelTransportWS      = TunnelTransportWS
 	tunnelTransportH2      = TunnelTransportH2
 	tunnelTransportH3      = TunnelTransportH3
-	tunnelProtocolCustom   = TunnelProtocolCustom
+	tunnelProtocolNative   = TunnelProtocolNative
 	tunnelProtocolVLESS    = TunnelProtocolVLESS
 	tunnelProtocolVMess    = TunnelProtocolVMess
 	tunnelProtocolTrojan   = TunnelProtocolTrojan
@@ -88,6 +88,7 @@ type Config struct {
 	ConfigPath             string
 	RouteConfigPath        string
 	DialTimeout            time.Duration
+	DirectProbeTimeout     time.Duration
 	RefreshInterval        time.Duration
 	ScanTimeout            time.Duration
 	ScanWorkers            int
@@ -103,22 +104,23 @@ func DefaultConfig() Config {
 
 func defaultConfig() Config {
 	return Config{
-		ListenAddr:       "127.0.0.1:1080",
-		Mode:             proxyModeLocal,
-		TunnelProtocol:   tunnelProtocolCustom,
-		TunnelSecurity:   tunnelSecurityNone,
-		TunnelTransport:  tunnelTransportRaw,
-		TunnelPath:       "/proxy",
-		TunnelMux:        true,
-		GatewayPort:      1080,
-		UpstreamProtocol: upstreamProtocolSOCKS5,
-		ConfigPath:       "config.json",
-		RouteConfigPath:  "route.json",
-		DialTimeout:      5 * time.Second,
-		RefreshInterval:  5 * time.Second,
-		ScanTimeout:      250 * time.Millisecond,
-		ScanWorkers:      max(64, runtime.GOMAXPROCS(0)*32),
-		BufferSize:       32 * 1024,
+		ListenAddr:         "127.0.0.1:1080",
+		Mode:               proxyModeLocal,
+		TunnelProtocol:     tunnelProtocolNative,
+		TunnelSecurity:     tunnelSecurityNone,
+		TunnelTransport:    tunnelTransportRaw,
+		TunnelPath:         "/proxy",
+		TunnelMux:          true,
+		GatewayPort:        1080,
+		UpstreamProtocol:   upstreamProtocolSOCKS5,
+		ConfigPath:         "config.json",
+		RouteConfigPath:    "route.json",
+		DialTimeout:        5 * time.Second,
+		DirectProbeTimeout: 500 * time.Millisecond,
+		RefreshInterval:    5 * time.Second,
+		ScanTimeout:        250 * time.Millisecond,
+		ScanWorkers:        max(64, runtime.GOMAXPROCS(0)*32),
+		BufferSize:         32 * 1024,
 	}
 }
 
@@ -203,6 +205,9 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	if cfg.DialTimeout <= 0 {
 		cfg.DialTimeout = defaultConfig().DialTimeout
 	}
+	if cfg.DirectProbeTimeout <= 0 {
+		cfg.DirectProbeTimeout = defaultConfig().DirectProbeTimeout
+	}
 	if cfg.ScanTimeout <= 0 {
 		cfg.ScanTimeout = defaultConfig().ScanTimeout
 	}
@@ -235,6 +240,12 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 
 	if err := applyRuntimeConfigDefaults(&cfg); err != nil {
 		return err
+	}
+	if cfg.DirectProbeTimeout < 0 {
+		return fmt.Errorf("invalid direct probe timeout: %s", cfg.DirectProbeTimeout)
+	}
+	if cfg.DirectProbeTimeout == 0 {
+		cfg.DirectProbeTimeout = defaultConfig().DirectProbeTimeout
 	}
 	cfg.Mode, err = normalizeProxyMode(cfg.Mode)
 	if err != nil {
@@ -435,8 +446,8 @@ func normalizeTunnelTransport(value string) (string, error) {
 
 func normalizeTunnelProtocol(value string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", tunnelProtocolCustom:
-		return tunnelProtocolCustom, nil
+	case "", tunnelProtocolNative:
+		return tunnelProtocolNative, nil
 	case tunnelProtocolVLESS:
 		return tunnelProtocolVLESS, nil
 	case tunnelProtocolVMess:
@@ -444,7 +455,7 @@ func normalizeTunnelProtocol(value string) (string, error) {
 	case tunnelProtocolTrojan:
 		return tunnelProtocolTrojan, nil
 	default:
-		return "", fmt.Errorf("invalid tunnel protocol %q; supported values: %s, %s, %s, %s", value, tunnelProtocolCustom, tunnelProtocolVLESS, tunnelProtocolVMess, tunnelProtocolTrojan)
+		return "", fmt.Errorf("invalid tunnel protocol %q; supported values: %s, %s, %s, %s", value, tunnelProtocolNative, tunnelProtocolVLESS, tunnelProtocolVMess, tunnelProtocolTrojan)
 	}
 }
 
@@ -683,9 +694,13 @@ func (s *proxyServer) connectUpstreamRaw(ctx context.Context) (net.Conn, string,
 }
 
 func (s *proxyServer) bridge(upstream net.Conn, client net.Conn, clientReader io.Reader) error {
+	return s.bridgeWithReaders(upstream, client, upstream, clientReader)
+}
+
+func (s *proxyServer) bridgeWithReaders(upstream net.Conn, client net.Conn, upstreamReader io.Reader, clientReader io.Reader) error {
 	done := make(chan error, 2)
 	go s.copyAndClose(upstream, clientReader, done)
-	go s.copyAndClose(client, upstream, done)
+	go s.copyAndClose(client, upstreamReader, done)
 	if err := <-done; err != nil && !isExpectedNetworkClose(err) {
 		return err
 	}

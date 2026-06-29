@@ -166,4 +166,4 @@ bin/proxy server
 bin/proxy client
 ```
 
-VLESS currently carries TCP only. Use `custom` when you need UDP relay or tunnel mux.
+VLESS currently carries TCP only. Use `native` when you need UDP relay or tunnel mux.

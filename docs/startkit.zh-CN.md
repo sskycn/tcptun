@@ -4,7 +4,7 @@ English version: [startkit.md](startkit.md)
 
 本文档是本项目 client/server 模式的协议配置入口。每个隧道协议都有独立文档，便于按部署目标选择配置。
 
-- [Custom 协议](protocol-custom.zh-CN.md)
+- [Native 协议](protocol-native.zh-CN.md)
 - [VLESS 协议](protocol-vless.zh-CN.md)
 - [VMess 协议](protocol-vmess.zh-CN.md)
 - [Trojan 协议](protocol-trojan.zh-CN.md)
@@ -22,7 +22,7 @@ bin/proxy config
 直接生成指定协议配置：
 
 ```sh
-bin/proxy config --protocol custom --server-addr proxy.example.com:9443
+bin/proxy config --protocol native --server-addr proxy.example.com:9443
 bin/proxy config --protocol vless --server-addr proxy.example.com:9443
 bin/proxy config --protocol vmess --server-addr proxy.example.com:9443
 bin/proxy config --protocol trojan --server-addr proxy.example.com:443 --tls --tls-server-name proxy.example.com
@@ -36,9 +36,11 @@ bin/proxy config --protocol trojan --server-addr proxy.example.com:443 --tls --t
 
 默认运行规则：
 
-- `proxy server` 默认读取可执行文件所在目录下的 `server.json`。
-- `proxy client` 默认读取可执行文件所在目录下的 `client.json`。
-- `proxy` 或 `proxy local` 默认读取可执行文件所在目录下的 `config.json`。
+- `proxy server` 默认读取 `server.json`。
+- `proxy client` 默认读取 `client.json`。
+- `proxy` 或 `proxy local` 默认读取 `config.json`。
+- 相对配置路径按顺序搜索：程序所在目录、当前工作目录、`~/.config/proxy`。
+- 如果三个位置都不存在，写回时使用程序所在目录。
 - 显式传入 `--config <path>` 时使用指定配置文件。
 - 显式传入 `--config ""` 时禁用运行配置加载。
 - 显式传入 `--route-config <path>` 时使用指定路由配置。
@@ -74,8 +76,8 @@ bin/proxy client --config /etc/proxy/client.json
 | `mode` | server/client/local | 运行模式。`server` 监听隧道连接，`client` 本地开 mixed 代理并转发到隧道服务端，`local` 发现网关代理。 |
 | `listen_addr` | server/client/local | 本地监听地址。server 常用 `0.0.0.0:9443`，client/local 常用 `127.0.0.1:1080`。 |
 | `server_addr` | client | client 连接的隧道服务端地址，格式为 `host:port`。 |
-| `token` | server/client | 认证材料。不同协议含义不同：custom 是共享 token，VLESS/VMess 是 UUID，Trojan 是 password。 |
-| `tunnel_protocol` | server/client | 隧道协议：`custom`、`vless`、`vmess`、`trojan`。 |
+| `token` | server/client | 认证材料。不同协议含义不同：native 是共享 token，VLESS/VMess 是 UUID，Trojan 是 password。 |
+| `tunnel_protocol` | server/client | 隧道协议：`native`、`vless`、`vmess`、`trojan`。 |
 | `tunnel_transport` | server/client | 承载层：`raw`、`ws`、`h2`、`h3`。 |
 | `tunnel_path` | server/client | WebSocket、HTTP/2、HTTP/3 使用的路径，例如 `/proxy`。raw transport 通常不关心该值。 |
 | `tunnel_tls` | client | client 是否用 TLS 连接服务端。raw/ws/h2 可用；h3 固定使用 HTTPS/QUIC。 |
@@ -85,7 +87,7 @@ bin/proxy client --config /etc/proxy/client.json
 | `tunnel_tls_insecure` | client | 是否跳过 TLS 证书校验。只用于测试或临时环境。 |
 | `tunnel_security` | server/client | 额外安全层。目前主要用于 VLESS REALITY，值为 `reality`。普通 TLS 不写在这里。 |
 | `tunnel_flow` | server/client | VLESS flow，例如 `xtls-rprx-vision`。 |
-| `tunnel_mux` | server/client | 是否开启本项目 tunnel 多路复用。当前只有 custom 协议支持。 |
+| `tunnel_mux` | server/client | 是否开启本项目 tunnel 多路复用。当前只有 native 协议支持。 |
 | `upstream_protocol` | client/local | 走上游时使用的本地上游协议，支持 `socks5` 和 `mixed`。 |
 | `socks5_username` | client/local | 本地 SOCKS5 用户名。用户名或密码任一非空时，会对 SOCKS5 客户端启用 username/password 认证。 |
 | `socks5_password` | client/local | 本地 SOCKS5 密码。 |
@@ -98,7 +100,7 @@ bin/proxy client --config /etc/proxy/client.json
 
 | 字段 | 适用模式 | 含义 |
 | --- | --- | --- |
-| `force_upstream` | client/local | 强制走上游规则，支持域名、域名前缀、域名后缀、IP、CIDR 和范围。 |
+| `force_upstream` | client/local | 强制走上游规则，支持域名、域名正则、域名后缀、IP、CIDR 和范围。 |
 
 ## Transport 选择
 
@@ -113,14 +115,14 @@ bin/proxy client --config /etc/proxy/client.json
 
 | 协议 | TCP | SOCKS5 UDP relay | tunnel mux | TLS | REALITY/Vision | Xray 兼容目标 |
 | --- | --- | --- | --- | --- | --- | --- |
-| custom | 支持 | 支持 | 支持 | 支持 | 不支持 | 不适用 |
+| native | 支持 | 支持 | 支持 | 支持 | 不支持 | 不适用 |
 | vless | 支持 | 不支持 | 不支持 | 支持 | 支持 | VLESS TCP，REALITY/Vision |
 | vmess | 支持 | 不支持 | 不支持 | 支持 | 不支持 | VMess AEAD TCP，security none |
 | trojan | 支持 | 不支持 | 不支持 | 推荐 | 不支持 | Trojan TCP |
 
 ## 配置建议
 
-- 自己控制 client/server 两端，并希望性能和功能优先：优先使用 `custom`。
+- 自己控制 client/server 两端，并希望性能和功能优先：优先使用 `native`。
 - 需要对接 Xray VLESS REALITY/Vision：使用 `vless`、`raw`、`tunnel_security: reality`。
 - 需要对接 Xray VMess AEAD TCP：使用 `vmess`，并确认对端是 `security: "none"`。
 - 需要 Trojan 兼容：使用 `trojan`，通常搭配 `raw` + TLS。

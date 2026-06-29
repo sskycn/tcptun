@@ -7,49 +7,99 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"time"
+
+	"golang.org/x/net/publicsuffix"
 )
+
+const domainSuffixPromotionThreshold = 3
+
+const obsoleteRouteDomainStartsWithField = "domain_" + "prefixes"
 
 type routeConfigFile struct {
 	ForceUpstream forceUpstreamConfig `json:"force_upstream"`
 }
 
 type runtimeConfigFile struct {
-	Mode                   string   `json:"mode,omitempty"`
-	ListenAddr             string   `json:"listen_addr,omitempty"`
-	ServerAddr             string   `json:"server_addr,omitempty"`
-	Token                  string   `json:"token,omitempty"`
-	TunnelProtocol         string   `json:"tunnel_protocol,omitempty"`
-	TunnelTransport        string   `json:"tunnel_transport,omitempty"`
-	TunnelPath             string   `json:"tunnel_path,omitempty"`
-	TunnelTLS              bool     `json:"tunnel_tls,omitempty"`
-	TunnelTLSCert          string   `json:"tunnel_tls_cert,omitempty"`
-	TunnelTLSKey           string   `json:"tunnel_tls_key,omitempty"`
-	TunnelTLSServerName    string   `json:"tunnel_tls_server_name,omitempty"`
-	TunnelTLSInsecure      bool     `json:"tunnel_tls_insecure,omitempty"`
-	TunnelSecurity         string   `json:"tunnel_security,omitempty"`
-	TunnelFlow             string   `json:"tunnel_flow,omitempty"`
-	RealityServerName      string   `json:"reality_server_name,omitempty"`
-	RealityServerNames     []string `json:"reality_server_names,omitempty"`
-	RealityFingerprint     string   `json:"reality_fingerprint,omitempty"`
-	RealityPublicKey       string   `json:"reality_public_key,omitempty"`
-	RealityPrivateKey      string   `json:"reality_private_key,omitempty"`
-	RealityShortID         string   `json:"reality_short_id,omitempty"`
-	RealityShortIDs        []string `json:"reality_short_ids,omitempty"`
-	RealityDest            string   `json:"reality_dest,omitempty"`
-	RealitySpiderX         string   `json:"reality_spider_x,omitempty"`
-	TunnelMux              *bool    `json:"tunnel_mux,omitempty"`
-	UpstreamProtocol       string   `json:"upstream_protocol,omitempty"`
-	SOCKS5Username         string   `json:"socks5_username,omitempty"`
-	SOCKS5Password         string   `json:"socks5_password,omitempty"`
-	UpstreamSOCKS5Username string   `json:"upstream_socks5_username,omitempty"`
-	UpstreamSOCKS5Password string   `json:"upstream_socks5_password,omitempty"`
+	Mode                   string         `json:"mode,omitempty"`
+	ListenAddr             string         `json:"listen_addr,omitempty"`
+	ServerAddr             string         `json:"server_addr,omitempty"`
+	Token                  string         `json:"token,omitempty"`
+	TunnelProtocol         string         `json:"tunnel_protocol,omitempty"`
+	TunnelTransport        string         `json:"tunnel_transport,omitempty"`
+	TunnelPath             string         `json:"tunnel_path,omitempty"`
+	TunnelTLS              bool           `json:"tunnel_tls,omitempty"`
+	TunnelTLSCert          string         `json:"tunnel_tls_cert,omitempty"`
+	TunnelTLSKey           string         `json:"tunnel_tls_key,omitempty"`
+	TunnelTLSServerName    string         `json:"tunnel_tls_server_name,omitempty"`
+	TunnelTLSInsecure      bool           `json:"tunnel_tls_insecure,omitempty"`
+	TunnelSecurity         string         `json:"tunnel_security,omitempty"`
+	TunnelFlow             string         `json:"tunnel_flow,omitempty"`
+	RealityServerName      string         `json:"reality_server_name,omitempty"`
+	RealityServerNames     []string       `json:"reality_server_names,omitempty"`
+	RealityFingerprint     string         `json:"reality_fingerprint,omitempty"`
+	RealityPublicKey       string         `json:"reality_public_key,omitempty"`
+	RealityPrivateKey      string         `json:"reality_private_key,omitempty"`
+	RealityShortID         string         `json:"reality_short_id,omitempty"`
+	RealityShortIDs        []string       `json:"reality_short_ids,omitempty"`
+	RealityDest            string         `json:"reality_dest,omitempty"`
+	RealitySpiderX         string         `json:"reality_spider_x,omitempty"`
+	TunnelMux              *bool          `json:"tunnel_mux,omitempty"`
+	UpstreamProtocol       string         `json:"upstream_protocol,omitempty"`
+	SOCKS5Username         string         `json:"socks5_username,omitempty"`
+	SOCKS5Password         string         `json:"socks5_password,omitempty"`
+	UpstreamSOCKS5Username string         `json:"upstream_socks5_username,omitempty"`
+	UpstreamSOCKS5Password string         `json:"upstream_socks5_password,omitempty"`
+	DirectProbeTimeout     configDuration `json:"direct_probe_timeout,omitempty"`
+}
+
+type configDuration struct {
+	value time.Duration
+	set   bool
+}
+
+func (d *configDuration) UnmarshalJSON(data []byte) error {
+	if d == nil {
+		return errors.New("duration target is nil")
+	}
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*d = configDuration{}
+		return nil
+	}
+	if strings.HasPrefix(trimmed, "\"") {
+		var text string
+		if err := json.Unmarshal(data, &text); err != nil {
+			return err
+		}
+		text = strings.TrimSpace(text)
+		if text == "" {
+			*d = configDuration{}
+			return nil
+		}
+		duration, err := time.ParseDuration(text)
+		if err != nil {
+			return err
+		}
+		d.value = duration
+		d.set = true
+		return nil
+	}
+	var nanos int64
+	if err := json.Unmarshal(data, &nanos); err != nil {
+		return err
+	}
+	d.value = time.Duration(nanos)
+	d.set = true
+	return nil
 }
 
 type forceUpstreamConfig struct {
 	Domains        []string `json:"domains"`
-	DomainPrefixes []string `json:"domain_prefixes"`
+	DomainRegexes  []string `json:"domain_regexes"`
 	DomainSuffixes []string `json:"domain_suffixes"`
 	IPCIDRs        []string `json:"ip_cidrs"`
 	IPRanges       []string `json:"ip_ranges"`
@@ -62,7 +112,7 @@ type routeRules struct {
 
 type forceUpstreamRules struct {
 	domains        map[string]struct{}
-	domainPrefixes []string
+	domainRegexes  []*regexp.Regexp
 	domainSuffixes []string
 	ipPrefixes     []netip.Prefix
 }
@@ -200,6 +250,9 @@ func applyRuntimeConfigDefaults(cfg *config) error {
 	if strings.TrimSpace(cfg.UpstreamSOCKS5Password) == "" {
 		cfg.UpstreamSOCKS5Password = fileCfg.UpstreamSOCKS5Password
 	}
+	if fileCfg.DirectProbeTimeout.set && (cfg.DirectProbeTimeout <= 0 || cfg.DirectProbeTimeout == DefaultConfig().DirectProbeTimeout) {
+		cfg.DirectProbeTimeout = fileCfg.DirectProbeTimeout.value
+	}
 	return nil
 }
 
@@ -211,12 +264,57 @@ func resolveConfigPath(path string) (string, error) {
 	if filepath.IsAbs(trimmed) {
 		return trimmed, nil
 	}
-	executable, err := os.Executable()
+	searchDirs, err := configSearchDirs()
 	if err != nil {
 		return "", err
 	}
+	for _, dir := range searchDirs {
+		candidate := filepath.Join(dir, trimmed)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+	}
+	if len(searchDirs) == 0 {
+		return "", errors.New("config search directories are empty")
+	}
+	return filepath.Join(searchDirs[0], trimmed), nil
+}
+
+func configSearchDirs() ([]string, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
 	executableDir := filepath.Dir(executable)
-	return filepath.Join(executableDir, trimmed), nil
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	dirs := make([]string, 0, 3)
+	dirs = appendUniquePath(dirs, executableDir)
+	dirs = appendUniquePath(dirs, workingDir)
+	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
+		dirs = appendUniquePath(dirs, filepath.Join(home, ".config", "proxy"))
+	} else if err != nil && len(dirs) == 0 {
+		return nil, err
+	}
+	return dirs, nil
+}
+
+func appendUniquePath(paths []string, path string) []string {
+	cleaned := filepath.Clean(strings.TrimSpace(path))
+	if cleaned == "." || cleaned == "" {
+		return paths
+	}
+	for _, existing := range paths {
+		if existing == cleaned {
+			return paths
+		}
+	}
+	return append(paths, cleaned)
 }
 
 func readRouteConfig(path string) (routeConfigFile, error) {
@@ -262,7 +360,7 @@ func readRuntimeConfig(path string) (runtimeConfigFile, error) {
 }
 
 func persistDirectFailures(path string, hosts []string) error {
-	if strings.TrimSpace(path) == "" || len(hosts) == 0 {
+	if strings.TrimSpace(path) == "" {
 		return nil
 	}
 
@@ -271,26 +369,73 @@ func persistDirectFailures(path string, hosts []string) error {
 		if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
+		if len(hosts) == 0 {
+			return nil
+		}
 		cfg = routeConfigFile{}
+	}
+	obsolete, err := routeConfigHasObsoleteFields(path)
+	if err != nil {
+		return err
 	}
 
 	changed, err := mergeDirectFailures(&cfg.ForceUpstream, hosts)
 	if err != nil {
 		return err
 	}
-	if !changed {
+	if !changed && !obsolete {
 		return nil
 	}
 	return writeRouteConfig(path, cfg)
 }
 
+func routeConfigHasObsoleteFields(path string) (bool, error) {
+	if strings.TrimSpace(path) == "" {
+		return false, nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	var raw map[string]json.RawMessage
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&raw); err != nil {
+		closeErr := file.Close()
+		if closeErr != nil {
+			return false, errors.Join(err, closeErr)
+		}
+		return false, err
+	}
+	if err := file.Close(); err != nil {
+		return false, err
+	}
+
+	forceRaw, ok := raw["force_upstream"]
+	if !ok {
+		return false, nil
+	}
+	var force map[string]json.RawMessage
+	if err := json.Unmarshal(forceRaw, &force); err != nil {
+		return false, err
+	}
+	_, ok = force[obsoleteRouteDomainStartsWithField]
+	return ok, nil
+}
+
 func mergeDirectFailures(cfg *forceUpstreamConfig, hosts []string) (bool, error) {
+	if cfg == nil {
+		return false, errors.New("force upstream config is nil")
+	}
+	before := forceUpstreamConfigSignature(*cfg)
 	rules, err := compileForceUpstreamRules(*cfg)
 	if err != nil {
 		return false, err
 	}
 
-	changed := false
 	for _, host := range hosts {
 		normalized := normalizeTargetHost(host)
 		if normalized == "" || rules.matches(normalized) {
@@ -301,17 +446,105 @@ func mergeDirectFailures(cfg *forceUpstreamConfig, hosts []string) (bool, error)
 			if addErr := addIPPrefix(&rules, addr.String()); addErr != nil {
 				return false, addErr
 			}
-			changed = true
 			continue
 		}
 		cfg.Domains = appendUniqueNormalized(cfg.Domains, normalized)
 		rules.domains[normalized] = struct{}{}
-		changed = true
 	}
-	if changed {
-		normalizeForceUpstreamConfig(cfg)
+	normalizeForceUpstreamConfig(cfg)
+	compactForceUpstreamDomainSuffixes(cfg)
+	normalizeForceUpstreamConfig(cfg)
+	return before != forceUpstreamConfigSignature(*cfg), nil
+}
+
+func compactForceUpstreamDomainSuffixes(cfg *forceUpstreamConfig) bool {
+	if cfg == nil {
+		return false
 	}
-	return changed, nil
+	before := forceUpstreamConfigSignature(*cfg)
+
+	suffixes := make(map[string]struct{}, len(cfg.DomainSuffixes))
+	for _, suffix := range cfg.DomainSuffixes {
+		normalized := strings.TrimPrefix(normalizeDomainRule(suffix), ".")
+		if normalized == "" {
+			continue
+		}
+		suffixes[normalized] = struct{}{}
+	}
+
+	subdomainsByBase := make(map[string]map[string]struct{})
+	for _, domain := range cfg.Domains {
+		normalized := normalizeDomainRule(domain)
+		if normalized == "" {
+			continue
+		}
+		base, ok := registrableDomain(normalized)
+		if !ok || normalized == base {
+			continue
+		}
+		if !strings.HasSuffix(normalized, "."+base) {
+			continue
+		}
+		subdomains := subdomainsByBase[base]
+		if subdomains == nil {
+			subdomains = make(map[string]struct{})
+			subdomainsByBase[base] = subdomains
+		}
+		subdomains[normalized] = struct{}{}
+	}
+
+	for base, subdomains := range subdomainsByBase {
+		if len(subdomains) > domainSuffixPromotionThreshold {
+			suffixes[base] = struct{}{}
+		}
+	}
+
+	if len(suffixes) == 0 {
+		return before != forceUpstreamConfigSignature(*cfg)
+	}
+	cfg.DomainSuffixes = cfg.DomainSuffixes[:0]
+	for suffix := range suffixes {
+		cfg.DomainSuffixes = append(cfg.DomainSuffixes, suffix)
+	}
+
+	domains := cfg.Domains[:0]
+	for _, domain := range cfg.Domains {
+		normalized := normalizeDomainRule(domain)
+		if normalized == "" || domainCoveredBySuffixes(normalized, suffixes) {
+			continue
+		}
+		domains = append(domains, normalized)
+	}
+	cfg.Domains = domains
+	normalizeForceUpstreamConfig(cfg)
+	return before != forceUpstreamConfigSignature(*cfg)
+}
+
+func registrableDomain(domain string) (string, bool) {
+	base, err := publicsuffix.EffectiveTLDPlusOne(domain)
+	if err != nil {
+		return "", false
+	}
+	base = normalizeDomainRule(base)
+	return base, base != ""
+}
+
+func domainCoveredBySuffixes(domain string, suffixes map[string]struct{}) bool {
+	for suffix := range suffixes {
+		if domain == suffix || strings.HasSuffix(domain, "."+suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func forceUpstreamConfigSignature(cfg forceUpstreamConfig) string {
+	return strings.Join(cfg.Domains, "\x00") + "\x01" +
+		strings.Join(cfg.DomainRegexes, "\x00") + "\x01" +
+		strings.Join(cfg.DomainSuffixes, "\x00") + "\x01" +
+		strings.Join(cfg.IPCIDRs, "\x00") + "\x01" +
+		strings.Join(cfg.IPRanges, "\x00") + "\x01" +
+		strings.Join(cfg.IPs, "\x00")
 }
 
 func writeRouteConfig(path string, cfg routeConfigFile) error {
@@ -339,12 +572,16 @@ func compileForceUpstreamRules(cfg forceUpstreamConfig) (forceUpstreamRules, err
 		}
 		rules.domains[normalized] = struct{}{}
 	}
-	for _, prefix := range cfg.DomainPrefixes {
-		normalized := normalizeDomainRule(prefix)
+	for _, pattern := range cfg.DomainRegexes {
+		normalized := normalizeRegexRule(pattern)
 		if normalized == "" {
 			continue
 		}
-		rules.domainPrefixes = append(rules.domainPrefixes, normalized)
+		compiled, err := regexp.Compile(normalized)
+		if err != nil {
+			return forceUpstreamRules{}, fmt.Errorf("invalid force_upstream domain regex %q: %w", pattern, err)
+		}
+		rules.domainRegexes = append(rules.domainRegexes, compiled)
 	}
 	for _, suffix := range cfg.DomainSuffixes {
 		normalized := normalizeDomainRule(suffix)
@@ -414,8 +651,8 @@ func (r forceUpstreamRules) matches(host string) bool {
 	if _, ok := r.domains[normalized]; ok {
 		return true
 	}
-	for _, prefix := range r.domainPrefixes {
-		if strings.HasPrefix(normalized, prefix) {
+	for _, regex := range r.domainRegexes {
+		if regex.MatchString(normalized) {
 			return true
 		}
 	}
@@ -435,9 +672,13 @@ func normalizeTargetHost(host string) string {
 	return normalizeDomainRule(trimHostBrackets(host))
 }
 
+func normalizeRegexRule(value string) string {
+	return strings.TrimSpace(value)
+}
+
 func normalizeForceUpstreamConfig(cfg *forceUpstreamConfig) {
 	cfg.Domains = normalizeUniqueStrings(cfg.Domains, normalizeDomainRule)
-	cfg.DomainPrefixes = normalizeUniqueStrings(cfg.DomainPrefixes, normalizeDomainRule)
+	cfg.DomainRegexes = normalizeUniqueStrings(cfg.DomainRegexes, normalizeRegexRule)
 	cfg.DomainSuffixes = normalizeUniqueStrings(cfg.DomainSuffixes, func(value string) string {
 		return strings.TrimPrefix(normalizeDomainRule(value), ".")
 	})

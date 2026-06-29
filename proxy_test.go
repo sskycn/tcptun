@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/binary"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -407,7 +408,7 @@ func TestLoadRouteRulesForceUpstreamMatchers(t *testing.T) {
 	configBody := []byte(`{
 		"force_upstream": {
 			"domains": ["exact.example.com"],
-			"domain_prefixes": ["api."],
+			"domain_regexes": ["^api\\.", "^assets-[0-9]+\\.example\\.net$"],
 			"domain_suffixes": ["x.com"],
 			"ip_cidrs": ["203.0.113.0/24"],
 			"ips": ["2001:db8::1"]
@@ -423,6 +424,7 @@ func TestLoadRouteRulesForceUpstreamMatchers(t *testing.T) {
 	for _, host := range []string{
 		"exact.example.com",
 		"api.example.com",
+		"assets-12.example.net",
 		"x.com",
 		"assets.x.com",
 		"203.0.113.8",
@@ -434,6 +436,7 @@ func TestLoadRouteRulesForceUpstreamMatchers(t *testing.T) {
 	}
 	for _, host := range []string{
 		"other.example.com",
+		"assets-x.example.net",
 		"notx.com",
 		"203.0.114.1",
 		"2001:db8::2",
@@ -441,6 +444,61 @@ func TestLoadRouteRulesForceUpstreamMatchers(t *testing.T) {
 		if rules.shouldForceUpstream(host) {
 			t.Fatalf("host %s should not force upstream", host)
 		}
+	}
+}
+
+func TestLoadRouteRulesRejectsInvalidDomainRegex(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	configBody := []byte(`{
+		"force_upstream": {
+			"domain_regexes": ["["]
+		}
+	}`)
+	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadRouteRules(configPath); err == nil {
+		t.Fatal("load route rules with invalid domain regex succeeded")
+	}
+}
+
+func TestPersistDirectFailuresRemovesObsoleteDomainStartsWithField(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	configBody, err := json.Marshal(map[string]any{
+		"force_upstream": map[string]any{
+			"domains":                          []string{"exact.example.com"},
+			obsoleteRouteDomainStartsWithField: []string{"api."},
+			"domain_regexes":                   []string{"^cdn\\."},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := persistDirectFailures(configPath, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["force_upstream"][obsoleteRouteDomainStartsWithField]; ok {
+		t.Fatal("obsolete domain starts-with field was not removed")
+	}
+	cfg, err := readRouteConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(cfg.ForceUpstream.DomainRegexes, ","), "^cdn\\."; got != want {
+		t.Fatalf("domain regexes = %q, want %q", got, want)
 	}
 }
 
@@ -501,6 +559,94 @@ func TestPersistDirectFailuresSkipsCoveredRules(t *testing.T) {
 	}
 }
 
+func TestPersistDirectFailuresDedupesAndSortsDomainSuffixes(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	configBody := []byte(`{
+		"force_upstream": {
+			"domains": ["api.x.com", "keep.example.net"],
+			"domain_suffixes": ["twitter.com", ".X.COM", "x.com", "apple.com"]
+		}
+	}`)
+	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := persistDirectFailures(configPath, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := readRouteConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(cfg.ForceUpstream.DomainSuffixes, ","), "apple.com,twitter.com,x.com"; got != want {
+		t.Fatalf("domain suffixes = %q, want %q", got, want)
+	}
+	if got, want := strings.Join(cfg.ForceUpstream.Domains, ","), "keep.example.net"; got != want {
+		t.Fatalf("domains = %q, want %q", got, want)
+	}
+}
+
+func TestPersistDirectFailuresPromotesBusyDomainSuffix(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	hosts := []string{
+		"example.co.uk",
+		"api.example.co.uk",
+		"cdn.example.co.uk",
+		"img.example.co.uk",
+		"static.example.co.uk",
+		"other.example.net",
+	}
+
+	if err := persistDirectFailures(configPath, hosts); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := readRouteConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(cfg.ForceUpstream.DomainSuffixes, ","), "example.co.uk"; got != want {
+		t.Fatalf("domain suffixes = %q, want %q", got, want)
+	}
+	if got, want := strings.Join(cfg.ForceUpstream.Domains, ","), "other.example.net"; got != want {
+		t.Fatalf("domains = %q, want %q", got, want)
+	}
+}
+
+func TestPersistDirectFailuresCompactsExistingBusyDomainSuffix(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	configBody := []byte(`{
+		"force_upstream": {
+			"domains": [
+				"api.example.com",
+				"cdn.example.com",
+				"img.example.com",
+				"static.example.com",
+				"other.example.net"
+			]
+		}
+	}`)
+	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := persistDirectFailures(configPath, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := readRouteConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(cfg.ForceUpstream.DomainSuffixes, ","), "example.com"; got != want {
+		t.Fatalf("domain suffixes = %q, want %q", got, want)
+	}
+	if got, want := strings.Join(cfg.ForceUpstream.Domains, ","), "other.example.net"; got != want {
+		t.Fatalf("domains = %q, want %q", got, want)
+	}
+}
+
 func TestApplyRuntimeConfigDefaultsLoadsModeOnlyWhenEmpty(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	configBody := []byte(`{
@@ -510,7 +656,8 @@ func TestApplyRuntimeConfigDefaultsLoadsModeOnlyWhenEmpty(t *testing.T) {
 		"token": "secret",
 		"tunnel_protocol": "vless",
 		"tunnel_transport": "ws",
-		"tunnel_path": "/ws"
+		"tunnel_path": "/ws",
+		"direct_probe_timeout": "25ms"
 	}`)
 	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
 		t.Fatal(err)
@@ -540,6 +687,9 @@ func TestApplyRuntimeConfigDefaultsLoadsModeOnlyWhenEmpty(t *testing.T) {
 	}
 	if cfg.TunnelPath != "/ws" {
 		t.Fatalf("tunnel path = %q", cfg.TunnelPath)
+	}
+	if cfg.DirectProbeTimeout != 25*time.Millisecond {
+		t.Fatalf("direct probe timeout = %s, want 25ms", cfg.DirectProbeTimeout)
 	}
 
 	cfg = config{ConfigPath: configPath, Mode: proxyModeServer}
@@ -571,21 +721,56 @@ func TestApplyModeListenDefault(t *testing.T) {
 	}
 }
 
-func TestResolveConfigPathUsesExecutableDirectory(t *testing.T) {
+func TestResolveConfigPathSearchOrder(t *testing.T) {
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := resolveConfigPath("config.json")
+	missingName := "proxy-missing-config-for-test.json"
+	got, err := resolveConfigPath(missingName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(filepath.Dir(executable), "config.json")
+	want := filepath.Join(filepath.Dir(executable), missingName)
 	if got != want {
 		t.Fatalf("resolved config path = %q, want %q", got, want)
 	}
 
-	absolute := filepath.Join(t.TempDir(), "custom.json")
+	workDir := t.TempDir()
+	t.Chdir(workDir)
+	workName := "proxy-work-config-for-test.json"
+	workPath := filepath.Join(workDir, workName)
+	if err := os.WriteFile(workPath, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err = resolveConfigPath(workName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != workPath {
+		t.Fatalf("working directory config path = %q, want %q", got, workPath)
+	}
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	homeConfigDir := filepath.Join(homeDir, ".config", "proxy")
+	if err := os.MkdirAll(homeConfigDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	homeName := "proxy-home-config-for-test.json"
+	homePath := filepath.Join(homeConfigDir, homeName)
+	if err := os.WriteFile(homePath, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err = resolveConfigPath(homeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != homePath {
+		t.Fatalf("home config path = %q, want %q", got, homePath)
+	}
+
+	absolute := filepath.Join(t.TempDir(), "explicit.json")
 	got, err = resolveConfigPath(absolute)
 	if err != nil {
 		t.Fatal(err)
@@ -915,6 +1100,113 @@ func TestRunProxyMixedUpstreamForwardsHTTPProxyRequestRaw(t *testing.T) {
 	}
 }
 
+func TestRunProxyHTTPDirectNoResponseFallsBackQuickly(t *testing.T) {
+	direct, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := direct.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close direct listener: %v", err)
+		}
+	})
+	directHits := make(chan struct{}, 2)
+	releaseDirect := make(chan struct{})
+	t.Cleanup(func() {
+		close(releaseDirect)
+	})
+	directErr := make(chan error, 1)
+	go blackholeHTTPDirect(direct, directHits, releaseDirect, directErr)
+
+	upstream, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := upstream.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close upstream listener: %v", err)
+		}
+	})
+	upstreamLine := make(chan string, 2)
+	upstreamErr := make(chan error, 1)
+	go rawHTTPUpstreamN(upstream, 2, upstreamLine, upstreamErr)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	listenAddr := reserveTCPAddr(t)
+	_, portText, err := net.SplitHostPort(upstream.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- runProxy(ctx, config{
+			ListenAddr:         listenAddr,
+			GatewayIP:          "127.0.0.1",
+			GatewayPort:        port,
+			UpstreamProtocol:   upstreamProtocolMixed,
+			DialTimeout:        time.Second,
+			DirectProbeTimeout: 30 * time.Millisecond,
+			BufferSize:         4096,
+		}, io.Discard)
+	}()
+	waitForTCP(t, listenAddr)
+
+	start := time.Now()
+	readHTTP204Prefix(t, listenAddr, direct.Addr().String())
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Fatalf("fallback took %s, want under 500ms", elapsed)
+	}
+	select {
+	case <-directHits:
+	case <-time.After(time.Second):
+		t.Fatal("direct target was not tried")
+	}
+	if line := <-upstreamLine; line != "GET http://"+direct.Addr().String()+"/path?q=1 HTTP/1.1\r\n" {
+		t.Fatalf("first upstream http line = %q", line)
+	}
+
+	readHTTP204Prefix(t, listenAddr, direct.Addr().String())
+	if line := <-upstreamLine; line != "GET http://"+direct.Addr().String()+"/path?q=1 HTTP/1.1\r\n" {
+		t.Fatalf("second upstream http line = %q", line)
+	}
+	select {
+	case <-directHits:
+		t.Fatal("direct target was retried after response probe failure")
+	case <-time.After(100 * time.Millisecond):
+	}
+	select {
+	case err := <-upstreamErr:
+		if err != nil {
+			t.Fatal(err)
+		}
+	default:
+	}
+	select {
+	case err := <-directErr:
+		if err != nil {
+			t.Fatal(err)
+		}
+	default:
+	}
+
+	cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("proxy did not stop")
+	}
+}
+
 func dialHTTPConnect(t *testing.T, proxyAddr string, targetAddr string) net.Conn {
 	t.Helper()
 	client, err := net.DialTimeout("tcp", proxyAddr, time.Second)
@@ -1144,41 +1436,117 @@ func fixedPayloadUpstream(listener net.Listener, size int, payloadCh chan<- []by
 }
 
 func rawHTTPUpstream(listener net.Listener, lineCh chan<- string, errCh chan<- error) {
+	rawHTTPUpstreamN(listener, 1, lineCh, errCh)
+}
+
+func rawHTTPUpstreamN(listener net.Listener, count int, lineCh chan<- string, errCh chan<- error) {
 	defer close(lineCh)
+	for i := 0; i < count; i++ {
+		if err := serveRawHTTPUpstreamOnce(listener, lineCh); err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			errCh <- err
+			return
+		}
+	}
+	errCh <- nil
+}
+
+func serveRawHTTPUpstreamOnce(listener net.Listener, lineCh chan<- string) error {
 	conn, err := listener.Accept()
 	if err != nil {
-		if !errors.Is(err, net.ErrClosed) {
-			errCh <- err
-		}
-		return
+		return err
 	}
-	defer func() {
-		if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			errCh <- err
-		}
-	}()
 	reader := bufio.NewReader(conn)
 	line, err := reader.ReadString('\n')
 	if err != nil {
-		errCh <- err
-		return
+		return errors.Join(err, conn.Close())
 	}
 	lineCh <- line
 	for {
 		header, err := reader.ReadString('\n')
 		if err != nil {
-			errCh <- err
-			return
+			return errors.Join(err, conn.Close())
 		}
 		if header == "\r\n" || header == "\n" {
 			break
 		}
 	}
 	if _, err := conn.Write([]byte("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n")); err != nil {
-		errCh <- err
-		return
+		return errors.Join(err, conn.Close())
 	}
-	errCh <- nil
+	if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		return err
+	}
+	return nil
+}
+
+func blackholeHTTPDirect(listener net.Listener, hits chan<- struct{}, release <-chan struct{}, errCh chan<- error) {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			if !errors.Is(err, net.ErrClosed) {
+				errCh <- err
+			}
+			return
+		}
+		select {
+		case hits <- struct{}{}:
+		default:
+		}
+		go drainHTTPHeadersThenHold(conn, release, errCh)
+	}
+}
+
+func drainHTTPHeadersThenHold(conn net.Conn, release <-chan struct{}, errCh chan<- error) {
+	defer func() {
+		if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			select {
+			case errCh <- err:
+			default:
+			}
+		}
+	}()
+	reader := bufio.NewReader(conn)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			select {
+			case errCh <- err:
+			default:
+			}
+			return
+		}
+		if line == "\r\n" || line == "\n" {
+			break
+		}
+	}
+	<-release
+}
+
+func readHTTP204Prefix(t *testing.T, proxyAddr string, targetAddr string) {
+	t.Helper()
+	client, err := net.DialTimeout("tcp", proxyAddr, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := client.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close client: %v", err)
+		}
+	}()
+	request := "GET http://" + targetAddr + "/path?q=1 HTTP/1.1\r\nHost: " + targetAddr + "\r\n\r\n"
+	if _, err := client.Write([]byte(request)); err != nil {
+		t.Fatal(err)
+	}
+	response := make([]byte, len("HTTP/1.1 204"))
+	if _, err := io.ReadFull(client, response); err != nil {
+		t.Fatal(err)
+	}
+	if string(response) != "HTTP/1.1 204" {
+		t.Fatalf("response prefix = %q, want HTTP/1.1 204", response)
+	}
 }
 
 func readSocks5ConnectTarget(reader *bufio.Reader, conn net.Conn) (string, error) {

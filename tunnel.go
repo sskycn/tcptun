@@ -49,7 +49,7 @@ type tunnelUDPFrame struct {
 	payload []byte
 }
 
-type customUDPUpstream struct {
+type nativeUDPUpstream struct {
 	tcp     net.Conn
 	reader  *bufio.Reader
 	label   string
@@ -187,7 +187,7 @@ func (s *proxyServer) handleTunnelConnError(ctx context.Context, conn net.Conn) 
 	}
 
 	reader := bufio.NewReader(conn)
-	if s.cfg.TunnelProtocol != tunnelProtocolCustom {
+	if s.cfg.TunnelProtocol != tunnelProtocolNative {
 		return s.handleProtocolTunnelConn(ctx, conn, reader)
 	}
 	req, err := readTunnelRequest(reader)
@@ -404,7 +404,7 @@ func (s *proxyServer) tunnelUDPRemoteToClient(ctx context.Context, conn net.Conn
 }
 
 func (s *proxyServer) connectViaTunnelTCP(ctx context.Context, req socksRequest) (net.Conn, string, error) {
-	if s.cfg.TunnelProtocol != tunnelProtocolCustom {
+	if s.cfg.TunnelProtocol != tunnelProtocolNative {
 		return s.connectViaProtocolTunnelTCP(ctx, req)
 	}
 	target := s.cfg.ServerAddr
@@ -429,8 +429,8 @@ func (s *proxyServer) connectViaTunnelTCP(ctx context.Context, req socksRequest)
 	return conn, target, nil
 }
 
-func (s *proxyServer) connectViaTunnelUDP(ctx context.Context) (*customUDPUpstream, error) {
-	if s.cfg.TunnelProtocol != tunnelProtocolCustom {
+func (s *proxyServer) connectViaTunnelUDP(ctx context.Context) (*nativeUDPUpstream, error) {
+	if s.cfg.TunnelProtocol != tunnelProtocolNative {
 		return nil, fmt.Errorf("UDP tunnel is unsupported for %s protocol", s.cfg.TunnelProtocol)
 	}
 	target := s.cfg.ServerAddr
@@ -451,7 +451,7 @@ func (s *proxyServer) connectViaTunnelUDP(ctx context.Context) (*customUDPUpstre
 	if err := readTunnelResponse(reader); err != nil {
 		return nil, closeAfterError(conn, err)
 	}
-	return &customUDPUpstream{tcp: conn, reader: reader, label: target}, nil
+	return &nativeUDPUpstream{tcp: conn, reader: reader, label: target}, nil
 }
 
 func (s *proxyServer) openTunnelConn(ctx context.Context) (net.Conn, error) {

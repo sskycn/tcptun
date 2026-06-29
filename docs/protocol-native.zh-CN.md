@@ -1,8 +1,8 @@
-# Custom 协议配置
+# Native 协议配置
 
-English version: [protocol-custom.md](protocol-custom.md)
+English version: [protocol-native.md](protocol-native.md)
 
-`custom` 是本项目自定义的轻量隧道协议，也是默认协议。它面向本项目自己的 client/server 组合，重点是低开销、功能完整和实现可控。
+`native` 是本项目原生隧道协议，也是默认协议。它面向本项目自己的 client/server 组合，重点是低开销、功能完整和实现可控。
 
 ## 适用场景
 
@@ -27,10 +27,10 @@ English version: [protocol-custom.md](protocol-custom.md)
 
 | 字段 | 位置 | 含义 |
 | --- | --- | --- |
-| `tunnel_protocol: "custom"` | server/client | 启用本项目自定义协议。 |
+| `tunnel_protocol: "native"` | server/client | 启用本项目原生协议。 |
 | `token` | server/client | 共享认证 token。server 配置为空时不强制认证；生产环境建议总是设置。 |
 | `tunnel_transport` | server/client | 承载层。默认 `raw`，也可使用 `ws`、`h2`、`h3`。 |
-| `tunnel_mux` | server/client | 是否开启多路复用。custom 默认建议开启。 |
+| `tunnel_mux` | server/client | 是否开启多路复用。native 默认建议开启。 |
 | `tunnel_path` | server/client | HTTP/WebSocket 类 transport 使用的路径。raw transport 可保留默认值。 |
 | `tunnel_tls` | client | client 是否使用 TLS 连接 server。 |
 | `tunnel_tls_cert` / `tunnel_tls_key` | server | server 侧 TLS 证书和私钥。 |
@@ -46,14 +46,14 @@ bin/proxy config
 非交互生成：
 
 ```sh
-bin/proxy config --protocol custom --server-addr proxy.example.com:9443
+bin/proxy config --protocol native --server-addr proxy.example.com:9443
 ```
 
 使用 WebSocket transport：
 
 ```sh
 bin/proxy config \
-  --protocol custom \
+  --protocol native \
   --transport ws \
   --server-addr proxy.example.com:443 \
   --tunnel-path /proxy \
@@ -68,7 +68,7 @@ bin/proxy config \
   "mode": "server",
   "listen_addr": "0.0.0.0:9443",
   "token": "CHANGE_ME_RANDOM_TOKEN",
-  "tunnel_protocol": "custom",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
   "tunnel_mux": true
@@ -83,7 +83,7 @@ bin/proxy config \
   "listen_addr": "127.0.0.1:1080",
   "server_addr": "proxy.example.com:9443",
   "token": "CHANGE_ME_RANDOM_TOKEN",
-  "tunnel_protocol": "custom",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
   "tunnel_mux": true,
@@ -102,7 +102,7 @@ server:
   "mode": "server",
   "listen_addr": "0.0.0.0:443",
   "token": "CHANGE_ME_RANDOM_TOKEN",
-  "tunnel_protocol": "custom",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_tls_cert": "/etc/proxy/server.crt",
   "tunnel_tls_key": "/etc/proxy/server.key"
@@ -117,7 +117,7 @@ client:
   "listen_addr": "127.0.0.1:1080",
   "server_addr": "proxy.example.com:443",
   "token": "CHANGE_ME_RANDOM_TOKEN",
-  "tunnel_protocol": "custom",
+  "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_tls": true,
   "tunnel_tls_server_name": "proxy.example.com"
@@ -126,7 +126,7 @@ client:
 
 ## 多路复用
 
-`custom` 支持 tunnel mux。开启后，client 会维持一条到底层 transport 的共享连接，并为每条 TCP 连接或 UDP relay 开一个逻辑 stream。
+`native` 支持 tunnel mux。开启后，client 会维持一条到底层 transport 的共享连接，并为每条 TCP 连接或 UDP relay 开一个逻辑 stream。
 
 建议：
 

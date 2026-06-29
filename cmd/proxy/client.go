@@ -30,9 +30,9 @@ func buildClientCommand(cfg *proxypkg.Config) *cmd.Command {
 			"proxy client --listen 127.0.0.1:1081 --server-addr 203.0.113.10:9443",
 		},
 		SetFlags: func(f *cmd.FlagSet) {
-			f.StringVar(&serverAddrFlag, "server-addr", serverAddrFlag, "custom tunnel server address", "")
+			f.StringVar(&serverAddrFlag, "server-addr", serverAddrFlag, "tunnel server address", "")
 			f.StringVar(&tokenFlag, "token", tokenFlag, "shared token, VLESS/VMess UUID, or Trojan password", "")
-			f.StringVar(&protocolFlag, "tunnel-protocol", protocolFlag, "tunnel protocol: custom, vless, vmess, or trojan [default: custom]", "")
+			f.StringVar(&protocolFlag, "tunnel-protocol", protocolFlag, "tunnel protocol: native, vless, vmess, or trojan [default: native]", "")
 			f.StringVar(&transportFlag, "transport", transportFlag, "tunnel transport: raw, ws, h2, or h3 [default: raw]", "")
 			f.StringVar(&securityFlag, "tunnel-security", securityFlag, "tunnel security: none or reality [default: none]", "")
 			f.StringVar(&flowFlag, "flow", flowFlag, "VLESS flow, for example xtls-rprx-vision", "")

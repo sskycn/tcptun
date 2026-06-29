@@ -65,7 +65,7 @@ type generatedRouteRulesConfig struct {
 
 type generatedForceUpstreamConfig struct {
 	Domains        []string `json:"domains"`
-	DomainPrefixes []string `json:"domain_prefixes"`
+	DomainRegexes  []string `json:"domain_regexes"`
 	DomainSuffixes []string `json:"domain_suffixes"`
 	IPCIDRs        []string `json:"ip_cidrs"`
 	IPRanges       []string `json:"ip_ranges"`
@@ -114,7 +114,7 @@ type generateConfigOptions struct {
 func buildConfigCommand() *cmd.Command {
 	opts := generateConfigOptions{
 		target:       configTargetBoth,
-		protocol:     proxypkg.TunnelProtocolCustom,
+		protocol:     proxypkg.TunnelProtocolNative,
 		transport:    proxypkg.TunnelTransportRaw,
 		outDir:       ".",
 		serverOutput: "server.json",
@@ -131,14 +131,14 @@ func buildConfigCommand() *cmd.Command {
 		UsageLine: "proxy config [flags]",
 		Short:     "generate server and client config files",
 		Examples: []string{
-			"proxy config --protocol custom",
+			"proxy config --protocol native",
 			"proxy config --protocol vless --server-addr proxy.example.com:9443",
 			"proxy config --protocol trojan --transport raw --tls --tls-cert server.crt --tls-key server.key --tls-server-name proxy.example.com",
 			"proxy config --target client --output client.json --server-addr proxy.example.com:9443",
 		},
 		SetFlags: func(f *cmd.FlagSet) {
 			f.StringVar(&opts.target, "target", opts.target, "config target: both, server, or client", "")
-			f.StringVar(&opts.protocol, "protocol", opts.protocol, "tunnel protocol: custom, vless, vmess, or trojan", "")
+			f.StringVar(&opts.protocol, "protocol", opts.protocol, "tunnel protocol: native, vless, vmess, or trojan", "")
 			f.StringVar(&opts.transport, "transport", opts.transport, "tunnel transport: raw, ws, h2, or h3", "")
 			f.StringVar(&opts.token, "token", opts.token, "shared token, VLESS/VMess UUID, or Trojan password; generated when empty", "")
 			f.StringVar(&opts.outDir, "out-dir", opts.outDir, "directory for generated config files", "")
@@ -168,10 +168,10 @@ func buildConfigCommand() *cmd.Command {
 			f.StringVar(&opts.realitySpiderX, "reality-spider-x", opts.realitySpiderX, "REALITY spiderX path", "")
 			f.StringVar(&opts.tunnelMux, "mux", opts.tunnelMux, "tunnel mux setting: true or false; empty keeps default", "")
 			f.StringVar(&opts.upstreamProtocol, "client-upstream-protocol", opts.upstreamProtocol, "client upstream protocol: socks5 or mixed", "")
-			f.StringVar(&opts.socks5Username, "socks5-username", opts.socks5Username, "local SOCKS5 username written to client config", "")
-			f.StringVar(&opts.socks5Password, "socks5-password", opts.socks5Password, "local SOCKS5 password written to client config", "")
-			f.StringVar(&opts.upstreamSOCKS5Username, "upstream-socks5-username", opts.upstreamSOCKS5Username, "upstream SOCKS5 username written to client config", "")
-			f.StringVar(&opts.upstreamSOCKS5Password, "upstream-socks5-password", opts.upstreamSOCKS5Password, "upstream SOCKS5 password written to client config", "")
+			f.StringVar(&opts.socks5Username, "client-socks5-username", opts.socks5Username, "local SOCKS5 username written to client config", "")
+			f.StringVar(&opts.socks5Password, "client-socks5-password", opts.socks5Password, "local SOCKS5 password written to client config", "")
+			f.StringVar(&opts.upstreamSOCKS5Username, "client-upstream-socks5-username", opts.upstreamSOCKS5Username, "upstream SOCKS5 username written to client config", "")
+			f.StringVar(&opts.upstreamSOCKS5Password, "client-upstream-socks5-password", opts.upstreamSOCKS5Password, "upstream SOCKS5 password written to client config", "")
 			f.StringVar(&opts.forceCIDRs, "force-ip-cidrs", opts.forceCIDRs, "comma-separated IP CIDRs to force upstream in route config", "")
 			f.BoolVar(&opts.overwrite, "overwrite", opts.overwrite, "overwrite existing output files", "")
 		},
@@ -277,44 +277,44 @@ func applyGenerateConfigDefaults(opts generateConfigOptions) generateConfigOptio
 }
 
 var configGenerateFlagNames = map[string]struct{}{
-	"target":                   {},
-	"protocol":                 {},
-	"transport":                {},
-	"token":                    {},
-	"out-dir":                  {},
-	"server-output":            {},
-	"client-output":            {},
-	"route-output":             {},
-	"output":                   {},
-	"o":                        {},
-	"server-listen":            {},
-	"client-listen":            {},
-	"server-addr":              {},
-	"tunnel-path":              {},
-	"tls":                      {},
-	"tls-cert":                 {},
-	"tls-key":                  {},
-	"tls-server-name":          {},
-	"tls-insecure":             {},
-	"tunnel-security":          {},
-	"flow":                     {},
-	"reality-server-name":      {},
-	"reality-server-names":     {},
-	"reality-fingerprint":      {},
-	"reality-public-key":       {},
-	"reality-private-key":      {},
-	"reality-short-id":         {},
-	"reality-short-ids":        {},
-	"reality-dest":             {},
-	"reality-spider-x":         {},
-	"mux":                      {},
-	"client-upstream-protocol": {},
-	"socks5-username":          {},
-	"socks5-password":          {},
-	"upstream-socks5-username": {},
-	"upstream-socks5-password": {},
-	"force-ip-cidrs":           {},
-	"overwrite":                {},
+	"target":                          {},
+	"protocol":                        {},
+	"transport":                       {},
+	"token":                           {},
+	"out-dir":                         {},
+	"server-output":                   {},
+	"client-output":                   {},
+	"route-output":                    {},
+	"output":                          {},
+	"o":                               {},
+	"server-listen":                   {},
+	"client-listen":                   {},
+	"server-addr":                     {},
+	"tunnel-path":                     {},
+	"tls":                             {},
+	"tls-cert":                        {},
+	"tls-key":                         {},
+	"tls-server-name":                 {},
+	"tls-insecure":                    {},
+	"tunnel-security":                 {},
+	"flow":                            {},
+	"reality-server-name":             {},
+	"reality-server-names":            {},
+	"reality-fingerprint":             {},
+	"reality-public-key":              {},
+	"reality-private-key":             {},
+	"reality-short-id":                {},
+	"reality-short-ids":               {},
+	"reality-dest":                    {},
+	"reality-spider-x":                {},
+	"mux":                             {},
+	"client-upstream-protocol":        {},
+	"client-socks5-username":          {},
+	"client-socks5-password":          {},
+	"client-upstream-socks5-username": {},
+	"client-upstream-socks5-password": {},
+	"force-ip-cidrs":                  {},
+	"overwrite":                       {},
 }
 
 func hasExplicitConfigGenerateFlags(args []string) bool {
@@ -429,7 +429,7 @@ func (w *configWizard) collect(ctx context.Context) (generateConfigOptions, erro
 	opts := w.opts
 	var err error
 	opts.protocol, err = w.readChoice("Protocol", []string{
-		proxypkg.TunnelProtocolCustom,
+		proxypkg.TunnelProtocolNative,
 		proxypkg.TunnelProtocolVLESS,
 		proxypkg.TunnelProtocolVMess,
 		proxypkg.TunnelProtocolTrojan,
@@ -769,7 +769,7 @@ func buildGeneratedRouteConfig(forceCIDRs []string) generatedRouteRulesConfig {
 func emptyGeneratedForceUpstreamConfig() generatedForceUpstreamConfig {
 	return generatedForceUpstreamConfig{
 		Domains:        []string{},
-		DomainPrefixes: []string{},
+		DomainRegexes:  []string{},
 		DomainSuffixes: []string{},
 		IPCIDRs:        []string{},
 		IPRanges:       []string{},
@@ -983,8 +983,8 @@ func normalizeConfigTarget(value string) (string, error) {
 
 func normalizeGeneratedProtocol(value string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", proxypkg.TunnelProtocolCustom:
-		return proxypkg.TunnelProtocolCustom, nil
+	case "", proxypkg.TunnelProtocolNative:
+		return proxypkg.TunnelProtocolNative, nil
 	case proxypkg.TunnelProtocolVLESS:
 		return proxypkg.TunnelProtocolVLESS, nil
 	case proxypkg.TunnelProtocolVMess:
@@ -992,7 +992,7 @@ func normalizeGeneratedProtocol(value string) (string, error) {
 	case proxypkg.TunnelProtocolTrojan:
 		return proxypkg.TunnelProtocolTrojan, nil
 	default:
-		return "", fmt.Errorf("invalid protocol %q; supported values: custom, vless, vmess, trojan", value)
+		return "", fmt.Errorf("invalid protocol %q; supported values: native, vless, vmess, trojan", value)
 	}
 }
 
@@ -1040,7 +1040,7 @@ func generateTokenForProtocol(protocol string) (string, error) {
 	switch protocol {
 	case proxypkg.TunnelProtocolVLESS, proxypkg.TunnelProtocolVMess:
 		return generateUUIDv4()
-	case proxypkg.TunnelProtocolCustom, proxypkg.TunnelProtocolTrojan:
+	case proxypkg.TunnelProtocolNative, proxypkg.TunnelProtocolTrojan:
 		return generateHexToken(32)
 	default:
 		return "", fmt.Errorf("unsupported protocol %q", protocol)

@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -239,18 +240,39 @@ func (s *proxyServer) handleHTTPProxy(ctx context.Context, client net.Conn, read
 				}
 				return err
 			}
-			if s.cfg.Verbose {
-				if err := logf(s.log, "direct http %s -> %s\n", client.RemoteAddr(), directTarget); err != nil {
+			directReader := io.Reader(direct)
+			directUsable := true
+			if shouldProbeDirectHTTPResponse(req) {
+				probedReader, probeErr := probeDirectHTTPResponse(direct, s.cfg.DirectProbeTimeout)
+				if probeErr != nil {
+					s.direct.markUpstreamOnly(cacheKey, targetHost)
+					if closeErr := direct.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
+						probeErr = errors.Join(probeErr, closeErr)
+					}
+					if s.cfg.Verbose {
+						if logErr := logf(s.log, "direct http %s response probe failed, fallback upstream: %v\n", directTarget, probeErr); logErr != nil {
+							return logErr
+						}
+					}
+					directUsable = false
+				} else {
+					directReader = probedReader
+				}
+			}
+			if directUsable {
+				if s.cfg.Verbose {
+					if err := logf(s.log, "direct http %s -> %s\n", client.RemoteAddr(), directTarget); err != nil {
+						return err
+					}
+				}
+				if err := s.bridgeWithReaders(direct, client, directReader, reader); err != nil {
+					if logErr := accessLog(s.log, accessSource(logProtocol, client.RemoteAddr()), "-", logTarget, err.Error()); logErr != nil {
+						return errors.Join(err, logErr)
+					}
 					return err
 				}
+				return accessLog(s.log, accessSource(logProtocol, client.RemoteAddr()), "-", logTarget, "ok")
 			}
-			if err := s.bridge(direct, client, reader); err != nil {
-				if logErr := accessLog(s.log, accessSource(logProtocol, client.RemoteAddr()), "-", logTarget, err.Error()); logErr != nil {
-					return errors.Join(err, logErr)
-				}
-				return err
-			}
-			return accessLog(s.log, accessSource(logProtocol, client.RemoteAddr()), "-", logTarget, "ok")
 		}
 	} else if s.cfg.Verbose {
 		if err := logf(s.log, "force upstream http %s\n", directTarget); err != nil {
@@ -373,6 +395,70 @@ func (s *proxyServer) proxyViaUpstreamRaw(ctx context.Context, client net.Conn, 
 		return err
 	}
 	return accessLog(s.log, accessSource(protocol, client.RemoteAddr()), upstreamTarget, target, "ok")
+}
+
+func shouldProbeDirectHTTPResponse(req *httpProxyRequest) bool {
+	if req == nil || strings.EqualFold(req.method, "CONNECT") {
+		return false
+	}
+	if httpRequestMayHaveBody(req) {
+		return false
+	}
+	switch strings.ToUpper(strings.TrimSpace(req.method)) {
+	case "GET", "HEAD", "OPTIONS", "TRACE":
+		return true
+	default:
+		return false
+	}
+}
+
+func httpRequestMayHaveBody(req *httpProxyRequest) bool {
+	for _, line := range strings.Split(string(req.headerRaw), "\n") {
+		name, value, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "content-length":
+			trimmed := strings.TrimSpace(value)
+			if trimmed != "" && trimmed != "0" {
+				return true
+			}
+		case "transfer-encoding":
+			trimmed := strings.TrimSpace(value)
+			if trimmed != "" && !strings.EqualFold(trimmed, "identity") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func probeDirectHTTPResponse(conn net.Conn, timeout time.Duration) (*bufio.Reader, error) {
+	if conn == nil {
+		return nil, errors.New("direct connection is nil")
+	}
+	if timeout <= 0 {
+		return nil, fmt.Errorf("invalid direct probe timeout: %s", timeout)
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
+	reader := bufio.NewReader(conn)
+	if _, err := reader.Peek(1); err != nil {
+		clearErr := conn.SetReadDeadline(time.Time{})
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			err = fmt.Errorf("direct response probe timed out after %s: %w", timeout, err)
+		}
+		if clearErr != nil {
+			return nil, errors.Join(err, clearErr)
+		}
+		return nil, err
+	}
+	if err := conn.SetReadDeadline(time.Time{}); err != nil {
+		return nil, err
+	}
+	return reader, nil
 }
 
 func socksRequestFromHostPort(host string, port string) (socksRequest, error) {
