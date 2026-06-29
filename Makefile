@@ -8,12 +8,23 @@ SERVER_ADDR ?=
 TOKEN ?=
 TUNNEL_PROTOCOL ?=
 TRANSPORT ?=
+TUNNEL_SECURITY ?=
+FLOW ?=
 TUNNEL_PATH ?=
 TLS ?=
 TLS_SERVER_NAME ?=
 TLS_INSECURE ?=
 TLS_CERT ?=
 TLS_KEY ?=
+REALITY_SERVER_NAME ?=
+REALITY_FINGERPRINT ?=
+REALITY_PUBLIC_KEY ?=
+REALITY_SHORT_ID ?=
+REALITY_SPIDER_X ?=
+REALITY_PRIVATE_KEY ?=
+REALITY_SERVER_NAMES ?=
+REALITY_SHORT_IDS ?=
+REALITY_DEST ?=
 MUX ?=
 GATEWAY_IP ?=
 GATEWAY_PORT ?= 1080
@@ -29,10 +40,10 @@ RELEASE_TARGETS ?= linux/amd64 linux/arm64 linux/arm/7 darwin/amd64 darwin/arm64
 
 ifeq ($(MODE),server)
 RUN_COMMAND := server
-RUN_FLAGS := --listen $(LISTEN) --config $(CONFIG) $(if $(TOKEN),--token $(TOKEN),) $(if $(TUNNEL_PROTOCOL),--tunnel-protocol $(TUNNEL_PROTOCOL),) $(if $(TRANSPORT),--transport $(TRANSPORT),) $(if $(TUNNEL_PATH),--tunnel-path $(TUNNEL_PATH),) $(if $(TLS_CERT),--tls-cert $(TLS_CERT),) $(if $(TLS_KEY),--tls-key $(TLS_KEY),) $(if $(MUX),--mux=$(MUX),)
+RUN_FLAGS := --listen $(LISTEN) --config $(CONFIG) $(if $(TOKEN),--token $(TOKEN),) $(if $(TUNNEL_PROTOCOL),--tunnel-protocol $(TUNNEL_PROTOCOL),) $(if $(TRANSPORT),--transport $(TRANSPORT),) $(if $(TUNNEL_SECURITY),--tunnel-security $(TUNNEL_SECURITY),) $(if $(FLOW),--flow $(FLOW),) $(if $(TUNNEL_PATH),--tunnel-path $(TUNNEL_PATH),) $(if $(TLS_CERT),--tls-cert $(TLS_CERT),) $(if $(TLS_KEY),--tls-key $(TLS_KEY),) $(if $(REALITY_PRIVATE_KEY),--reality-private-key $(REALITY_PRIVATE_KEY),) $(if $(REALITY_SERVER_NAMES),--reality-server-names $(REALITY_SERVER_NAMES),) $(if $(REALITY_SHORT_IDS),--reality-short-ids $(REALITY_SHORT_IDS),) $(if $(REALITY_DEST),--reality-dest $(REALITY_DEST),) $(if $(MUX),--mux=$(MUX),)
 else ifeq ($(MODE),client)
 RUN_COMMAND := client
-RUN_FLAGS := --listen $(LISTEN) --config $(CONFIG) $(if $(SERVER_ADDR),--server-addr $(SERVER_ADDR),) $(if $(TOKEN),--token $(TOKEN),) $(if $(TUNNEL_PROTOCOL),--tunnel-protocol $(TUNNEL_PROTOCOL),) $(if $(TRANSPORT),--transport $(TRANSPORT),) $(if $(TUNNEL_PATH),--tunnel-path $(TUNNEL_PATH),) $(if $(TLS),--tls,) $(if $(TLS_SERVER_NAME),--tls-server-name $(TLS_SERVER_NAME),) $(if $(TLS_INSECURE),--tls-insecure,) $(if $(MUX),--mux=$(MUX),)
+RUN_FLAGS := --listen $(LISTEN) --config $(CONFIG) $(if $(SERVER_ADDR),--server-addr $(SERVER_ADDR),) $(if $(TOKEN),--token $(TOKEN),) $(if $(TUNNEL_PROTOCOL),--tunnel-protocol $(TUNNEL_PROTOCOL),) $(if $(TRANSPORT),--transport $(TRANSPORT),) $(if $(TUNNEL_SECURITY),--tunnel-security $(TUNNEL_SECURITY),) $(if $(FLOW),--flow $(FLOW),) $(if $(TUNNEL_PATH),--tunnel-path $(TUNNEL_PATH),) $(if $(TLS),--tls,) $(if $(TLS_SERVER_NAME),--tls-server-name $(TLS_SERVER_NAME),) $(if $(TLS_INSECURE),--tls-insecure,) $(if $(REALITY_SERVER_NAME),--reality-server-name $(REALITY_SERVER_NAME),) $(if $(REALITY_FINGERPRINT),--reality-fingerprint $(REALITY_FINGERPRINT),) $(if $(REALITY_PUBLIC_KEY),--reality-public-key $(REALITY_PUBLIC_KEY),) $(if $(REALITY_SHORT_ID),--reality-short-id $(REALITY_SHORT_ID),) $(if $(REALITY_SPIDER_X),--reality-spider-x $(REALITY_SPIDER_X),) $(if $(MUX),--mux=$(MUX),)
 else ifeq ($(MODE),local)
 RUN_COMMAND := local
 RUN_FLAGS := --listen $(LISTEN) --gateway-port $(GATEWAY_PORT) --config $(CONFIG) $(if $(UPSTREAM_PROTOCOL),--upstream-protocol $(UPSTREAM_PROTOCOL),) $(if $(GATEWAY_IP),--gateway-ip $(GATEWAY_IP),)
@@ -95,7 +106,7 @@ help:
 	@echo "  make test     Run tests"
 	@echo "  make fmt      Format Go code"
 	@echo "  make tidy     Tidy Go modules"
-	@echo "  make run      Run proxy with LISTEN/MODE/SERVER_ADDR/TOKEN/TUNNEL_PROTOCOL/TRANSPORT/TUNNEL_PATH/MUX/GATEWAY_IP/GATEWAY_PORT/UPSTREAM_PROTOCOL/CONFIG overrides"
+	@echo "  make run      Run proxy with LISTEN/MODE/SERVER_ADDR/TOKEN/TUNNEL_PROTOCOL/TRANSPORT/TUNNEL_SECURITY/FLOW/TUNNEL_PATH/MUX/GATEWAY_IP/GATEWAY_PORT/UPSTREAM_PROTOCOL/CONFIG overrides"
 	@echo "  make clean    Remove build output, release output, and local Go cache"
 	@echo ""
 	@echo "Release targets: $(RELEASE_TARGETS)"

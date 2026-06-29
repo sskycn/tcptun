@@ -29,7 +29,7 @@
 
 ## 环境要求
 
-- Go 1.24 或更新版本。
+- Go 1.25 或更新版本。
 
 ## 构建
 
@@ -121,11 +121,11 @@ bin/proxy client --listen 127.0.0.1:1080 --server-addr proxy.example.com:443 --t
 使用 VLESS 协议运行 client/server：
 
 ```sh
-bin/proxy server --listen 0.0.0.0:9443 --tunnel-protocol vless --token 11111111-1111-4111-8111-111111111111
-bin/proxy client --server-addr 203.0.113.10:9443 --tunnel-protocol vless --token 11111111-1111-4111-8111-111111111111
+bin/proxy server --listen 0.0.0.0:9443 --tunnel-protocol vless --token 00000000-0000-4000-8000-000000000000
+bin/proxy client --server-addr 203.0.113.10:9443 --tunnel-protocol vless --token 00000000-0000-4000-8000-000000000000
 ```
 
-连接 Xray VLESS REALITY/Vision 服务端：
+连接 Xray VLESS REALITY/Vision 服务端。下面的值都是占位示例；不要把真实服务器地址、UUID、public key 或 private key 写进文档或提交到仓库：
 
 ```sh
 bin/proxy client \
@@ -135,10 +135,10 @@ bin/proxy client \
   --transport raw \
   --tunnel-security reality \
   --flow xtls-rprx-vision \
-  --token 11111111-1111-4111-8111-111111111111 \
+  --token 00000000-0000-4000-8000-000000000000 \
   --reality-server-name example.com \
   --reality-fingerprint chrome \
-  --reality-public-key PUBLIC_KEY \
+  --reality-public-key REALITY_PUBLIC_KEY \
   --reality-short-id ''
 ```
 
@@ -151,12 +151,14 @@ bin/proxy server \
   --transport raw \
   --tunnel-security reality \
   --flow xtls-rprx-vision \
-  --token 11111111-1111-4111-8111-111111111111 \
-  --reality-private-key PRIVATE_KEY \
+  --token 00000000-0000-4000-8000-000000000000 \
+  --reality-private-key REALITY_PRIVATE_KEY \
   --reality-server-names example.com \
   --reality-short-ids '' \
   --reality-dest example.com:443
 ```
+
+REALITY 密钥可以用 `xray x25519` 或其他兼容工具生成。private key 请放在安全的部署配置中，不要进入版本控制。`--reality-spider-x` 目前用于兼容 Xray 配置字段；成功的 REALITY 握手不依赖它。
 
 使用 Trojan 协议运行 client/server：
 
@@ -240,7 +242,7 @@ bin/proxy client --server-addr proxy.example.com:9443 --transport h3 --tunnel-pa
 
 作为客户端兼容 Xray REALITY/Vision 时，请使用 `proxy client`，并设置 `--transport raw`、`--tunnel-protocol vless`、`--tunnel-security reality` 和 `--flow xtls-rprx-vision`。REALITY 需要 `--reality-server-name`、`--reality-public-key` 和 UUID 格式的 `--token`；`--reality-fingerprint` 默认是 `chrome`。
 
-作为服务端兼容 Xray REALITY/Vision 时，请使用 `proxy server`，并设置 `--transport raw`、`--tunnel-protocol vless`、`--tunnel-security reality` 和 `--flow xtls-rprx-vision`。REALITY 服务端模式需要 `--reality-private-key`、`--reality-server-names`、`--reality-short-ids`，以及类似 `example.com:443` 的 fallback `--reality-dest`。Xray 客户端需要使用匹配的 public key、server name、shortId、UUID 和 flow。
+作为服务端兼容 Xray REALITY/Vision 时，请使用 `proxy server`，并设置 `--transport raw`、`--tunnel-protocol vless`、`--tunnel-security reality` 和 `--flow xtls-rprx-vision`。REALITY 服务端模式需要 `--reality-private-key`、`--reality-server-names`，以及类似 `example.com:443` 的 fallback `--reality-dest`。`--reality-short-ids` 可用于限制允许的 shortId；如果省略，则允许空 shortId。Xray 客户端需要使用匹配的 public key、server name、shortId、UUID 和 flow。
 
 当前只有 `custom` 支持 SOCKS5 UDP relay 和隧道多路复用。`vless`、`vmess`、`trojan` 只承载 TCP 流量，但仍可运行在 raw、WebSocket、HTTP/2 或 HTTP/3 transport 上。
 
@@ -290,6 +292,8 @@ bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-pat
   "tunnel_flow": "",
   "tunnel_path": "/proxy",
   "tunnel_tls": false,
+  "tunnel_tls_cert": "",
+  "tunnel_tls_key": "",
   "tunnel_tls_server_name": "",
   "tunnel_tls_insecure": false,
   "reality_server_name": "",
@@ -397,6 +401,7 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 
 ```sh
 make build    # 构建 bin/proxy
+make release  # 交叉编译发布二进制到 dist/
 make test     # 运行测试
 make fmt      # 格式化 Go 代码
 make tidy     # 整理 Go 模块
@@ -414,14 +419,18 @@ make run UPSTREAM_PROTOCOL=mixed
 make run MODE=local
 make run MODE=server LISTEN=0.0.0.0:9443 TOKEN=change-me
 make run MODE=client SERVER_ADDR=203.0.113.10:9443 TOKEN=change-me
-make run MODE=server LISTEN=0.0.0.0:9443 TUNNEL_PROTOCOL=vless TOKEN=11111111-1111-4111-8111-111111111111
-make run MODE=client SERVER_ADDR=203.0.113.10:9443 TUNNEL_PROTOCOL=vless TOKEN=11111111-1111-4111-8111-111111111111
+make run MODE=server LISTEN=0.0.0.0:9443 TUNNEL_PROTOCOL=vless TOKEN=00000000-0000-4000-8000-000000000000
+make run MODE=client SERVER_ADDR=203.0.113.10:9443 TUNNEL_PROTOCOL=vless TOKEN=00000000-0000-4000-8000-000000000000
+make run MODE=server LISTEN=0.0.0.0:443 TUNNEL_PROTOCOL=vless TRANSPORT=raw TUNNEL_SECURITY=reality FLOW=xtls-rprx-vision TOKEN=00000000-0000-4000-8000-000000000000 REALITY_PRIVATE_KEY=REALITY_PRIVATE_KEY REALITY_SERVER_NAMES=example.com REALITY_DEST=example.com:443
+make run MODE=client SERVER_ADDR=proxy.example.com:443 TUNNEL_PROTOCOL=vless TRANSPORT=raw TUNNEL_SECURITY=reality FLOW=xtls-rprx-vision TOKEN=00000000-0000-4000-8000-000000000000 REALITY_SERVER_NAME=example.com REALITY_PUBLIC_KEY=REALITY_PUBLIC_KEY REALITY_FINGERPRINT=chrome
 make run MODE=server LISTEN=127.0.0.1:9443 TRANSPORT=ws TUNNEL_PATH=/proxy TOKEN=change-me
 make run MODE=client SERVER_ADDR=proxy.example.com:443 TRANSPORT=ws TUNNEL_PATH=/proxy TLS=1 TOKEN=change-me
 make run MODE=client SERVER_ADDR=proxy.example.com:443 TRANSPORT=ws MUX=false TOKEN=change-me
 ```
 
 `MODE=local`、`MODE=server` 和 `MODE=client` 是 Makefile 快捷入口，会分别运行 `proxy local`、`proxy server` 和 `proxy client`。
+
+`make release` 会构建 `RELEASE_TARGETS` 中列出的目标平台，默认覆盖 Linux、macOS、Windows 的 amd64/arm64，以及 Linux arm/v7。可通过 `DIST_DIR` 或 `RELEASE_TARGETS` 覆盖输出目录或平台列表。
 
 ## 开发
 

@@ -29,7 +29,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## Requirements
 
-- Go 1.24 or newer.
+- Go 1.25 or newer.
 
 ## Build
 
@@ -121,11 +121,11 @@ bin/proxy client --listen 127.0.0.1:1080 --server-addr proxy.example.com:443 --t
 Run client/server mode with VLESS:
 
 ```sh
-bin/proxy server --listen 0.0.0.0:9443 --tunnel-protocol vless --token 11111111-1111-4111-8111-111111111111
-bin/proxy client --server-addr 203.0.113.10:9443 --tunnel-protocol vless --token 11111111-1111-4111-8111-111111111111
+bin/proxy server --listen 0.0.0.0:9443 --tunnel-protocol vless --token 00000000-0000-4000-8000-000000000000
+bin/proxy client --server-addr 203.0.113.10:9443 --tunnel-protocol vless --token 00000000-0000-4000-8000-000000000000
 ```
 
-Connect to an Xray VLESS REALITY/Vision server:
+Connect to an Xray VLESS REALITY/Vision server. The values below are placeholders; do not commit real server addresses, UUIDs, public keys, or private keys to documentation:
 
 ```sh
 bin/proxy client \
@@ -135,10 +135,10 @@ bin/proxy client \
   --transport raw \
   --tunnel-security reality \
   --flow xtls-rprx-vision \
-  --token 11111111-1111-4111-8111-111111111111 \
+  --token 00000000-0000-4000-8000-000000000000 \
   --reality-server-name example.com \
   --reality-fingerprint chrome \
-  --reality-public-key PUBLIC_KEY \
+  --reality-public-key REALITY_PUBLIC_KEY \
   --reality-short-id ''
 ```
 
@@ -151,12 +151,14 @@ bin/proxy server \
   --transport raw \
   --tunnel-security reality \
   --flow xtls-rprx-vision \
-  --token 11111111-1111-4111-8111-111111111111 \
-  --reality-private-key PRIVATE_KEY \
+  --token 00000000-0000-4000-8000-000000000000 \
+  --reality-private-key REALITY_PRIVATE_KEY \
   --reality-server-names example.com \
   --reality-short-ids '' \
   --reality-dest example.com:443
 ```
+
+Generate REALITY keys with `xray x25519` or another compatible tool. Keep the private key outside version control. `--reality-spider-x` is accepted for Xray config compatibility on the client side; successful REALITY handshakes do not need it.
 
 Run client/server mode with Trojan:
 
@@ -240,7 +242,7 @@ The tunnel protocol is selected with `--tunnel-protocol` or `tunnel_protocol` in
 
 For Xray REALITY/Vision client compatibility, use `proxy client` with `--transport raw`, `--tunnel-protocol vless`, `--tunnel-security reality`, and `--flow xtls-rprx-vision`. REALITY requires `--reality-server-name`, `--reality-public-key`, and a UUID `--token`; `--reality-fingerprint` defaults to `chrome`.
 
-For Xray REALITY/Vision server compatibility, use `proxy server` with `--transport raw`, `--tunnel-protocol vless`, `--tunnel-security reality`, and `--flow xtls-rprx-vision`. REALITY server mode requires `--reality-private-key`, `--reality-server-names`, `--reality-short-ids`, and a fallback `--reality-dest` such as `example.com:443`. The Xray client must use the matching public key, server name, shortId, UUID, and flow.
+For Xray REALITY/Vision server compatibility, use `proxy server` with `--transport raw`, `--tunnel-protocol vless`, `--tunnel-security reality`, and `--flow xtls-rprx-vision`. REALITY server mode requires `--reality-private-key`, `--reality-server-names`, and a fallback `--reality-dest` such as `example.com:443`. `--reality-short-ids` can restrict allowed shortIds; if omitted, the empty shortId is allowed. The Xray client must use the matching public key, server name, shortId, UUID, and flow.
 
 Only `custom` currently supports SOCKS5 UDP relay and tunnel multiplexing. `vless`, `vmess`, and `trojan` carry TCP streams over the selected transport.
 
@@ -290,6 +292,8 @@ Example:
   "tunnel_flow": "",
   "tunnel_path": "/proxy",
   "tunnel_tls": false,
+  "tunnel_tls_cert": "",
+  "tunnel_tls_key": "",
   "tunnel_tls_server_name": "",
   "tunnel_tls_insecure": false,
   "reality_server_name": "",
@@ -397,6 +401,7 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 
 ```sh
 make build    # Build bin/proxy
+make release  # Cross-compile release binaries into dist/
 make test     # Run tests
 make fmt      # Format Go code
 make tidy     # Tidy Go modules
@@ -414,14 +419,18 @@ make run UPSTREAM_PROTOCOL=mixed
 make run MODE=local
 make run MODE=server LISTEN=0.0.0.0:9443 TOKEN=change-me
 make run MODE=client SERVER_ADDR=203.0.113.10:9443 TOKEN=change-me
-make run MODE=server LISTEN=0.0.0.0:9443 TUNNEL_PROTOCOL=vless TOKEN=11111111-1111-4111-8111-111111111111
-make run MODE=client SERVER_ADDR=203.0.113.10:9443 TUNNEL_PROTOCOL=vless TOKEN=11111111-1111-4111-8111-111111111111
+make run MODE=server LISTEN=0.0.0.0:9443 TUNNEL_PROTOCOL=vless TOKEN=00000000-0000-4000-8000-000000000000
+make run MODE=client SERVER_ADDR=203.0.113.10:9443 TUNNEL_PROTOCOL=vless TOKEN=00000000-0000-4000-8000-000000000000
+make run MODE=server LISTEN=0.0.0.0:443 TUNNEL_PROTOCOL=vless TRANSPORT=raw TUNNEL_SECURITY=reality FLOW=xtls-rprx-vision TOKEN=00000000-0000-4000-8000-000000000000 REALITY_PRIVATE_KEY=REALITY_PRIVATE_KEY REALITY_SERVER_NAMES=example.com REALITY_DEST=example.com:443
+make run MODE=client SERVER_ADDR=proxy.example.com:443 TUNNEL_PROTOCOL=vless TRANSPORT=raw TUNNEL_SECURITY=reality FLOW=xtls-rprx-vision TOKEN=00000000-0000-4000-8000-000000000000 REALITY_SERVER_NAME=example.com REALITY_PUBLIC_KEY=REALITY_PUBLIC_KEY REALITY_FINGERPRINT=chrome
 make run MODE=server LISTEN=127.0.0.1:9443 TRANSPORT=ws TUNNEL_PATH=/proxy TOKEN=change-me
 make run MODE=client SERVER_ADDR=proxy.example.com:443 TRANSPORT=ws TUNNEL_PATH=/proxy TLS=1 TOKEN=change-me
 make run MODE=client SERVER_ADDR=proxy.example.com:443 TRANSPORT=ws MUX=false TOKEN=change-me
 ```
 
 `MODE=local`, `MODE=server`, and `MODE=client` are Makefile shortcuts that run `proxy local`, `proxy server`, and `proxy client`.
+
+`make release` builds the targets listed in `RELEASE_TARGETS`, which defaults to Linux, macOS, and Windows on amd64/arm64 plus Linux arm/v7. Override `DIST_DIR` or `RELEASE_TARGETS` to change the output directory or platform list.
 
 ## Development
 
