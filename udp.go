@@ -229,7 +229,7 @@ func (r *udpRelay) ensureUpstream(ctx context.Context) (*udpUpstream, error) {
 	if r.upstream != nil {
 		return r.upstream, nil
 	}
-	upstream, err := r.server.connectViaUpstreamUDP(ctx)
+	upstream, err := r.server.connectViaUpstreamUDP(ctx, upstreamStickySource(r.clientAddr))
 	if err != nil {
 		return nil, err
 	}
@@ -333,36 +333,71 @@ func (r *udpRelay) forwardTunnelUDPResponses(upstream *nativeUDPUpstream) {
 	}
 }
 
-func (s *proxyServer) connectViaUpstreamUDP(ctx context.Context) (*udpUpstream, error) {
+func (s *proxyServer) connectViaUpstreamUDP(ctx context.Context, source string) (*udpUpstream, error) {
 	if s.cfg.Mode == proxyModeClient {
 		return nil, errors.New("SOCKS5 UDP upstream is unsupported in client mode")
 	}
-	upstream, target, err := s.connectUpstreamRaw(ctx)
-	if err != nil {
-		return nil, err
+	if s.resolver == nil {
+		return nil, errors.New("upstream resolver is nil")
 	}
-	if err := s.authenticateUpstreamSOCKS5(upstream); err != nil {
-		return nil, closeAfterError(upstream, err)
+	preferred := s.sticky.get(source)
+	targets := s.resolver.orderedTargetsFor(preferred)
+	if len(targets) == 0 {
+		return nil, errors.New("no upstream targets available")
 	}
-	if err := writeAll(upstream, buildSocks5UDPAssociateRequest("0.0.0.0", 0)); err != nil {
-		return nil, closeAfterError(upstream, err)
-	}
-	host, port, err := readSocks5ReplyEndpoint(upstream)
-	if err != nil {
-		return nil, closeAfterError(upstream, err)
-	}
-	if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
-		upstreamHost, _, splitErr := net.SplitHostPort(target)
-		if splitErr != nil {
-			return nil, closeAfterError(upstream, splitErr)
+
+	var errs []error
+	for _, candidate := range targets {
+		target := candidate.target
+		upstream, err := s.connectUpstreamRawTarget(ctx, target)
+		if err != nil {
+			s.sticky.clear(source, target)
+			errs = append(errs, err)
+			if ctx.Err() != nil {
+				return nil, errors.Join(errs...)
+			}
+			continue
 		}
-		host = trimHostBrackets(upstreamHost)
+		if err := s.authenticateUpstreamSOCKS5(upstream); err != nil {
+			s.resolver.recordFailure(target)
+			s.sticky.clear(source, target)
+			errs = append(errs, fmt.Errorf("%s: %w", target, closeAfterError(upstream, err)))
+			continue
+		}
+		if err := writeAll(upstream, buildSocks5UDPAssociateRequest("0.0.0.0", 0)); err != nil {
+			s.resolver.recordFailure(target)
+			s.sticky.clear(source, target)
+			errs = append(errs, fmt.Errorf("%s: %w", target, closeAfterError(upstream, err)))
+			continue
+		}
+		host, port, err := readSocks5ReplyEndpoint(upstream)
+		if err != nil {
+			s.resolver.recordFailure(target)
+			s.sticky.clear(source, target)
+			errs = append(errs, fmt.Errorf("%s: %w", target, closeAfterError(upstream, err)))
+			continue
+		}
+		if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
+			upstreamHost, _, splitErr := net.SplitHostPort(target)
+			if splitErr != nil {
+				s.resolver.recordFailure(target)
+				s.sticky.clear(source, target)
+				errs = append(errs, fmt.Errorf("%s: %w", target, closeAfterError(upstream, splitErr)))
+				continue
+			}
+			host = trimHostBrackets(upstreamHost)
+		}
+		relayAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(host, strconv.Itoa(int(port))))
+		if err != nil {
+			s.resolver.recordFailure(target)
+			s.sticky.clear(source, target)
+			errs = append(errs, fmt.Errorf("%s: %w", target, closeAfterError(upstream, err)))
+			continue
+		}
+		s.sticky.set(source, target)
+		return &udpUpstream{tcp: upstream, relayAddr: relayAddr, label: target}, nil
 	}
-	relayAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(host, strconv.Itoa(int(port))))
-	if err != nil {
-		return nil, closeAfterError(upstream, err)
-	}
-	return &udpUpstream{tcp: upstream, relayAddr: relayAddr, label: target}, nil
+	return nil, errors.Join(errs...)
 }
 
 func parseSocksUDPDatagram(packet []byte) (socksUDPDatagram, error) {

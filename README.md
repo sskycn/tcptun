@@ -21,8 +21,9 @@ English | [简体中文](README.zh-CN.md)
 - Prints compact terminal access logs; direct connections omit the proxy field.
 - Auto-detects the default gateway IP.
 - Checks whether the detected gateway port is reachable only when the machine has an internal IPv4 address.
-- Scans internal local IPv4 networks when the detected gateway is unreachable.
-- Periodically refreshes the reachable upstream so new connections follow network changes.
+- Scans internal local IPv4 networks when the detected gateway is unreachable and keeps all reachable proxy candidates.
+- Prefers faster scanned upstreams while keeping the same source IP bound to the same upstream until that upstream fails.
+- Periodically refreshes reachable upstreams so new connections follow network changes.
 - Connects directly to private, loopback, link-local, `localhost`, and `.local` targets instead of forwarding them upstream.
 - Tries direct TCP connections first; if a target cannot be reached directly, remembers that target and sends later connections upstream immediately.
 - Supports `route.json` force-upstream rules by exact domain, domain regex, domain suffix, exact IP, and IP CIDR/range.
@@ -210,14 +211,17 @@ When `--gateway-ip` is not set, startup works like this:
 1. Check whether the machine has an internal IPv4 address.
 2. If it does, detect the system default gateway IP.
 3. Try to connect to `<gateway-ip>:<gateway-port>`.
-4. If that connection fails, scan internal local IPv4 networks for a host with `<gateway-port>` open.
-5. Use the first reachable host as the upstream proxy.
+4. If that connection fails, scan internal local IPv4 networks for hosts with `<gateway-port>` open.
+5. If no host is found, pause for `--scan-retry-interval` and scan again.
+6. Keep all reachable scanned hosts as upstream candidates, sorted by measured connection latency.
 
 If the machine has no internal IPv4 address, automatic gateway probing and local IPv4 scanning are skipped. Set `--gateway-ip` explicitly in that case.
 
 Manual `--gateway-ip` disables scanning and uses the provided IP directly.
 
-While running, the proxy checks local IPv4 addresses every `--refresh-interval`. Gateway discovery and local-network scanning only run when the local IPv4 address set changes. Existing connections continue on their current upstream; new connections use the refreshed target after a change is detected.
+While running, the proxy checks local IPv4 addresses every `--refresh-interval`. Gateway discovery and local-network scanning only run when the local IPv4 address set changes. Existing connections continue on their current upstream; new connections use the refreshed targets after a change is detected.
+
+When multiple upstream candidates are available from scanning, new sources prefer the fastest currently known upstream. The same source IP keeps using the same upstream so long as it remains usable; if that upstream fails to connect or complete its upstream protocol handshake, the binding is cleared and the next best candidate is tried.
 
 ## Internal Address Bypass
 
@@ -329,6 +333,7 @@ Runtime config example:
   "upstream_socks5_username": "",
   "upstream_socks5_password": "",
   "direct_probe_timeout": "500ms",
+  "scan_retry_interval": "5s",
   "tunnel_protocol": "native",
   "tunnel_transport": "raw",
   "tunnel_security": "none",

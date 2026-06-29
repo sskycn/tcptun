@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,6 +92,7 @@ type Config struct {
 	DirectProbeTimeout     time.Duration
 	RefreshInterval        time.Duration
 	ScanTimeout            time.Duration
+	ScanRetryInterval      time.Duration
 	ScanWorkers            int
 	BufferSize             int
 	Verbose                bool
@@ -119,6 +121,7 @@ func defaultConfig() Config {
 		DirectProbeTimeout: 500 * time.Millisecond,
 		RefreshInterval:    5 * time.Second,
 		ScanTimeout:        250 * time.Millisecond,
+		ScanRetryInterval:  5 * time.Second,
 		ScanWorkers:        max(64, runtime.GOMAXPROCS(0)*32),
 		BufferSize:         32 * 1024,
 	}
@@ -143,6 +146,7 @@ type proxyServer struct {
 	resolver   *upstreamResolver
 	dialer     net.Dialer
 	direct     *directCache
+	sticky     *upstreamSticky
 	routes     *routeRules
 	bufferPool sync.Pool
 	log        io.Writer
@@ -155,8 +159,46 @@ type directCache struct {
 	upstreamOnly map[string]string
 }
 
+type upstreamSticky struct {
+	mu      sync.RWMutex
+	targets map[string]string
+}
+
 func newDirectCache() *directCache {
 	return &directCache{upstreamOnly: make(map[string]string)}
+}
+
+func newUpstreamSticky() *upstreamSticky {
+	return &upstreamSticky{targets: make(map[string]string)}
+}
+
+func (s *upstreamSticky) get(source string) string {
+	if s == nil || strings.TrimSpace(source) == "" {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.targets[source]
+}
+
+func (s *upstreamSticky) set(source string, target string) {
+	if s == nil || strings.TrimSpace(source) == "" || strings.TrimSpace(target) == "" {
+		return
+	}
+	s.mu.Lock()
+	s.targets[source] = target
+	s.mu.Unlock()
+}
+
+func (s *upstreamSticky) clear(source string, target string) {
+	if s == nil || strings.TrimSpace(source) == "" {
+		return
+	}
+	s.mu.Lock()
+	if current := s.targets[source]; current == target || target == "" {
+		delete(s.targets, source)
+	}
+	s.mu.Unlock()
 }
 
 func (c *directCache) shouldTry(key string) bool {
@@ -205,15 +247,6 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	if cfg.DialTimeout <= 0 {
 		cfg.DialTimeout = defaultConfig().DialTimeout
 	}
-	if cfg.DirectProbeTimeout <= 0 {
-		cfg.DirectProbeTimeout = defaultConfig().DirectProbeTimeout
-	}
-	if cfg.ScanTimeout <= 0 {
-		cfg.ScanTimeout = defaultConfig().ScanTimeout
-	}
-	if cfg.ScanWorkers <= 0 {
-		cfg.ScanWorkers = defaultConfig().ScanWorkers
-	}
 	if cfg.RefreshInterval < 0 {
 		return fmt.Errorf("invalid refresh interval: %s", cfg.RefreshInterval)
 	}
@@ -246,6 +279,21 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	}
 	if cfg.DirectProbeTimeout == 0 {
 		cfg.DirectProbeTimeout = defaultConfig().DirectProbeTimeout
+	}
+	if cfg.ScanTimeout < 0 {
+		return fmt.Errorf("invalid scan timeout: %s", cfg.ScanTimeout)
+	}
+	if cfg.ScanTimeout == 0 {
+		cfg.ScanTimeout = defaultConfig().ScanTimeout
+	}
+	if cfg.ScanRetryInterval < 0 {
+		return fmt.Errorf("invalid scan retry interval: %s", cfg.ScanRetryInterval)
+	}
+	if cfg.ScanRetryInterval == 0 {
+		cfg.ScanRetryInterval = defaultConfig().ScanRetryInterval
+	}
+	if cfg.ScanWorkers <= 0 {
+		cfg.ScanWorkers = defaultConfig().ScanWorkers
 	}
 	cfg.Mode, err = normalizeProxyMode(cfg.Mode)
 	if err != nil {
@@ -315,6 +363,7 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 			KeepAlive: 30 * time.Second,
 		},
 		direct: newDirectCache(),
+		sticky: newUpstreamSticky(),
 		routes: routes,
 		log:    log,
 	}
@@ -335,7 +384,7 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 			return err
 		}
 	} else {
-		if err := logf(log, "listening on %s, forwarding mixed traffic to %s via %s\n", listener.Addr(), server.upstreamTarget(), cfg.UpstreamProtocol); err != nil {
+		if err := logf(log, "listening on %s, forwarding mixed traffic to %s via %s\n", listener.Addr(), server.upstreamTargetSummary(), cfg.UpstreamProtocol); err != nil {
 			return err
 		}
 	}
@@ -491,13 +540,45 @@ func (s *proxyServer) upstreamTarget() string {
 	return s.resolver.target()
 }
 
-func resolveGatewayIP(ctx context.Context, cfg config, log io.Writer) (net.IP, error) {
+func (s *proxyServer) upstreamTargetSummary() string {
+	if s.cfg.Mode == proxyModeClient {
+		return s.cfg.ServerAddr
+	}
+	if s.resolver == nil {
+		return ""
+	}
+	return s.resolver.targetSummary()
+}
+
+func upstreamStickySource(addr net.Addr) string {
+	if addr == nil {
+		return ""
+	}
+	switch value := addr.(type) {
+	case *net.TCPAddr:
+		return value.IP.String()
+	case *net.UDPAddr:
+		return value.IP.String()
+	}
+	host, _, err := net.SplitHostPort(addr.String())
+	if err == nil && strings.TrimSpace(host) != "" {
+		return trimHostBrackets(host)
+	}
+	return addr.String()
+}
+
+type upstreamCandidate struct {
+	target  string
+	latency time.Duration
+}
+
+func resolveGatewayTargets(ctx context.Context, cfg config, log io.Writer) ([]upstreamCandidate, error) {
 	if cfg.GatewayIP != "" {
 		gatewayIP := net.ParseIP(cfg.GatewayIP)
 		if gatewayIP == nil {
 			return nil, fmt.Errorf("invalid gateway IP: %s", cfg.GatewayIP)
 		}
-		return gatewayIP, nil
+		return []upstreamCandidate{{target: net.JoinHostPort(gatewayIP.String(), strconv.Itoa(cfg.GatewayPort))}}, nil
 	}
 
 	hasInternalIPv4, err := hasLocalInternalIPv4()
@@ -510,8 +591,9 @@ func resolveGatewayIP(ctx context.Context, cfg config, log io.Writer) (net.IP, e
 
 	gatewayIP, err := discoverDefaultGateway()
 	if err == nil {
-		if canConnect(ctx, gatewayIP, cfg.GatewayPort, cfg.DialTimeout) {
-			return gatewayIP, nil
+		target := net.JoinHostPort(gatewayIP.String(), strconv.Itoa(cfg.GatewayPort))
+		if latency, ok := canConnectTargetLatency(ctx, target, cfg.DialTimeout); ok {
+			return []upstreamCandidate{{target: target, latency: latency}}, nil
 		}
 		if cfg.Verbose {
 			if err := logf(log, "gateway %s:%d is not reachable, scanning local IPv4 networks\n", gatewayIP, cfg.GatewayPort); err != nil {
@@ -526,22 +608,83 @@ func resolveGatewayIP(ctx context.Context, cfg config, log io.Writer) (net.IP, e
 		}
 	}
 
-	ip, err := scanLocalIPv4(ctx, cfg.GatewayPort, cfg.ScanTimeout, cfg.ScanWorkers, gatewayIP)
+	reachable, err := scanLocalIPv4WithRetry(ctx, cfg, gatewayIP, log, scanLocalIPv4All)
 	if err != nil {
 		if gatewayIP != nil {
 			return nil, fmt.Errorf("gateway %s:%d is unreachable and scan found no reachable proxy: %w", gatewayIP, cfg.GatewayPort, err)
 		}
 		return nil, fmt.Errorf("scan local IPv4 networks: %w", err)
 	}
-	return ip, nil
+	candidates := make([]upstreamCandidate, 0, len(reachable))
+	for _, item := range reachable {
+		if item.ip == nil {
+			continue
+		}
+		candidates = append(candidates, upstreamCandidate{
+			target:  net.JoinHostPort(item.ip.String(), strconv.Itoa(cfg.GatewayPort)),
+			latency: item.latency,
+		})
+	}
+	if len(candidates) == 0 {
+		return nil, errReachableProxyNotFound
+	}
+	return candidates, nil
+}
+
+type localIPv4Scanner func(context.Context, int, time.Duration, int, net.IP) ([]reachableProxy, error)
+
+func scanLocalIPv4WithRetry(ctx context.Context, cfg config, gatewayHint net.IP, log io.Writer, scanner localIPv4Scanner) ([]reachableProxy, error) {
+	if scanner == nil {
+		return nil, errors.New("local IPv4 scanner is nil")
+	}
+	for {
+		reachable, err := scanner(ctx, cfg.GatewayPort, cfg.ScanTimeout, cfg.ScanWorkers, gatewayHint)
+		if err == nil {
+			return reachable, nil
+		}
+		if !errors.Is(err, errReachableProxyNotFound) {
+			return nil, err
+		}
+		if cfg.Verbose {
+			if logErr := logf(log, "scan local IPv4 networks found no reachable proxy; retrying in %s\n", cfg.ScanRetryInterval); logErr != nil {
+				return nil, logErr
+			}
+		}
+		if err := sleepContext(ctx, cfg.ScanRetryInterval); err != nil {
+			return nil, err
+		}
+	}
+}
+
+func sleepContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 type upstreamResolver struct {
 	cfg              config
 	log              io.Writer
 	mu               sync.RWMutex
-	currentTarget    string
+	targets          map[string]upstreamTargetState
 	localIPSignature string
+}
+
+type upstreamTargetState struct {
+	target   string
+	latency  time.Duration
+	failures int
+}
+
+type upstreamTargetSnapshot struct {
+	target   string
+	latency  time.Duration
+	failures int
 }
 
 func newUpstreamResolver(ctx context.Context, cfg config, log io.Writer) (*upstreamResolver, error) {
@@ -549,28 +692,155 @@ func newUpstreamResolver(ctx context.Context, cfg config, log io.Writer) (*upstr
 	if err != nil {
 		return nil, err
 	}
-	ip, err := resolveGatewayIP(ctx, cfg, log)
+	candidates, err := resolveGatewayTargets(ctx, cfg, log)
 	if err != nil {
 		return nil, err
 	}
-	return &upstreamResolver{
+	resolver := &upstreamResolver{
 		cfg:              cfg,
 		log:              log,
-		currentTarget:    net.JoinHostPort(ip.String(), strconv.Itoa(cfg.GatewayPort)),
+		targets:          make(map[string]upstreamTargetState, len(candidates)),
 		localIPSignature: signature,
-	}, nil
+	}
+	resolver.setTargets(candidates)
+	return resolver, nil
 }
 
 func (r *upstreamResolver) target() string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.currentTarget
+	targets := r.orderedTargets()
+	if len(targets) == 0 {
+		return ""
+	}
+	return targets[0].target
 }
 
-func (r *upstreamResolver) setTarget(target string) {
+func (r *upstreamResolver) targetSummary() string {
+	targets := r.orderedTargets()
+	parts := make([]string, 0, len(targets))
+	for _, target := range targets {
+		parts = append(parts, target.target)
+	}
+	return strings.Join(parts, ",")
+}
+
+func (r *upstreamResolver) orderedTargets() []upstreamTargetSnapshot {
+	r.mu.RLock()
+	targets := make([]upstreamTargetSnapshot, 0, len(r.targets))
+	for _, target := range r.targets {
+		targets = append(targets, upstreamTargetSnapshot{
+			target:   target.target,
+			latency:  target.latency,
+			failures: target.failures,
+		})
+	}
+	r.mu.RUnlock()
+
+	sort.SliceStable(targets, func(i, j int) bool {
+		left := r.targetScore(targets[i])
+		right := r.targetScore(targets[j])
+		if left != right {
+			return left < right
+		}
+		return targets[i].target < targets[j].target
+	})
+	return targets
+}
+
+func (r *upstreamResolver) orderedTargetsFor(preferred string) []upstreamTargetSnapshot {
+	targets := r.orderedTargets()
+	if strings.TrimSpace(preferred) == "" || len(targets) < 2 {
+		return targets
+	}
+	for i, target := range targets {
+		if target.target != preferred {
+			continue
+		}
+		if i == 0 {
+			return targets
+		}
+		copy(targets[1:i+1], targets[0:i])
+		targets[0] = target
+		return targets
+	}
+	return targets
+}
+
+func (r *upstreamResolver) targetScore(target upstreamTargetSnapshot) time.Duration {
+	base := target.latency
+	if base <= 0 {
+		base = r.cfg.DialTimeout
+		if base <= 0 {
+			base = defaultConfig().DialTimeout
+		}
+	}
+	failures := target.failures
+	if failures > 100 {
+		failures = 100
+	}
+	penaltyBase := r.cfg.DialTimeout
+	if penaltyBase <= 0 {
+		penaltyBase = defaultConfig().DialTimeout
+	}
+	return base + time.Duration(failures)*penaltyBase
+}
+
+func (r *upstreamResolver) setTargets(candidates []upstreamCandidate) {
 	r.mu.Lock()
-	r.currentTarget = target
-	r.mu.Unlock()
+	defer r.mu.Unlock()
+
+	next := make(map[string]upstreamTargetState, len(candidates))
+	for _, candidate := range candidates {
+		target := strings.TrimSpace(candidate.target)
+		if target == "" {
+			continue
+		}
+		state, ok := r.targets[target]
+		if !ok {
+			state = upstreamTargetState{target: target}
+		}
+		if candidate.latency > 0 {
+			state.latency = candidate.latency
+		}
+		next[target] = state
+	}
+	r.targets = next
+}
+
+func (r *upstreamResolver) recordSuccess(target string, latency time.Duration) {
+	if r == nil || strings.TrimSpace(target) == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	state, ok := r.targets[target]
+	if !ok {
+		state = upstreamTargetState{target: target}
+	}
+	state.failures = 0
+	if latency > 0 {
+		if state.latency <= 0 {
+			state.latency = latency
+		} else {
+			state.latency = (state.latency*3 + latency) / 4
+		}
+	}
+	r.targets[target] = state
+}
+
+func (r *upstreamResolver) recordFailure(target string) {
+	if r == nil || strings.TrimSpace(target) == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	state, ok := r.targets[target]
+	if !ok {
+		state = upstreamTargetState{target: target}
+	}
+	state.failures++
+	r.targets[target] = state
 }
 
 func (r *upstreamResolver) setLocalIPSignature(signature string) {
@@ -628,8 +898,8 @@ func (r *upstreamResolver) refresh(ctx context.Context) error {
 	}
 	r.setLocalIPSignature(signature)
 
-	ip, err := resolveGatewayIP(ctx, r.cfg, r.log)
-	current := r.target()
+	candidates, err := resolveGatewayTargets(ctx, r.cfg, r.log)
+	current := r.targetSummary()
 	if err != nil {
 		if r.cfg.Verbose {
 			if logErr := logf(r.log, "refresh upstream failed: %v; keeping %s\n", err, current); logErr != nil {
@@ -639,13 +909,13 @@ func (r *upstreamResolver) refresh(ctx context.Context) error {
 		return nil
 	}
 
-	next := net.JoinHostPort(ip.String(), strconv.Itoa(r.cfg.GatewayPort))
+	r.setTargets(candidates)
+	next := r.targetSummary()
 	if next == current {
 		return nil
 	}
 
-	r.setTarget(next)
-	if err := logf(r.log, "upstream changed from %s to %s\n", current, next); err != nil {
+	if err := logf(r.log, "upstreams changed from %s to %s\n", current, next); err != nil {
 		return err
 	}
 	return nil
@@ -675,22 +945,53 @@ func (s *proxyServer) handleConn(ctx context.Context, client net.Conn) error {
 	return s.routeMixed(ctx, client, reader)
 }
 
-func (s *proxyServer) connectUpstreamRaw(ctx context.Context) (net.Conn, string, error) {
+func (s *proxyServer) connectUpstreamRaw(ctx context.Context, source string) (net.Conn, string, error) {
 	if s.cfg.Mode == proxyModeClient {
 		return nil, s.cfg.ServerAddr, errors.New("raw upstream is unsupported in client mode")
 	}
-	target := s.resolver.target()
+	if s.resolver == nil {
+		return nil, "", errors.New("upstream resolver is nil")
+	}
+	preferred := s.sticky.get(source)
+	targets := s.resolver.orderedTargetsFor(preferred)
+	if len(targets) == 0 {
+		return nil, "", errors.New("no upstream targets available")
+	}
+
+	var errs []error
+	for _, candidate := range targets {
+		upstream, err := s.connectUpstreamRawTarget(ctx, candidate.target)
+		if err != nil {
+			s.sticky.clear(source, candidate.target)
+			errs = append(errs, err)
+			if ctx.Err() != nil {
+				return nil, candidate.target, errors.Join(errs...)
+			}
+			continue
+		}
+		s.sticky.set(source, candidate.target)
+		return upstream, candidate.target, nil
+	}
+	return nil, targets[0].target, errors.Join(errs...)
+}
+
+func (s *proxyServer) connectUpstreamRawTarget(ctx context.Context, target string) (net.Conn, error) {
+	start := time.Now()
 	upstream, err := s.dialer.DialContext(ctx, "tcp", target)
+	latency := time.Since(start)
 	if err != nil {
-		return nil, target, err
+		s.resolver.recordFailure(target)
+		return nil, fmt.Errorf("%s: %w", target, err)
 	}
 	if err := tuneTCP(upstream); err != nil {
+		s.resolver.recordFailure(target)
 		if closeErr := upstream.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
-			return nil, target, errors.Join(fmt.Errorf("tune upstream tcp: %w", err), fmt.Errorf("close upstream after tune failure: %w", closeErr))
+			return nil, fmt.Errorf("%s: %w", target, errors.Join(fmt.Errorf("tune upstream tcp: %w", err), fmt.Errorf("close upstream after tune failure: %w", closeErr)))
 		}
-		return nil, target, fmt.Errorf("tune upstream tcp: %w", err)
+		return nil, fmt.Errorf("%s: tune upstream tcp: %w", target, err)
 	}
-	return upstream, target, nil
+	s.resolver.recordSuccess(target, latency)
+	return upstream, nil
 }
 
 func (s *proxyServer) bridge(upstream net.Conn, client net.Conn, clientReader io.Reader) error {

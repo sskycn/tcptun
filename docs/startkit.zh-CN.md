@@ -99,6 +99,7 @@ bin/proxy client --config /etc/proxy/client.json
 | `dial_timeout` | server/client/local | TCP 拨号超时时间，用于上游、隧道和网关检测，默认 `5s`。 |
 | `refresh_interval` | local | 检查本机 IPv4 变化的间隔。只有本机 IPv4 变化后才重新发现网关。`0` 表示禁用刷新。 |
 | `scan_timeout` | local | 扫描本机 IPv4 网段时每个 IP 的探测超时。 |
+| `scan_retry_interval` | local | 自动扫描本机 IPv4 网段没有找到可达网关代理时，下一次重扫前的等待时间。默认 `5s`。 |
 | `scan_workers` | local | 扫描本机 IPv4 网段时使用的并发 worker 数。 |
 | `buffer_size` | server/client/local | 每个方向的复制缓冲区大小；低于 4096 时会提升到 4096。 |
 | `verbose` | server/client/local | 是否输出调试日志。访问日志始终会输出。 |
@@ -106,6 +107,8 @@ bin/proxy client --config /etc/proxy/client.json
 ## 路由配置字段
 
 路由字段写在 `route.json`，不写入 `server.json`、`client.json` 或 `config.json`。`proxy config` 默认会写出一个空的路由文件。
+
+local 模式自动发现网关时，如果本机内网 IPv4 网段扫描没有找到可达代理，会等待 `scan_retry_interval` 后重新扫描同一批本机内网 IPv4 网段。至少找到一个代理、进程退出或 discovery context 被取消时，重试循环结束。如果扫描找到多个可达代理，会全部保留为上游候选，并按测得的连接延迟排序。新的源 IP 优先选择当前已知最快的候选；已有源 IP 会继续使用已绑定上游，直到该上游连接失败或上游协议握手失败。网关发现和网段扫描仍然只会在本机存在内网 IPv4 地址时触发；启动后也仍然只有本机 IPv4 地址集合发生变化才会重新触发。
 
 | 字段 | 适用模式 | 含义 |
 | --- | --- | --- |

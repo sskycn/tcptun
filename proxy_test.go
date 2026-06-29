@@ -657,7 +657,8 @@ func TestApplyRuntimeConfigDefaultsLoadsModeOnlyWhenEmpty(t *testing.T) {
 		"tunnel_protocol": "vless",
 		"tunnel_transport": "ws",
 		"tunnel_path": "/ws",
-		"direct_probe_timeout": "25ms"
+		"direct_probe_timeout": "25ms",
+		"scan_retry_interval": "75ms"
 	}`)
 	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
 		t.Fatal(err)
@@ -691,6 +692,9 @@ func TestApplyRuntimeConfigDefaultsLoadsModeOnlyWhenEmpty(t *testing.T) {
 	if cfg.DirectProbeTimeout != 25*time.Millisecond {
 		t.Fatalf("direct probe timeout = %s, want 25ms", cfg.DirectProbeTimeout)
 	}
+	if cfg.ScanRetryInterval != 75*time.Millisecond {
+		t.Fatalf("scan retry interval = %s, want 75ms", cfg.ScanRetryInterval)
+	}
 
 	cfg = config{ConfigPath: configPath, Mode: proxyModeServer}
 	if err := applyRuntimeConfigDefaults(&cfg); err != nil {
@@ -698,6 +702,76 @@ func TestApplyRuntimeConfigDefaultsLoadsModeOnlyWhenEmpty(t *testing.T) {
 	}
 	if cfg.Mode != proxyModeServer {
 		t.Fatalf("explicit mode = %q, want %q", cfg.Mode, proxyModeServer)
+	}
+}
+
+func TestScanLocalIPv4WithRetryRetriesAfterNotFound(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.GatewayPort = 1080
+	cfg.ScanTimeout = time.Millisecond
+	cfg.ScanRetryInterval = time.Millisecond
+	cfg.ScanWorkers = 1
+
+	attempts := 0
+	wantIP := net.ParseIP("192.168.1.20")
+	got, err := scanLocalIPv4WithRetry(context.Background(), cfg, nil, io.Discard, func(ctx context.Context, port int, timeout time.Duration, workers int, gatewayHint net.IP) ([]reachableProxy, error) {
+		if ctx == nil {
+			return nil, errors.New("context is nil")
+		}
+		if port != cfg.GatewayPort {
+			return nil, fmt.Errorf("port = %d, want %d", port, cfg.GatewayPort)
+		}
+		attempts++
+		if attempts == 1 {
+			return nil, errReachableProxyNotFound
+		}
+		return []reachableProxy{{ip: wantIP, latency: time.Millisecond}}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !got[0].ip.Equal(wantIP) {
+		t.Fatalf("reachable = %#v, want %s", got, wantIP)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+}
+
+func TestScanLocalIPv4WithRetryStopsOnContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg := defaultConfig()
+	cfg.ScanRetryInterval = time.Hour
+
+	attempts := 0
+	_, err := scanLocalIPv4WithRetry(ctx, cfg, nil, io.Discard, func(ctx context.Context, port int, timeout time.Duration, workers int, gatewayHint net.IP) ([]reachableProxy, error) {
+		attempts++
+		cancel()
+		return nil, errReachableProxyNotFound
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context canceled", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1", attempts)
+	}
+}
+
+func TestScanLocalIPv4WithRetryDoesNotRetryOtherErrors(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.ScanRetryInterval = time.Millisecond
+	wantErr := errors.New("interfaces unavailable")
+
+	attempts := 0
+	_, err := scanLocalIPv4WithRetry(context.Background(), cfg, nil, io.Discard, func(ctx context.Context, port int, timeout time.Duration, workers int, gatewayHint net.IP) ([]reachableProxy, error) {
+		attempts++
+		return nil, wantErr
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("err = %v, want %v", err, wantErr)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1", attempts)
 	}
 }
 
@@ -815,8 +889,10 @@ func TestUpstreamRefreshSkipsDiscoveryWhenLocalIPUnchanged(t *testing.T) {
 			ScanWorkers: 1,
 			Verbose:     true,
 		},
-		log:              &log,
-		currentTarget:    upstream.Addr().String(),
+		log: &log,
+		targets: map[string]upstreamTargetState{
+			upstream.Addr().String(): {target: upstream.Addr().String()},
+		},
 		localIPSignature: signature,
 	}
 
@@ -844,8 +920,10 @@ func TestUpstreamRefreshRunsWhenLocalIPChanged(t *testing.T) {
 			DialTimeout: time.Second,
 			Verbose:     true,
 		},
-		log:              io.Discard,
-		currentTarget:    "192.0.2.1:1080",
+		log: io.Discard,
+		targets: map[string]upstreamTargetState{
+			"192.0.2.1:1080": {target: "192.0.2.1:1080"},
+		},
 		localIPSignature: "old-local-ip",
 	}
 
@@ -857,6 +935,100 @@ func TestUpstreamRefreshRunsWhenLocalIPChanged(t *testing.T) {
 	}
 	if resolver.localSignature() == "old-local-ip" {
 		t.Fatal("local IP signature was not updated")
+	}
+}
+
+func TestConnectUpstreamRawKeepsSourceStickyUntilFailure(t *testing.T) {
+	upstreamA, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := upstreamA.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close upstream A: %v", err)
+		}
+	})
+	upstreamB, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := upstreamB.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close upstream B: %v", err)
+		}
+	})
+
+	hits := make(chan string, 4)
+	go acceptLabels(upstreamA, "A", hits)
+	go acceptLabels(upstreamB, "B", hits)
+
+	targetA := upstreamA.Addr().String()
+	targetB := upstreamB.Addr().String()
+	server := &proxyServer{
+		cfg: config{Mode: proxyModeLocal, DialTimeout: 100 * time.Millisecond},
+		resolver: &upstreamResolver{
+			cfg: config{DialTimeout: 100 * time.Millisecond},
+			targets: map[string]upstreamTargetState{
+				targetA: {target: targetA, latency: 10 * time.Millisecond},
+				targetB: {target: targetB, latency: time.Millisecond},
+			},
+		},
+		sticky: newUpstreamSticky(),
+	}
+	source := "192.168.1.50"
+
+	conn, target, err := server.connectUpstreamRaw(context.Background(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		t.Fatal(err)
+	}
+	if target != targetB {
+		t.Fatalf("first target = %s, want %s", target, targetB)
+	}
+	if hit := waitForLabel(t, hits); hit != "B" {
+		t.Fatalf("first hit = %s, want B", hit)
+	}
+
+	server.resolver.mu.Lock()
+	stateA := server.resolver.targets[targetA]
+	stateA.latency = time.Nanosecond
+	server.resolver.targets[targetA] = stateA
+	stateB := server.resolver.targets[targetB]
+	stateB.latency = time.Second
+	server.resolver.targets[targetB] = stateB
+	server.resolver.mu.Unlock()
+
+	conn, target, err = server.connectUpstreamRaw(context.Background(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		t.Fatal(err)
+	}
+	if target != targetB {
+		t.Fatalf("sticky target = %s, want %s", target, targetB)
+	}
+	if hit := waitForLabel(t, hits); hit != "B" {
+		t.Fatalf("sticky hit = %s, want B", hit)
+	}
+
+	if err := upstreamB.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		t.Fatal(err)
+	}
+	conn, target, err = server.connectUpstreamRaw(context.Background(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		t.Fatal(err)
+	}
+	if target != targetA {
+		t.Fatalf("fallback target = %s, want %s", target, targetA)
+	}
+	if hit := waitForLabel(t, hits); hit != "A" {
+		t.Fatalf("fallback hit = %s, want A", hit)
 	}
 }
 
@@ -2747,6 +2919,30 @@ func acceptSignal(listener net.Listener, hit chan<- struct{}) {
 		}
 	}()
 	hit <- struct{}{}
+}
+
+func acceptLabels(listener net.Listener, label string, hits chan<- string) {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			return
+		}
+		hits <- label
+	}
+}
+
+func waitForLabel(t *testing.T, hits <-chan string) string {
+	t.Helper()
+	select {
+	case hit := <-hits:
+		return hit
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for upstream hit")
+		return ""
+	}
 }
 
 func udpEchoOnce(conn *net.UDPConn, errCh chan<- error) {

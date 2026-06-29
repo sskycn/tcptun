@@ -6,7 +6,7 @@ import (
 )
 
 type upstreamDialer interface {
-	dialTCP(ctx context.Context, req socksRequest) (net.Conn, string, error)
+	dialTCP(ctx context.Context, source string, req socksRequest) (net.Conn, string, error)
 }
 
 type socks5UpstreamDialer struct {
@@ -17,11 +17,11 @@ type tunnelUpstreamDialer struct {
 	server *proxyServer
 }
 
-func (s socks5UpstreamDialer) dialTCP(ctx context.Context, req socksRequest) (net.Conn, string, error) {
-	return s.server.connectViaUpstreamSocks5(ctx, req)
+func (s socks5UpstreamDialer) dialTCP(ctx context.Context, source string, req socksRequest) (net.Conn, string, error) {
+	return s.server.connectViaUpstreamSocks5(ctx, source, req)
 }
 
-func (t tunnelUpstreamDialer) dialTCP(ctx context.Context, req socksRequest) (net.Conn, string, error) {
+func (t tunnelUpstreamDialer) dialTCP(ctx context.Context, source string, req socksRequest) (net.Conn, string, error) {
 	return t.server.connectViaTunnelTCP(ctx, req)
 }
 

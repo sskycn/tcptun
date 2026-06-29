@@ -143,7 +143,7 @@ func (s *proxyServer) handleSocks5Connect(ctx context.Context, client net.Conn, 
 				return err
 			}
 			outbound, outboundReader, upstreamTarget, directOK, err := s.probeDirectTunnelOrFallback(ctx, client, reader, direct, cacheKey, req.host, func(ctx context.Context) (net.Conn, io.Reader, string, error) {
-				upstream, upstreamTarget, err := s.connectViaUpstreamTCP(ctx, req)
+				upstream, upstreamTarget, err := s.connectViaUpstreamTCP(ctx, upstreamStickySource(client.RemoteAddr()), req)
 				if err != nil {
 					return nil, nil, upstreamTarget, err
 				}
@@ -186,7 +186,7 @@ func (s *proxyServer) handleSocks5Connect(ctx context.Context, client net.Conn, 
 	}
 
 	requestedTarget := logTarget
-	upstream, target, err := s.connectViaUpstreamTCP(ctx, req)
+	upstream, target, err := s.connectViaUpstreamTCP(ctx, upstreamStickySource(client.RemoteAddr()), req)
 	if err != nil {
 		if logErr := accessLog(s.log, accessSource("socks5", client.RemoteAddr()), target, requestedTarget, err.Error()); logErr != nil {
 			return errors.Join(err, logErr)
@@ -247,7 +247,7 @@ func (s *proxyServer) handleHTTPProxy(ctx context.Context, client net.Conn, read
 					return err
 				}
 				outbound, outboundReader, upstreamTarget, directOK, err := s.probeDirectTunnelOrFallback(ctx, client, reader, direct, cacheKey, targetHost, func(ctx context.Context) (net.Conn, io.Reader, string, error) {
-					return s.connectHTTPConnectFallback(ctx, req, socksReq)
+					return s.connectHTTPConnectFallback(ctx, upstreamStickySource(client.RemoteAddr()), req, socksReq)
 				})
 				if err != nil {
 					if logErr := accessLog(s.log, accessSource(logProtocol, client.RemoteAddr()), upstreamTarget, logTarget, err.Error()); logErr != nil {
@@ -370,7 +370,7 @@ func (s *proxyServer) handleHTTPUpstreamSocks5(ctx context.Context, client net.C
 		return err
 	}
 
-	upstream, upstreamTarget, err := s.connectViaUpstreamTCP(ctx, socksReq)
+	upstream, upstreamTarget, err := s.connectViaUpstreamTCP(ctx, upstreamStickySource(client.RemoteAddr()), socksReq)
 	if err != nil {
 		if logErr := accessLog(s.log, accessSource(logProtocol, client.RemoteAddr()), upstreamTarget, target, err.Error()); logErr != nil {
 			return errors.Join(err, logErr)
@@ -421,7 +421,7 @@ func (s *proxyServer) handleHTTPUpstreamSocks5(ctx context.Context, client net.C
 }
 
 func (s *proxyServer) proxyViaUpstreamRaw(ctx context.Context, client net.Conn, reader *bufio.Reader, initial []byte, protocol string, target string) error {
-	upstream, upstreamTarget, err := s.connectUpstreamRaw(ctx)
+	upstream, upstreamTarget, err := s.connectUpstreamRaw(ctx, upstreamStickySource(client.RemoteAddr()))
 	if err != nil {
 		if logErr := accessLog(s.log, accessSource(protocol, client.RemoteAddr()), upstreamTarget, target, err.Error()); logErr != nil {
 			return errors.Join(err, logErr)
@@ -590,9 +590,9 @@ func readClientTunnelProbePayload(client net.Conn, reader *bufio.Reader, timeout
 	return payload, true, nil
 }
 
-func (s *proxyServer) connectHTTPConnectFallback(ctx context.Context, req *httpProxyRequest, socksReq socksRequest) (net.Conn, io.Reader, string, error) {
+func (s *proxyServer) connectHTTPConnectFallback(ctx context.Context, source string, req *httpProxyRequest, socksReq socksRequest) (net.Conn, io.Reader, string, error) {
 	if s.cfg.Mode == proxyModeLocal && s.cfg.UpstreamProtocol == upstreamProtocolMixed {
-		upstream, upstreamTarget, err := s.connectUpstreamRaw(ctx)
+		upstream, upstreamTarget, err := s.connectUpstreamRaw(ctx, source)
 		if err != nil {
 			return nil, nil, upstreamTarget, err
 		}
@@ -606,7 +606,7 @@ func (s *proxyServer) connectHTTPConnectFallback(ctx context.Context, req *httpP
 		return upstream, reader, upstreamTarget, nil
 	}
 
-	upstream, upstreamTarget, err := s.connectViaUpstreamTCP(ctx, socksReq)
+	upstream, upstreamTarget, err := s.connectViaUpstreamTCP(ctx, source, socksReq)
 	if err != nil {
 		return nil, nil, upstreamTarget, err
 	}
@@ -649,25 +649,57 @@ func socksRequestFromHostPort(host string, port string) (socksRequest, error) {
 	return socksRequest{cmd: socksCmdConnect, host: host, port: uint16(portNumber)}, nil
 }
 
-func (s *proxyServer) connectViaUpstreamSocks5(ctx context.Context, req socksRequest) (net.Conn, string, error) {
-	upstream, target, err := s.connectUpstreamRaw(ctx)
-	if err != nil {
-		return nil, target, err
+func (s *proxyServer) connectViaUpstreamSocks5(ctx context.Context, source string, req socksRequest) (net.Conn, string, error) {
+	if s.cfg.Mode == proxyModeClient {
+		return nil, s.cfg.ServerAddr, errors.New("SOCKS5 upstream is unsupported in client mode")
 	}
-	if err := s.authenticateUpstreamSOCKS5(upstream); err != nil {
-		return nil, target, closeAfterError(upstream, err)
+	if s.resolver == nil {
+		return nil, "", errors.New("upstream resolver is nil")
 	}
-	if err := writeAll(upstream, buildSocks5ConnectRequest(req)); err != nil {
-		return nil, target, closeAfterError(upstream, err)
+	preferred := s.sticky.get(source)
+	targets := s.resolver.orderedTargetsFor(preferred)
+	if len(targets) == 0 {
+		return nil, "", errors.New("no upstream targets available")
 	}
-	if err := readSocks5ConnectReply(upstream); err != nil {
-		return nil, target, closeAfterError(upstream, err)
+
+	var errs []error
+	for _, candidate := range targets {
+		target := candidate.target
+		upstream, err := s.connectUpstreamRawTarget(ctx, target)
+		if err != nil {
+			s.sticky.clear(source, target)
+			errs = append(errs, err)
+			if ctx.Err() != nil {
+				return nil, target, errors.Join(errs...)
+			}
+			continue
+		}
+		if err := s.authenticateUpstreamSOCKS5(upstream); err != nil {
+			s.resolver.recordFailure(target)
+			s.sticky.clear(source, target)
+			errs = append(errs, fmt.Errorf("%s: %w", target, closeAfterError(upstream, err)))
+			continue
+		}
+		if err := writeAll(upstream, buildSocks5ConnectRequest(req)); err != nil {
+			s.resolver.recordFailure(target)
+			s.sticky.clear(source, target)
+			errs = append(errs, fmt.Errorf("%s: %w", target, closeAfterError(upstream, err)))
+			continue
+		}
+		if err := readSocks5ConnectReply(upstream); err != nil {
+			s.resolver.recordFailure(target)
+			s.sticky.clear(source, target)
+			errs = append(errs, fmt.Errorf("%s: %w", target, closeAfterError(upstream, err)))
+			continue
+		}
+		s.sticky.set(source, target)
+		return upstream, target, nil
 	}
-	return upstream, target, nil
+	return nil, targets[0].target, errors.Join(errs...)
 }
 
-func (s *proxyServer) connectViaUpstreamTCP(ctx context.Context, req socksRequest) (net.Conn, string, error) {
-	return s.upstreamDialer().dialTCP(ctx, req)
+func (s *proxyServer) connectViaUpstreamTCP(ctx context.Context, source string, req socksRequest) (net.Conn, string, error) {
+	return s.upstreamDialer().dialTCP(ctx, source, req)
 }
 
 func (s *proxyServer) localSOCKS5AuthRequired() bool {

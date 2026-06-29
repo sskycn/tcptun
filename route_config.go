@@ -54,6 +54,7 @@ type runtimeConfigFile struct {
 	UpstreamSOCKS5Username string         `json:"upstream_socks5_username,omitempty"`
 	UpstreamSOCKS5Password string         `json:"upstream_socks5_password,omitempty"`
 	DirectProbeTimeout     configDuration `json:"direct_probe_timeout,omitempty"`
+	ScanRetryInterval      configDuration `json:"scan_retry_interval,omitempty"`
 }
 
 type configDuration struct {
@@ -252,6 +253,9 @@ func applyRuntimeConfigDefaults(cfg *config) error {
 	}
 	if fileCfg.DirectProbeTimeout.set && (cfg.DirectProbeTimeout <= 0 || cfg.DirectProbeTimeout == DefaultConfig().DirectProbeTimeout) {
 		cfg.DirectProbeTimeout = fileCfg.DirectProbeTimeout.value
+	}
+	if fileCfg.ScanRetryInterval.set && (cfg.ScanRetryInterval <= 0 || cfg.ScanRetryInterval == DefaultConfig().ScanRetryInterval) {
+		cfg.ScanRetryInterval = fileCfg.ScanRetryInterval.value
 	}
 	return nil
 }

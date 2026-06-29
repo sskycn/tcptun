@@ -46,6 +46,7 @@ func buildApp() *cmd.App {
 			f.DurationVar(&cfg.DirectProbeTimeout, "direct-probe-timeout", cfg.DirectProbeTimeout, "timeout waiting for direct target response before falling back upstream", "")
 			f.DurationVar(&cfg.RefreshInterval, "refresh-interval", cfg.RefreshInterval, "interval for checking local IPv4 changes; 0 disables refresh", "")
 			f.DurationVar(&cfg.ScanTimeout, "scan-timeout", cfg.ScanTimeout, "per-IP timeout when scanning local IPv4 networks", "")
+			f.DurationVar(&cfg.ScanRetryInterval, "scan-retry-interval", cfg.ScanRetryInterval, "pause before retrying local IPv4 network scanning after no proxy is found", "")
 			f.IntVar(&cfg.ScanWorkers, "scan-workers", cfg.ScanWorkers, "parallel workers used for IPv4 network scanning", "")
 			f.IntVar(&cfg.BufferSize, "buffer-size", cfg.BufferSize, "per-direction copy buffer size in bytes", "")
 			f.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable debug logs", "v")

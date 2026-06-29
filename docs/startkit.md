@@ -99,6 +99,7 @@ bin/proxy client --config /etc/proxy/client.json
 | `dial_timeout` | server/client/local | TCP dial timeout for upstream, tunnel, and gateway checks. Default is `5s`. |
 | `refresh_interval` | local | Interval for checking local IPv4 changes. Gateway rediscovery only runs after local IPv4 changes. `0` disables refresh. |
 | `scan_timeout` | local | Per-IP timeout when scanning the local IPv4 network for a reachable gateway proxy. |
+| `scan_retry_interval` | local | Pause before retrying local IPv4 network scanning after no reachable gateway proxy is found. Default is `5s`. |
 | `scan_workers` | local | Parallel workers used during local IPv4 network scanning. |
 | `buffer_size` | server/client/local | Per-direction copy buffer size. Values below 4096 are raised to 4096. |
 | `verbose` | server/client/local | Enables debug logs. Access logs are printed regardless of this setting. |
@@ -106,6 +107,8 @@ bin/proxy client --config /etc/proxy/client.json
 ## Route Fields
 
 Route fields live in `route.json`, not in `server.json`, `client.json`, or `config.json`. `proxy config` writes an empty route file by default.
+
+When local mode auto-discovers a gateway and local IPv4 scanning finds no reachable proxy, it waits for `scan_retry_interval` and scans the same local private IPv4 networks again. This retry loop stops when at least one proxy is found, the process exits, or the discovery context is canceled. When scanning finds multiple reachable proxies, all of them are kept as upstream candidates and sorted by measured connection latency. New source IPs prefer the fastest known candidate; an existing source IP keeps using its bound upstream until that upstream fails to connect or complete the upstream protocol handshake. Gateway discovery and scanning are still only triggered when the local machine has a private IPv4 address and, after startup, when the local IPv4 address set changes.
 
 | Field | Modes | Meaning |
 | --- | --- | --- |

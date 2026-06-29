@@ -23,26 +23,46 @@ type localInterface struct {
 	addrs []net.Addr
 }
 
+type reachableProxy struct {
+	ip      net.IP
+	latency time.Duration
+}
+
 func canConnect(ctx context.Context, ip net.IP, port int, timeout time.Duration) bool {
 	if ip == nil {
 		return false
 	}
-	return canConnectTarget(ctx, net.JoinHostPort(ip.String(), strconv.Itoa(port)), timeout)
+	_, ok := canConnectTargetLatency(ctx, net.JoinHostPort(ip.String(), strconv.Itoa(port)), timeout)
+	return ok
 }
 
 func canConnectTarget(ctx context.Context, target string, timeout time.Duration) bool {
+	_, ok := canConnectTargetLatency(ctx, target, timeout)
+	return ok
+}
+
+func canConnectTargetLatency(ctx context.Context, target string, timeout time.Duration) (time.Duration, bool) {
 	dialer := net.Dialer{Timeout: timeout}
+	start := time.Now()
 	conn, err := dialer.DialContext(ctx, "tcp", target)
 	if err != nil {
-		return false
+		return 0, false
 	}
 	if err := conn.Close(); err != nil {
-		return false
+		return 0, false
 	}
-	return true
+	return time.Since(start), true
 }
 
 func scanLocalIPv4(ctx context.Context, port int, timeout time.Duration, workers int, gatewayHint net.IP) (net.IP, error) {
+	reachable, err := scanLocalIPv4All(ctx, port, timeout, workers, gatewayHint)
+	if err != nil {
+		return nil, err
+	}
+	return reachable[0].ip, nil
+}
+
+func scanLocalIPv4All(ctx context.Context, port int, timeout time.Duration, workers int, gatewayHint net.IP) ([]reachableProxy, error) {
 	networks, err := localIPv4Networks(gatewayHint)
 	if err != nil {
 		return nil, err
@@ -58,7 +78,7 @@ func scanLocalIPv4(ctx context.Context, port int, timeout time.Duration, workers
 	defer cancel()
 
 	jobs := make(chan net.IP, workers*2)
-	found := make(chan net.IP, 1)
+	results := make(chan reachableProxy, workers)
 	var wg sync.WaitGroup
 
 	for i := 0; i < workers; i++ {
@@ -66,13 +86,12 @@ func scanLocalIPv4(ctx context.Context, port int, timeout time.Duration, workers
 		go func() {
 			defer wg.Done()
 			for ip := range jobs {
-				if canConnect(scanCtx, ip, port, timeout) {
+				if latency, ok := canConnectTargetLatency(scanCtx, net.JoinHostPort(ip.String(), strconv.Itoa(port)), timeout); ok {
 					select {
-					case found <- ip:
-						cancel()
-					default:
+					case results <- reachableProxy{ip: ip, latency: latency}:
+					case <-scanCtx.Done():
+						return
 					}
-					return
 				}
 			}
 		}()
@@ -108,24 +127,42 @@ func scanLocalIPv4(ctx context.Context, port int, timeout time.Duration, workers
 		}
 	}()
 
-	select {
-	case ip := <-found:
-		<-feedDone
+	workersDone := make(chan struct{})
+	go func() {
 		wg.Wait()
-		return ip, nil
-	case <-feedDone:
-		wg.Wait()
+		close(workersDone)
+		close(results)
+	}()
+
+	reachable := make([]reachableProxy, 0, 8)
+	for {
 		select {
-		case ip := <-found:
-			return ip, nil
-		default:
-			return nil, errReachableProxyNotFound
+		case result, ok := <-results:
+			if !ok {
+				if len(reachable) == 0 {
+					return nil, errReachableProxyNotFound
+				}
+				sort.SliceStable(reachable, func(i, j int) bool {
+					if reachable[i].latency != reachable[j].latency {
+						return reachable[i].latency < reachable[j].latency
+					}
+					return ipv4ToUint32(reachable[i].ip) < ipv4ToUint32(reachable[j].ip)
+				})
+				return reachable, nil
+			}
+			reachable = append(reachable, result)
+		case <-workersDone:
+			workersDone = nil
+		case <-feedDone:
+			feedDone = nil
+		case <-ctx.Done():
+			cancel()
+			if feedDone != nil {
+				<-feedDone
+			}
+			wg.Wait()
+			return nil, ctx.Err()
 		}
-	case <-ctx.Done():
-		cancel()
-		<-feedDone
-		wg.Wait()
-		return nil, ctx.Err()
 	}
 }
 
