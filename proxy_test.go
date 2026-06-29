@@ -361,12 +361,12 @@ func TestRunProxyForceUpstreamCIDRSkipsDirect(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- runProxy(ctx, config{
-			ListenAddr:  listenAddr,
-			GatewayIP:   "127.0.0.1",
-			GatewayPort: upstreamPort,
-			ConfigPath:  configPath,
-			DialTimeout: time.Second,
-			BufferSize:  4096,
+			ListenAddr:      listenAddr,
+			GatewayIP:       "127.0.0.1",
+			GatewayPort:     upstreamPort,
+			RouteConfigPath: configPath,
+			DialTimeout:     time.Second,
+			BufferSize:      4096,
 		}, io.Discard)
 	}()
 	waitForTCP(t, listenAddr)
@@ -758,7 +758,7 @@ func TestRunProxyMixedUpstreamFromConfigForwardsUnknownTraffic(t *testing.T) {
 	go fixedPayloadUpstream(upstream, len(payload), upstreamPayload, upstreamErr)
 
 	configPath := filepath.Join(t.TempDir(), "config.json")
-	configBody := []byte(`{"upstream_protocol":"mixed","force_upstream":{}}`)
+	configBody := []byte(`{"upstream_protocol":"mixed"}`)
 	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -1761,7 +1761,7 @@ func TestRunProxyClientServerHTTPConnectTunnel(t *testing.T) {
 					TunnelTransport: transport,
 					TunnelPath:      "/tunnel",
 					TunnelMux:       true,
-					ConfigPath:      configPath,
+					RouteConfigPath: configPath,
 					DialTimeout:     time.Second,
 					BufferSize:      4096,
 				}, io.Discard)
@@ -1873,7 +1873,7 @@ func TestRunProxyClientServerProtocolTunnel(t *testing.T) {
 					Token:           tt.token,
 					TunnelProtocol:  tt.protocol,
 					TunnelTransport: tunnelTransportRaw,
-					ConfigPath:      configPath,
+					RouteConfigPath: configPath,
 					DialTimeout:     time.Second,
 					BufferSize:      4096,
 				}, io.Discard)
@@ -1967,7 +1967,7 @@ func TestRunProxyClientServerTrojanRawTLS(t *testing.T) {
 			TunnelTLS:           true,
 			TunnelTLSInsecure:   true,
 			TunnelTLSServerName: "localhost",
-			ConfigPath:          configPath,
+			RouteConfigPath:     configPath,
 			DialTimeout:         time.Second,
 			BufferSize:          4096,
 		}, io.Discard)
@@ -2057,7 +2057,7 @@ func TestRunProxyClientServerSOCKS5UDPTunnel(t *testing.T) {
 					TunnelTransport: transport,
 					TunnelPath:      "/tunnel",
 					TunnelMux:       true,
-					ConfigPath:      configPath,
+					RouteConfigPath: configPath,
 					DialTimeout:     time.Second,
 					BufferSize:      4096,
 				}, io.Discard)

@@ -30,10 +30,11 @@ bin/proxy config --protocol vmess --server-addr proxy.example.com:9443
 bin/proxy config --protocol trojan --server-addr proxy.example.com:443 --tls --tls-server-name proxy.example.com
 ```
 
-By default, config generation writes two files:
+By default, config generation writes three files:
 
 - `server.json`: used by `proxy server`.
 - `client.json`: used by `proxy client`.
+- `route.json`: used by local/client routing rules and learned direct-failure targets.
 
 Runtime config defaults:
 
@@ -41,7 +42,9 @@ Runtime config defaults:
 - `proxy client` reads `client.json` next to the executable.
 - `proxy` and `proxy local` read `config.json` next to the executable.
 - `--config <path>` overrides the mode default.
-- `--config ""` disables config loading and write-back.
+- `--config ""` disables runtime config loading.
+- `--route-config <path>` overrides the default `route.json` route file.
+- `--route-config ""` disables route loading and write-back.
 
 ## Run
 
@@ -84,6 +87,13 @@ bin/proxy client --config /etc/proxy/client.json
 | `tunnel_flow` | server/client | VLESS flow, for example `xtls-rprx-vision`. |
 | `tunnel_mux` | server/client | Enables this project's tunnel multiplexing. Currently supported by `custom`. |
 | `upstream_protocol` | client/local | Upstream protocol used for parsed proxy traffic: `socks5` or `mixed`. |
+
+## Route Fields
+
+Route fields live in `route.json`, not in `server.json`, `client.json`, or `config.json`.
+
+| Field | Modes | Meaning |
+| --- | --- | --- |
 | `force_upstream` | client/local | Force-upstream routing rules by domain, prefix, suffix, IP, CIDR, or IP range. |
 
 ## Transport Choices

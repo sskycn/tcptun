@@ -58,15 +58,7 @@ server:
   "token": "00000000-0000-4000-8000-000000000000",
   "tunnel_protocol": "vless",
   "tunnel_transport": "raw",
-  "tunnel_path": "/proxy",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "tunnel_path": "/proxy"
 }
 ```
 
@@ -81,15 +73,7 @@ client:
   "tunnel_protocol": "vless",
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
-  "upstream_protocol": "socks5",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "upstream_protocol": "socks5"
 }
 ```
 
@@ -129,15 +113,7 @@ server:
   "reality_private_key": "REALITY_PRIVATE_KEY",
   "reality_server_names": ["example.com"],
   "reality_short_ids": [""],
-  "reality_dest": "example.com:443",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "reality_dest": "example.com:443"
 }
 ```
 
@@ -158,15 +134,7 @@ client:
   "reality_public_key": "REALITY_PUBLIC_KEY",
   "reality_short_id": "",
   "reality_spider_x": "/",
-  "upstream_protocol": "socks5",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "upstream_protocol": "socks5"
 }
 ```
 

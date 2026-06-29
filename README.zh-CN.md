@@ -23,8 +23,8 @@
 - 运行期间定时刷新可用上游，网络变化后新连接会使用新的目标地址。
 - 对私有地址、回环地址、链路本地地址、`localhost` 和 `.local` 目标直连，不转发到上游。
 - TCP 目标优先直连；如果直连失败，会记住该目标，后续连接直接走上游。
-- 支持通过 `config.json` 配置强制走上游规则，可按精确域名、域名前缀、域名后缀、精确 IP 和 IP CIDR/网段匹配。
-- 程序退出前会把学习到的直连失败目标写回 `config.json`；文件不存在会自动创建，已有规则会去重。
+- 支持通过 `route.json` 配置强制走上游规则，可按精确域名、域名前缀、域名后缀、精确 IP 和 IP CIDR/网段匹配。
+- 程序退出前会把学习到的直连失败目标写回 `route.json`；文件不存在会自动创建，已有规则会去重。
 - 命令行基于 `pkg.gostartkit.com/cmd v0.2.1`。
 
 ## 环境要求
@@ -93,10 +93,16 @@ bin/proxy --upstream-protocol mixed
 bin/proxy local
 ```
 
-指定路由配置文件：
+指定运行配置文件：
 
 ```sh
 bin/proxy --config ./config.json
+```
+
+指定路由配置文件：
+
+```sh
+bin/proxy --route-config ./route.json
 ```
 
 以隧道服务端运行：
@@ -213,7 +219,7 @@ bin/proxy client --server-addr proxy.example.com:9443 --transport h3 --tunnel-pa
 
 ## 内网地址直连
 
-对于 SOCKS5、SOCKS5 UDP ASSOCIATE、HTTP CONNECT 和 HTTP 代理请求，程序会解析请求目标。`config.json` 中的强制走上游规则优先级最高。否则，TCP 目标会优先直连；如果直连失败，会记住该目标为仅走上游，后续连接跳过直连尝试。UDP 目标保持保守规则：内网目标直连，其他目标走上游。
+对于 SOCKS5、SOCKS5 UDP ASSOCIATE、HTTP CONNECT 和 HTTP 代理请求，程序会解析请求目标。`route.json` 中的强制走上游规则优先级最高。否则，TCP 目标会优先直连；如果直连失败，会记住该目标为仅走上游，后续连接跳过直连尝试。UDP 目标保持保守规则：内网目标直连，其他目标走上游。
 
 ## 上游协议
 
@@ -235,9 +241,9 @@ bin/proxy client --server-addr proxy.example.com:9443 --transport h3 --tunnel-pa
 
 `proxy client` 保持本地 mixed 代理入口，但会把已解析出目标的 TCP 和 UDP 上游流量封装到隧道服务端。使用 `--server-addr` 指定服务端地址，`--token` 需要和服务端一致。
 
-默认情况下，`proxy server` 会读取可执行文件旁边的 `server.json`，`proxy client` 会读取可执行文件旁边的 `client.json`。显式传入 `--config <path>` 仍会覆盖这些模式默认值；传入 `--config ""` 可以禁用配置加载和写回。
+默认情况下，`proxy server` 会读取可执行文件旁边的 `server.json`，`proxy client` 会读取可执行文件旁边的 `client.json`。显式传入 `--config <path>` 仍会覆盖这些模式默认值；传入 `--config ""` 可以禁用运行配置加载。
 
-`proxy config` 用于生成可直接编辑的 JSON 配置文件，不会启动代理。不带任何 flag 运行时会进入基于命令运行时的交互向导；直接回车使用默认值，也可以输入要覆盖的字段。传入 flag 时仍保持非交互生成，适合脚本使用。默认同时写出 `server.json` 和 `client.json`，两端共享同一个自动生成的 token，并支持通过 `--protocol custom|vless|vmess|trojan` 指定协议。
+`proxy config` 用于生成可直接编辑的 JSON 配置文件，不会启动代理。不带任何 flag 运行时会进入基于命令运行时的交互向导；直接回车使用默认值，也可以输入要覆盖的字段。传入 flag 时仍保持非交互生成，适合脚本使用。默认同时写出 `server.json`、`client.json` 和 `route.json`，服务端/客户端配置共享同一个自动生成的 token，并支持通过 `--protocol custom|vless|vmess|trojan` 指定协议。
 
 ```sh
 bin/proxy config
@@ -307,37 +313,27 @@ bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-pat
 
 ## 路由配置
 
-默认情况下，local 模式和不带子命令的 `proxy` 会读取可执行文件所在目录下的 `config.json`，`proxy server` 会读取 `server.json`，`proxy client` 会读取 `client.json`。相对路径形式的 `--config` 会按可执行文件所在目录解析，绝对路径会原样使用。仓库自带的 `config.json` 已经将 `x.com`、`twitter.com` 及相关子域名设置为强制走上游。如果选中的配置文件不存在，会先按无自定义规则运行，并在退出前发现新的直连失败目标时自动创建。可以使用 `--config <path>` 指定其他文件，或使用 `--config ""` 禁用配置加载和写回。
+运行配置和路由规则使用独立文件。默认情况下，local 模式和不带子命令的 `proxy` 会从可执行文件所在目录的 `config.json` 读取运行配置，`proxy server` 读取 `server.json`，`proxy client` 读取 `client.json`。路由规则默认读取可执行文件所在目录下的 `route.json`，也可以通过 `--route-config <path>` 指定；传入 `--route-config ""` 可以禁用路由加载和写回。
 
-示例：
+运行配置示例：
 
 ```json
 {
   "mode": "local",
   "listen_addr": "127.0.0.1:1080",
   "upstream_protocol": "socks5",
-  "server_addr": "",
-  "token": "",
   "tunnel_protocol": "custom",
   "tunnel_transport": "raw",
   "tunnel_security": "none",
-  "tunnel_flow": "",
   "tunnel_path": "/proxy",
-  "tunnel_tls": false,
-  "tunnel_tls_cert": "",
-  "tunnel_tls_key": "",
-  "tunnel_tls_server_name": "",
-  "tunnel_tls_insecure": false,
-  "reality_server_name": "",
-  "reality_server_names": [],
-  "reality_fingerprint": "chrome",
-  "reality_public_key": "",
-  "reality_private_key": "",
-  "reality_short_id": "",
-  "reality_short_ids": [],
-  "reality_dest": "",
-  "reality_spider_x": "/",
-  "tunnel_mux": true,
+  "tunnel_mux": true
+}
+```
+
+路由配置示例：
+
+```json
+{
   "force_upstream": {
     "domains": ["x.com", "twitter.com"],
     "domain_prefixes": ["api.", "pbs.twimg."],
@@ -351,15 +347,13 @@ bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-pat
 
 规则说明：
 
-- `mode`：不带子命令运行 `proxy` 时使用的运行模式。支持 `local`、`client` 和 `server`。
-- `listen_addr`：未显式传入 `--listen` 时，local、client 或 server 模式使用的监听地址。
 - `domains`：精确匹配主机名。
 - `domain_prefixes`：匹配以指定值开头的主机名。
 - `domain_suffixes`：匹配该域名本身及其子域名。
 - `ips`：精确匹配 IP。
 - `ip_cidrs` 和 `ip_ranges`：按 CIDR 前缀匹配。`ip_ranges` 是 CIDR 风格网段的别名。
 
-程序退出前会将学习到的 TCP 直连失败目标合并写入该文件。失败的域名目标会追加到 `domains`，失败的 IP 目标会追加到 `ips`。如果已有精确域名、域名前缀、域名后缀、精确 IP 或 IP CIDR/网段规则已经覆盖该目标，就不会重复写入。
+程序退出前会将学习到的 TCP 直连失败目标合并写入 `route.json` 或 `--route-config` 指定的文件。失败的域名目标会追加到 `domains`，失败的 IP 目标会追加到 `ips`。如果已有精确域名、域名前缀、域名后缀、精确 IP 或 IP CIDR/网段规则已经覆盖该目标，就不会重复写入。
 
 ## UDP 支持
 
@@ -379,7 +373,8 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 
 ```text
 --buffer-size <int>         每个方向的拷贝缓冲区大小，单位字节 [默认: 32768]
--c, --config <string>       JSON 路由配置文件路径；默认按模式选择；为空表示禁用配置加载 [默认: "config.json"]
+-c, --config <string>       JSON 运行配置文件路径；默认按模式选择；为空表示禁用运行配置加载 [默认: "config.json"]
+--route-config <string>     JSON 路由配置文件路径；为空表示禁用路由加载和写回 [默认: "route.json"]
 --dial-timeout <duration>   连接上游超时时间 [默认: 5s]
 --gateway-ip <string>       网关 IP；为空表示自动发现
 -p, --gateway-port <int>    网关代理端口 [默认: 1080]
@@ -442,12 +437,13 @@ make run      # 使用 Makefile 默认参数运行
 make clean    # 删除构建产物和本地 Go 缓存
 ```
 
-`make run` 默认使用本仓库里的 `config.json`，也支持临时覆盖参数：
+`make run` 默认使用本仓库里的 `config.json` 和 `route.json`，也支持临时覆盖参数：
 
 ```sh
 make run LISTEN=127.0.0.1:1081 GATEWAY_PORT=7890
 make run GATEWAY_IP=192.168.1.1
 make run CONFIG=/path/to/config.json
+make run ROUTE_CONFIG=/path/to/route.json
 make run UPSTREAM_PROTOCOL=mixed
 make run MODE=local
 make run MODE=server LISTEN=0.0.0.0:9443 TOKEN=change-me

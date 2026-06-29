@@ -32,6 +32,7 @@ func TestGenerateConfigFilesBoth(t *testing.T) {
 
 	server := readGeneratedConfigForTest(t, filepath.Join(dir, "server.json"))
 	client := readGeneratedConfigForTest(t, filepath.Join(dir, "client.json"))
+	route := readGeneratedRouteConfigForTest(t, filepath.Join(dir, "route.json"))
 	if server.Mode != proxypkg.ProxyModeServer {
 		t.Fatalf("server mode = %q", server.Mode)
 	}
@@ -47,8 +48,11 @@ func TestGenerateConfigFilesBoth(t *testing.T) {
 	if client.ServerAddr != "proxy.example.com:9443" {
 		t.Fatalf("client server_addr = %q", client.ServerAddr)
 	}
-	if len(client.ForceUpstream.IPCIDRs) != 2 {
-		t.Fatalf("force CIDRs = %v", client.ForceUpstream.IPCIDRs)
+	if len(route.ForceUpstream.IPCIDRs) != 2 {
+		t.Fatalf("force CIDRs = %v", route.ForceUpstream.IPCIDRs)
+	}
+	if generatedConfigHasField(t, filepath.Join(dir, "client.json"), "force_upstream") {
+		t.Fatal("client.json should not contain force_upstream")
 	}
 }
 
@@ -114,6 +118,7 @@ func TestRunInteractiveConfigGeneratesBothConfigs(t *testing.T) {
 		"",
 		"",
 		"",
+		"",
 	}, "\n") + "\n"
 	var output strings.Builder
 	if err := runInteractiveConfig(t.Context(), opts, strings.NewReader(input), &output, &output); err != nil {
@@ -130,6 +135,9 @@ func TestRunInteractiveConfigGeneratesBothConfigs(t *testing.T) {
 	}
 	if client.UpstreamProtocol != "socks5" {
 		t.Fatalf("client upstream_protocol = %q", client.UpstreamProtocol)
+	}
+	if generatedConfigHasField(t, filepath.Join(dir, "client.json"), "force_upstream") {
+		t.Fatal("client.json should not contain force_upstream")
 	}
 	if server.TunnelMux == nil || !*server.TunnelMux {
 		t.Fatalf("server tunnel_mux = %v", server.TunnelMux)
@@ -176,4 +184,31 @@ func readGeneratedConfigForTest(t *testing.T, path string) generatedRouteConfig 
 		t.Fatal(err)
 	}
 	return cfg
+}
+
+func readGeneratedRouteConfigForTest(t *testing.T, path string) generatedRouteRulesConfig {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg generatedRouteRulesConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	return cfg
+}
+
+func generatedConfigHasField(t *testing.T, path string, field string) bool {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	_, ok := raw[field]
+	return ok
 }

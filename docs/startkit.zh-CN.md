@@ -28,10 +28,11 @@ bin/proxy config --protocol vmess --server-addr proxy.example.com:9443
 bin/proxy config --protocol trojan --server-addr proxy.example.com:443 --tls --tls-server-name proxy.example.com
 ```
 
-默认会生成两份文件：
+默认会生成三份文件：
 
 - `server.json`：给 `proxy server` 使用。
 - `client.json`：给 `proxy client` 使用。
+- `route.json`：给 local/client 路由规则和学习到的直连失败目标使用。
 
 默认运行规则：
 
@@ -39,7 +40,9 @@ bin/proxy config --protocol trojan --server-addr proxy.example.com:443 --tls --t
 - `proxy client` 默认读取可执行文件所在目录下的 `client.json`。
 - `proxy` 或 `proxy local` 默认读取可执行文件所在目录下的 `config.json`。
 - 显式传入 `--config <path>` 时使用指定配置文件。
-- 显式传入 `--config ""` 时禁用配置加载和写回。
+- 显式传入 `--config ""` 时禁用运行配置加载。
+- 显式传入 `--route-config <path>` 时使用指定路由配置。
+- 显式传入 `--route-config ""` 时禁用路由加载和写回。
 
 ## 运行方式
 
@@ -84,6 +87,13 @@ bin/proxy client --config /etc/proxy/client.json
 | `tunnel_flow` | server/client | VLESS flow，例如 `xtls-rprx-vision`。 |
 | `tunnel_mux` | server/client | 是否开启本项目 tunnel 多路复用。当前只有 custom 协议支持。 |
 | `upstream_protocol` | client/local | 走上游时使用的本地上游协议，支持 `socks5` 和 `mixed`。 |
+
+## 路由配置字段
+
+路由字段写在 `route.json`，不写入 `server.json`、`client.json` 或 `config.json`。
+
+| 字段 | 适用模式 | 含义 |
+| --- | --- | --- |
 | `force_upstream` | client/local | 强制走上游规则，支持域名、域名前缀、域名后缀、IP、CIDR 和范围。 |
 
 ## Transport 选择

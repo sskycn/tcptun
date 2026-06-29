@@ -26,32 +26,35 @@ const (
 )
 
 type generatedRouteConfig struct {
-	Mode                string                       `json:"mode,omitempty"`
-	ListenAddr          string                       `json:"listen_addr,omitempty"`
-	ServerAddr          string                       `json:"server_addr,omitempty"`
-	Token               string                       `json:"token,omitempty"`
-	TunnelProtocol      string                       `json:"tunnel_protocol,omitempty"`
-	TunnelTransport     string                       `json:"tunnel_transport,omitempty"`
-	TunnelPath          string                       `json:"tunnel_path,omitempty"`
-	TunnelTLS           bool                         `json:"tunnel_tls,omitempty"`
-	TunnelTLSCert       string                       `json:"tunnel_tls_cert,omitempty"`
-	TunnelTLSKey        string                       `json:"tunnel_tls_key,omitempty"`
-	TunnelTLSServerName string                       `json:"tunnel_tls_server_name,omitempty"`
-	TunnelTLSInsecure   bool                         `json:"tunnel_tls_insecure,omitempty"`
-	TunnelSecurity      string                       `json:"tunnel_security,omitempty"`
-	TunnelFlow          string                       `json:"tunnel_flow,omitempty"`
-	RealityServerName   string                       `json:"reality_server_name,omitempty"`
-	RealityServerNames  []string                     `json:"reality_server_names,omitempty"`
-	RealityFingerprint  string                       `json:"reality_fingerprint,omitempty"`
-	RealityPublicKey    string                       `json:"reality_public_key,omitempty"`
-	RealityPrivateKey   string                       `json:"reality_private_key,omitempty"`
-	RealityShortID      string                       `json:"reality_short_id,omitempty"`
-	RealityShortIDs     []string                     `json:"reality_short_ids,omitempty"`
-	RealityDest         string                       `json:"reality_dest,omitempty"`
-	RealitySpiderX      string                       `json:"reality_spider_x,omitempty"`
-	TunnelMux           *bool                        `json:"tunnel_mux,omitempty"`
-	UpstreamProtocol    string                       `json:"upstream_protocol,omitempty"`
-	ForceUpstream       generatedForceUpstreamConfig `json:"force_upstream"`
+	Mode                string   `json:"mode,omitempty"`
+	ListenAddr          string   `json:"listen_addr,omitempty"`
+	ServerAddr          string   `json:"server_addr,omitempty"`
+	Token               string   `json:"token,omitempty"`
+	TunnelProtocol      string   `json:"tunnel_protocol,omitempty"`
+	TunnelTransport     string   `json:"tunnel_transport,omitempty"`
+	TunnelPath          string   `json:"tunnel_path,omitempty"`
+	TunnelTLS           bool     `json:"tunnel_tls,omitempty"`
+	TunnelTLSCert       string   `json:"tunnel_tls_cert,omitempty"`
+	TunnelTLSKey        string   `json:"tunnel_tls_key,omitempty"`
+	TunnelTLSServerName string   `json:"tunnel_tls_server_name,omitempty"`
+	TunnelTLSInsecure   bool     `json:"tunnel_tls_insecure,omitempty"`
+	TunnelSecurity      string   `json:"tunnel_security,omitempty"`
+	TunnelFlow          string   `json:"tunnel_flow,omitempty"`
+	RealityServerName   string   `json:"reality_server_name,omitempty"`
+	RealityServerNames  []string `json:"reality_server_names,omitempty"`
+	RealityFingerprint  string   `json:"reality_fingerprint,omitempty"`
+	RealityPublicKey    string   `json:"reality_public_key,omitempty"`
+	RealityPrivateKey   string   `json:"reality_private_key,omitempty"`
+	RealityShortID      string   `json:"reality_short_id,omitempty"`
+	RealityShortIDs     []string `json:"reality_short_ids,omitempty"`
+	RealityDest         string   `json:"reality_dest,omitempty"`
+	RealitySpiderX      string   `json:"reality_spider_x,omitempty"`
+	TunnelMux           *bool    `json:"tunnel_mux,omitempty"`
+	UpstreamProtocol    string   `json:"upstream_protocol,omitempty"`
+}
+
+type generatedRouteRulesConfig struct {
+	ForceUpstream generatedForceUpstreamConfig `json:"force_upstream"`
 }
 
 type generatedForceUpstreamConfig struct {
@@ -71,6 +74,7 @@ type generateConfigOptions struct {
 	outDir              string
 	serverOutput        string
 	clientOutput        string
+	routeOutput         string
 	serverListen        string
 	clientListen        string
 	serverAddr          string
@@ -105,6 +109,7 @@ func buildConfigCommand() *cmd.Command {
 		outDir:       ".",
 		serverOutput: "server.json",
 		clientOutput: "client.json",
+		routeOutput:  "route.json",
 		serverListen: "0.0.0.0:9443",
 		clientListen: proxypkg.DefaultConfig().ListenAddr,
 		serverAddr:   "127.0.0.1:9443",
@@ -129,6 +134,7 @@ func buildConfigCommand() *cmd.Command {
 			f.StringVar(&opts.outDir, "out-dir", opts.outDir, "directory for generated config files", "")
 			f.StringVar(&opts.serverOutput, "server-output", opts.serverOutput, "server config output filename or path", "")
 			f.StringVar(&opts.clientOutput, "client-output", opts.clientOutput, "client config output filename or path", "")
+			f.StringVar(&opts.routeOutput, "route-output", opts.routeOutput, "route config output filename or path", "")
 			f.StringVar(&opts.serverOutput, "output", opts.serverOutput, "single output path when --target is server or client", "o")
 			f.StringVar(&opts.serverListen, "server-listen", opts.serverListen, "server listen address written to server config", "")
 			f.StringVar(&opts.clientListen, "client-listen", opts.clientListen, "client local listen address written to client config", "")
@@ -152,7 +158,7 @@ func buildConfigCommand() *cmd.Command {
 			f.StringVar(&opts.realitySpiderX, "reality-spider-x", opts.realitySpiderX, "REALITY spiderX path", "")
 			f.StringVar(&opts.tunnelMux, "mux", opts.tunnelMux, "tunnel mux setting: true or false; empty keeps default", "")
 			f.StringVar(&opts.upstreamProtocol, "client-upstream-protocol", opts.upstreamProtocol, "client upstream protocol: socks5 or mixed", "")
-			f.StringVar(&opts.forceCIDRs, "force-ip-cidrs", opts.forceCIDRs, "comma-separated IP CIDRs to force upstream in client config", "")
+			f.StringVar(&opts.forceCIDRs, "force-ip-cidrs", opts.forceCIDRs, "comma-separated IP CIDRs to force upstream in route config", "")
 			f.BoolVar(&opts.overwrite, "overwrite", opts.overwrite, "overwrite existing output files", "")
 		},
 		Run: func(ctx context.Context, c *cmd.Command, args []string) error {
@@ -172,6 +178,7 @@ func generateConfigFiles(opts generateConfigOptions) error {
 }
 
 func generateConfigFilesWithOutput(opts generateConfigOptions, out io.Writer) error {
+	opts = applyGenerateConfigDefaults(opts)
 	normalizedTarget, err := normalizeConfigTarget(opts.target)
 	if err != nil {
 		return err
@@ -199,13 +206,15 @@ func generateConfigFilesWithOutput(opts generateConfigOptions, out io.Writer) er
 	if err := validateGeneratedOptions(normalizedTarget, protocol, opts, token); err != nil {
 		return err
 	}
-	serverCfg, clientCfg := buildGeneratedConfigs(protocol, transport, token, opts, mux, muxSet, forceCIDRs)
-	writes := make([]configWrite, 0, 2)
+	serverCfg, clientCfg := buildGeneratedConfigs(protocol, transport, token, opts, mux, muxSet)
+	routeCfg := buildGeneratedRouteConfig(forceCIDRs)
+	writes := make([]configWrite, 0, 3)
 	switch normalizedTarget {
 	case configTargetBoth:
 		writes = append(writes,
 			configWrite{path: resolveGeneratedOutput(opts.outDir, opts.serverOutput), cfg: serverCfg},
 			configWrite{path: resolveGeneratedOutput(opts.outDir, opts.clientOutput), cfg: clientCfg},
+			configWrite{path: resolveGeneratedOutput(opts.outDir, opts.routeOutput), cfg: routeCfg},
 		)
 	case configTargetServer:
 		writes = append(writes, configWrite{path: resolveGeneratedOutput(opts.outDir, opts.serverOutput), cfg: serverCfg})
@@ -214,7 +223,10 @@ func generateConfigFilesWithOutput(opts generateConfigOptions, out io.Writer) er
 		if strings.TrimSpace(opts.serverOutput) != "" && opts.serverOutput != "server.json" {
 			output = opts.serverOutput
 		}
-		writes = append(writes, configWrite{path: resolveGeneratedOutput(opts.outDir, output), cfg: clientCfg})
+		writes = append(writes,
+			configWrite{path: resolveGeneratedOutput(opts.outDir, output), cfg: clientCfg},
+			configWrite{path: resolveGeneratedOutput(opts.outDir, opts.routeOutput), cfg: routeCfg},
+		)
 	default:
 		return fmt.Errorf("unsupported config target %q", normalizedTarget)
 	}
@@ -231,6 +243,22 @@ func generateConfigFilesWithOutput(opts generateConfigOptions, out io.Writer) er
 	return nil
 }
 
+func applyGenerateConfigDefaults(opts generateConfigOptions) generateConfigOptions {
+	if strings.TrimSpace(opts.outDir) == "" {
+		opts.outDir = "."
+	}
+	if strings.TrimSpace(opts.serverOutput) == "" {
+		opts.serverOutput = "server.json"
+	}
+	if strings.TrimSpace(opts.clientOutput) == "" {
+		opts.clientOutput = "client.json"
+	}
+	if strings.TrimSpace(opts.routeOutput) == "" {
+		opts.routeOutput = "route.json"
+	}
+	return opts
+}
+
 var configGenerateFlagNames = map[string]struct{}{
 	"target":                   {},
 	"protocol":                 {},
@@ -239,6 +267,7 @@ var configGenerateFlagNames = map[string]struct{}{
 	"out-dir":                  {},
 	"server-output":            {},
 	"client-output":            {},
+	"route-output":             {},
 	"output":                   {},
 	"o":                        {},
 	"server-listen":            {},
@@ -328,7 +357,7 @@ func configFlagName(value string) (string, bool) {
 
 type configWrite struct {
 	path string
-	cfg  generatedRouteConfig
+	cfg  any
 }
 
 type configWizardDriver struct {
@@ -516,6 +545,10 @@ func (w *configWizard) collect(ctx context.Context) (generateConfigOptions, erro
 	if err != nil {
 		return generateConfigOptions{}, err
 	}
+	opts.routeOutput, err = w.readString("Route config output", opts.routeOutput)
+	if err != nil {
+		return generateConfigOptions{}, err
+	}
 	opts.overwrite, err = w.readBool("Overwrite existing files", opts.overwrite)
 	if err != nil {
 		return generateConfigOptions{}, err
@@ -649,7 +682,7 @@ func strconvBool(value bool) string {
 	return "false"
 }
 
-func buildGeneratedConfigs(protocol string, transport string, token string, opts generateConfigOptions, mux bool, muxSet bool, forceCIDRs []string) (generatedRouteConfig, generatedRouteConfig) {
+func buildGeneratedConfigs(protocol string, transport string, token string, opts generateConfigOptions, mux bool, muxSet bool) (generatedRouteConfig, generatedRouteConfig) {
 	serverCfg := generatedRouteConfig{
 		Mode:            proxypkg.ProxyModeServer,
 		ListenAddr:      strings.TrimSpace(opts.serverListen),
@@ -657,7 +690,6 @@ func buildGeneratedConfigs(protocol string, transport string, token string, opts
 		TunnelProtocol:  protocol,
 		TunnelTransport: transport,
 		TunnelPath:      normalizeGeneratedPath(opts.tunnelPath),
-		ForceUpstream:   emptyGeneratedForceUpstreamConfig(),
 	}
 	clientCfg := generatedRouteConfig{
 		Mode:             proxypkg.ProxyModeClient,
@@ -668,9 +700,7 @@ func buildGeneratedConfigs(protocol string, transport string, token string, opts
 		TunnelTransport:  transport,
 		TunnelPath:       normalizeGeneratedPath(opts.tunnelPath),
 		UpstreamProtocol: strings.TrimSpace(opts.upstreamProtocol),
-		ForceUpstream:    emptyGeneratedForceUpstreamConfig(),
 	}
-	clientCfg.ForceUpstream.IPCIDRs = forceCIDRs
 	if muxSet {
 		serverCfg.TunnelMux = &mux
 		clientCfg.TunnelMux = &mux
@@ -683,6 +713,12 @@ func buildGeneratedConfigs(protocol string, transport string, token string, opts
 	clientCfg.TunnelTLSInsecure = opts.tunnelTLSInsecure
 	applyGeneratedSecurity(&serverCfg, &clientCfg, opts)
 	return serverCfg, clientCfg
+}
+
+func buildGeneratedRouteConfig(forceCIDRs []string) generatedRouteRulesConfig {
+	cfg := generatedRouteRulesConfig{ForceUpstream: emptyGeneratedForceUpstreamConfig()}
+	cfg.ForceUpstream.IPCIDRs = forceCIDRs
+	return cfg
 }
 
 func emptyGeneratedForceUpstreamConfig() generatedForceUpstreamConfig {
@@ -742,7 +778,7 @@ func validateGeneratedOptions(target string, protocol string, opts generateConfi
 	return nil
 }
 
-func writeGeneratedConfig(path string, cfg generatedRouteConfig, overwrite bool) error {
+func writeGeneratedConfig(path string, cfg any, overwrite bool) error {
 	if strings.TrimSpace(path) == "" {
 		return errors.New("output path is required")
 	}

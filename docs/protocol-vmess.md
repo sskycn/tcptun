@@ -76,15 +76,7 @@ bin/proxy config \
   "token": "00000000-0000-4000-8000-000000000000",
   "tunnel_protocol": "vmess",
   "tunnel_transport": "raw",
-  "tunnel_path": "/proxy",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "tunnel_path": "/proxy"
 }
 ```
 
@@ -99,15 +91,7 @@ bin/proxy config \
   "tunnel_protocol": "vmess",
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
-  "upstream_protocol": "socks5",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "upstream_protocol": "socks5"
 }
 ```
 

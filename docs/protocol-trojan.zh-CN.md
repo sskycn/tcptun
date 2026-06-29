@@ -69,15 +69,7 @@ bin/proxy config \
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
   "tunnel_tls_cert": "/etc/proxy/server.crt",
-  "tunnel_tls_key": "/etc/proxy/server.key",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "tunnel_tls_key": "/etc/proxy/server.key"
 }
 ```
 
@@ -94,15 +86,7 @@ bin/proxy config \
   "tunnel_path": "/proxy",
   "tunnel_tls": true,
   "tunnel_tls_server_name": "proxy.example.com",
-  "upstream_protocol": "socks5",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "upstream_protocol": "socks5"
 }
 ```
 

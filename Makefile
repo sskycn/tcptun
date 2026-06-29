@@ -30,6 +30,7 @@ GATEWAY_IP ?=
 GATEWAY_PORT ?= 1080
 UPSTREAM_PROTOCOL ?=
 CONFIG ?= $(CURDIR)/config.json
+ROUTE_CONFIG ?= $(CURDIR)/route.json
 GOCACHE ?= $(CURDIR)/.gocache
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -40,16 +41,16 @@ RELEASE_TARGETS ?= linux/amd64 linux/arm64 linux/arm/7 darwin/amd64 darwin/arm64
 
 ifeq ($(MODE),server)
 RUN_COMMAND := server
-RUN_FLAGS := --listen $(LISTEN) --config $(CONFIG) $(if $(TOKEN),--token $(TOKEN),) $(if $(TUNNEL_PROTOCOL),--tunnel-protocol $(TUNNEL_PROTOCOL),) $(if $(TRANSPORT),--transport $(TRANSPORT),) $(if $(TUNNEL_SECURITY),--tunnel-security $(TUNNEL_SECURITY),) $(if $(FLOW),--flow $(FLOW),) $(if $(TUNNEL_PATH),--tunnel-path $(TUNNEL_PATH),) $(if $(TLS_CERT),--tls-cert $(TLS_CERT),) $(if $(TLS_KEY),--tls-key $(TLS_KEY),) $(if $(REALITY_PRIVATE_KEY),--reality-private-key $(REALITY_PRIVATE_KEY),) $(if $(REALITY_SERVER_NAMES),--reality-server-names $(REALITY_SERVER_NAMES),) $(if $(REALITY_SHORT_IDS),--reality-short-ids $(REALITY_SHORT_IDS),) $(if $(REALITY_DEST),--reality-dest $(REALITY_DEST),) $(if $(MUX),--mux=$(MUX),)
+RUN_FLAGS := --listen $(LISTEN) --config $(CONFIG) --route-config $(ROUTE_CONFIG) $(if $(TOKEN),--token $(TOKEN),) $(if $(TUNNEL_PROTOCOL),--tunnel-protocol $(TUNNEL_PROTOCOL),) $(if $(TRANSPORT),--transport $(TRANSPORT),) $(if $(TUNNEL_SECURITY),--tunnel-security $(TUNNEL_SECURITY),) $(if $(FLOW),--flow $(FLOW),) $(if $(TUNNEL_PATH),--tunnel-path $(TUNNEL_PATH),) $(if $(TLS_CERT),--tls-cert $(TLS_CERT),) $(if $(TLS_KEY),--tls-key $(TLS_KEY),) $(if $(REALITY_PRIVATE_KEY),--reality-private-key $(REALITY_PRIVATE_KEY),) $(if $(REALITY_SERVER_NAMES),--reality-server-names $(REALITY_SERVER_NAMES),) $(if $(REALITY_SHORT_IDS),--reality-short-ids $(REALITY_SHORT_IDS),) $(if $(REALITY_DEST),--reality-dest $(REALITY_DEST),) $(if $(MUX),--mux=$(MUX),)
 else ifeq ($(MODE),client)
 RUN_COMMAND := client
-RUN_FLAGS := --listen $(LISTEN) --config $(CONFIG) $(if $(SERVER_ADDR),--server-addr $(SERVER_ADDR),) $(if $(TOKEN),--token $(TOKEN),) $(if $(TUNNEL_PROTOCOL),--tunnel-protocol $(TUNNEL_PROTOCOL),) $(if $(TRANSPORT),--transport $(TRANSPORT),) $(if $(TUNNEL_SECURITY),--tunnel-security $(TUNNEL_SECURITY),) $(if $(FLOW),--flow $(FLOW),) $(if $(TUNNEL_PATH),--tunnel-path $(TUNNEL_PATH),) $(if $(TLS),--tls,) $(if $(TLS_SERVER_NAME),--tls-server-name $(TLS_SERVER_NAME),) $(if $(TLS_INSECURE),--tls-insecure,) $(if $(REALITY_SERVER_NAME),--reality-server-name $(REALITY_SERVER_NAME),) $(if $(REALITY_FINGERPRINT),--reality-fingerprint $(REALITY_FINGERPRINT),) $(if $(REALITY_PUBLIC_KEY),--reality-public-key $(REALITY_PUBLIC_KEY),) $(if $(REALITY_SHORT_ID),--reality-short-id $(REALITY_SHORT_ID),) $(if $(REALITY_SPIDER_X),--reality-spider-x $(REALITY_SPIDER_X),) $(if $(MUX),--mux=$(MUX),)
+RUN_FLAGS := --listen $(LISTEN) --config $(CONFIG) --route-config $(ROUTE_CONFIG) $(if $(SERVER_ADDR),--server-addr $(SERVER_ADDR),) $(if $(TOKEN),--token $(TOKEN),) $(if $(TUNNEL_PROTOCOL),--tunnel-protocol $(TUNNEL_PROTOCOL),) $(if $(TRANSPORT),--transport $(TRANSPORT),) $(if $(TUNNEL_SECURITY),--tunnel-security $(TUNNEL_SECURITY),) $(if $(FLOW),--flow $(FLOW),) $(if $(TUNNEL_PATH),--tunnel-path $(TUNNEL_PATH),) $(if $(TLS),--tls,) $(if $(TLS_SERVER_NAME),--tls-server-name $(TLS_SERVER_NAME),) $(if $(TLS_INSECURE),--tls-insecure,) $(if $(REALITY_SERVER_NAME),--reality-server-name $(REALITY_SERVER_NAME),) $(if $(REALITY_FINGERPRINT),--reality-fingerprint $(REALITY_FINGERPRINT),) $(if $(REALITY_PUBLIC_KEY),--reality-public-key $(REALITY_PUBLIC_KEY),) $(if $(REALITY_SHORT_ID),--reality-short-id $(REALITY_SHORT_ID),) $(if $(REALITY_SPIDER_X),--reality-spider-x $(REALITY_SPIDER_X),) $(if $(MUX),--mux=$(MUX),)
 else ifeq ($(MODE),local)
 RUN_COMMAND := local
-RUN_FLAGS := --listen $(LISTEN) --gateway-port $(GATEWAY_PORT) --config $(CONFIG) $(if $(UPSTREAM_PROTOCOL),--upstream-protocol $(UPSTREAM_PROTOCOL),) $(if $(GATEWAY_IP),--gateway-ip $(GATEWAY_IP),)
+RUN_FLAGS := --listen $(LISTEN) --gateway-port $(GATEWAY_PORT) --config $(CONFIG) --route-config $(ROUTE_CONFIG) $(if $(UPSTREAM_PROTOCOL),--upstream-protocol $(UPSTREAM_PROTOCOL),) $(if $(GATEWAY_IP),--gateway-ip $(GATEWAY_IP),)
 else
 RUN_COMMAND :=
-RUN_FLAGS := --listen $(LISTEN) --gateway-port $(GATEWAY_PORT) --config $(CONFIG) $(if $(UPSTREAM_PROTOCOL),--upstream-protocol $(UPSTREAM_PROTOCOL),) $(if $(GATEWAY_IP),--gateway-ip $(GATEWAY_IP),)
+RUN_FLAGS := --listen $(LISTEN) --gateway-port $(GATEWAY_PORT) --config $(CONFIG) --route-config $(ROUTE_CONFIG) $(if $(UPSTREAM_PROTOCOL),--upstream-protocol $(UPSTREAM_PROTOCOL),) $(if $(GATEWAY_IP),--gateway-ip $(GATEWAY_IP),)
 endif
 
 .PHONY: all build release test fmt tidy run clean help

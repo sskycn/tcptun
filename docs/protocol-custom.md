@@ -71,15 +71,7 @@ bin/proxy config \
   "tunnel_protocol": "custom",
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
-  "tunnel_mux": true,
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "tunnel_mux": true
 }
 ```
 
@@ -95,15 +87,7 @@ bin/proxy config \
   "tunnel_transport": "raw",
   "tunnel_path": "/proxy",
   "tunnel_mux": true,
-  "upstream_protocol": "socks5",
-  "force_upstream": {
-    "domains": [],
-    "domain_prefixes": [],
-    "domain_suffixes": [],
-    "ip_cidrs": [],
-    "ip_ranges": [],
-    "ips": []
-  }
+  "upstream_protocol": "socks5"
 }
 ```
 

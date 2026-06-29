@@ -12,32 +12,35 @@ import (
 )
 
 type routeConfigFile struct {
-	Mode                string              `json:"mode,omitempty"`
-	ListenAddr          string              `json:"listen_addr,omitempty"`
-	ServerAddr          string              `json:"server_addr,omitempty"`
-	Token               string              `json:"token,omitempty"`
-	TunnelProtocol      string              `json:"tunnel_protocol,omitempty"`
-	TunnelTransport     string              `json:"tunnel_transport,omitempty"`
-	TunnelPath          string              `json:"tunnel_path,omitempty"`
-	TunnelTLS           bool                `json:"tunnel_tls,omitempty"`
-	TunnelTLSCert       string              `json:"tunnel_tls_cert,omitempty"`
-	TunnelTLSKey        string              `json:"tunnel_tls_key,omitempty"`
-	TunnelTLSServerName string              `json:"tunnel_tls_server_name,omitempty"`
-	TunnelTLSInsecure   bool                `json:"tunnel_tls_insecure,omitempty"`
-	TunnelSecurity      string              `json:"tunnel_security,omitempty"`
-	TunnelFlow          string              `json:"tunnel_flow,omitempty"`
-	RealityServerName   string              `json:"reality_server_name,omitempty"`
-	RealityServerNames  []string            `json:"reality_server_names,omitempty"`
-	RealityFingerprint  string              `json:"reality_fingerprint,omitempty"`
-	RealityPublicKey    string              `json:"reality_public_key,omitempty"`
-	RealityPrivateKey   string              `json:"reality_private_key,omitempty"`
-	RealityShortID      string              `json:"reality_short_id,omitempty"`
-	RealityShortIDs     []string            `json:"reality_short_ids,omitempty"`
-	RealityDest         string              `json:"reality_dest,omitempty"`
-	RealitySpiderX      string              `json:"reality_spider_x,omitempty"`
-	TunnelMux           *bool               `json:"tunnel_mux,omitempty"`
-	UpstreamProtocol    string              `json:"upstream_protocol,omitempty"`
-	ForceUpstream       forceUpstreamConfig `json:"force_upstream"`
+	ForceUpstream forceUpstreamConfig `json:"force_upstream"`
+}
+
+type runtimeConfigFile struct {
+	Mode                string   `json:"mode,omitempty"`
+	ListenAddr          string   `json:"listen_addr,omitempty"`
+	ServerAddr          string   `json:"server_addr,omitempty"`
+	Token               string   `json:"token,omitempty"`
+	TunnelProtocol      string   `json:"tunnel_protocol,omitempty"`
+	TunnelTransport     string   `json:"tunnel_transport,omitempty"`
+	TunnelPath          string   `json:"tunnel_path,omitempty"`
+	TunnelTLS           bool     `json:"tunnel_tls,omitempty"`
+	TunnelTLSCert       string   `json:"tunnel_tls_cert,omitempty"`
+	TunnelTLSKey        string   `json:"tunnel_tls_key,omitempty"`
+	TunnelTLSServerName string   `json:"tunnel_tls_server_name,omitempty"`
+	TunnelTLSInsecure   bool     `json:"tunnel_tls_insecure,omitempty"`
+	TunnelSecurity      string   `json:"tunnel_security,omitempty"`
+	TunnelFlow          string   `json:"tunnel_flow,omitempty"`
+	RealityServerName   string   `json:"reality_server_name,omitempty"`
+	RealityServerNames  []string `json:"reality_server_names,omitempty"`
+	RealityFingerprint  string   `json:"reality_fingerprint,omitempty"`
+	RealityPublicKey    string   `json:"reality_public_key,omitempty"`
+	RealityPrivateKey   string   `json:"reality_private_key,omitempty"`
+	RealityShortID      string   `json:"reality_short_id,omitempty"`
+	RealityShortIDs     []string `json:"reality_short_ids,omitempty"`
+	RealityDest         string   `json:"reality_dest,omitempty"`
+	RealitySpiderX      string   `json:"reality_spider_x,omitempty"`
+	TunnelMux           *bool    `json:"tunnel_mux,omitempty"`
+	UpstreamProtocol    string   `json:"upstream_protocol,omitempty"`
 }
 
 type forceUpstreamConfig struct {
@@ -85,7 +88,7 @@ func loadConfiguredUpstreamProtocol(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", nil
 	}
-	cfg, err := readRouteConfig(path)
+	cfg, err := readRuntimeConfig(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", nil
@@ -99,7 +102,7 @@ func applyRuntimeConfigDefaults(cfg *config) error {
 	if cfg == nil || strings.TrimSpace(cfg.ConfigPath) == "" {
 		return nil
 	}
-	fileCfg, err := readRouteConfig(cfg.ConfigPath)
+	fileCfg, err := readRuntimeConfig(cfg.ConfigPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -217,6 +220,27 @@ func readRouteConfig(path string) (routeConfigFile, error) {
 	}
 	if err := file.Close(); err != nil {
 		return routeConfigFile{}, err
+	}
+	return cfg, nil
+}
+
+func readRuntimeConfig(path string) (runtimeConfigFile, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return runtimeConfigFile{}, err
+	}
+
+	var cfg runtimeConfigFile
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&cfg); err != nil {
+		closeErr := file.Close()
+		if closeErr != nil {
+			return runtimeConfigFile{}, errors.Join(err, closeErr)
+		}
+		return runtimeConfigFile{}, err
+	}
+	if err := file.Close(); err != nil {
+		return runtimeConfigFile{}, err
 	}
 	return cfg, nil
 }

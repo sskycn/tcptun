@@ -82,6 +82,7 @@ type Config struct {
 	GatewayPort         int
 	UpstreamProtocol    string
 	ConfigPath          string
+	RouteConfigPath     string
 	DialTimeout         time.Duration
 	RefreshInterval     time.Duration
 	ScanTimeout         time.Duration
@@ -108,6 +109,7 @@ func defaultConfig() Config {
 		GatewayPort:      1080,
 		UpstreamProtocol: upstreamProtocolSOCKS5,
 		ConfigPath:       "config.json",
+		RouteConfigPath:  "route.json",
 		DialTimeout:      5 * time.Second,
 		RefreshInterval:  5 * time.Second,
 		ScanTimeout:      250 * time.Millisecond,
@@ -215,6 +217,11 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 		return err
 	}
 	cfg.ConfigPath = configPath
+	routeConfigPath, err := resolveConfigPath(cfg.RouteConfigPath)
+	if err != nil {
+		return err
+	}
+	cfg.RouteConfigPath = routeConfigPath
 
 	if err := applyRuntimeConfigDefaults(&cfg); err != nil {
 		return err
@@ -254,7 +261,7 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 		return runTunnelServer(ctx, cfg, log)
 	}
 
-	routes, err := loadRouteRules(cfg.ConfigPath)
+	routes, err := loadRouteRules(cfg.RouteConfigPath)
 	if err != nil {
 		return err
 	}
@@ -296,7 +303,7 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	}
 	defer func() {
 		if cfg.Mode != proxyModeServer {
-			if err := persistDirectFailures(cfg.ConfigPath, server.direct.upstreamOnlyHosts()); err != nil {
+			if err := persistDirectFailures(cfg.RouteConfigPath, server.direct.upstreamOnlyHosts()); err != nil {
 				retErr = errors.Join(retErr, err)
 			}
 		}

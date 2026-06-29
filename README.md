@@ -23,8 +23,8 @@ English | [简体中文](README.zh-CN.md)
 - Periodically refreshes the reachable upstream so new connections follow network changes.
 - Connects directly to private, loopback, link-local, `localhost`, and `.local` targets instead of forwarding them upstream.
 - Tries direct TCP connections first; if a target cannot be reached directly, remembers that target and sends later connections upstream immediately.
-- Supports `config.json` force-upstream rules by exact domain, domain prefix, domain suffix, exact IP, and IP CIDR/range.
-- Writes learned direct-failure targets back to `config.json` before exit, creating the file when needed and deduplicating existing rules.
+- Supports `route.json` force-upstream rules by exact domain, domain prefix, domain suffix, exact IP, and IP CIDR/range.
+- Writes learned direct-failure targets back to `route.json` before exit, creating the file when needed and deduplicating existing rules.
 - Uses `pkg.gostartkit.com/cmd v0.2.1` for the command-line interface.
 
 ## Requirements
@@ -93,10 +93,16 @@ Run explicitly in local mode, ignoring any `mode` value from `config.json`:
 bin/proxy local
 ```
 
-Use a different route config:
+Use a different runtime config:
 
 ```sh
 bin/proxy --config ./config.json
+```
+
+Use a different route config:
+
+```sh
+bin/proxy --route-config ./route.json
 ```
 
 Run as a tunnel server:
@@ -213,7 +219,7 @@ While running, the proxy checks local IPv4 addresses every `--refresh-interval`.
 
 ## Internal Address Bypass
 
-For SOCKS5, SOCKS5 UDP ASSOCIATE, HTTP CONNECT, and HTTP proxy requests, the proxy inspects the requested target. Force-upstream rules in `config.json` have the highest priority. Otherwise, TCP targets are tried directly first. If direct TCP connection fails, that target is remembered as upstream-only and later connections skip the direct attempt. UDP targets keep the conservative rule: internal targets go direct, other targets go upstream.
+For SOCKS5, SOCKS5 UDP ASSOCIATE, HTTP CONNECT, and HTTP proxy requests, the proxy inspects the requested target. Force-upstream rules in `route.json` have the highest priority. Otherwise, TCP targets are tried directly first. If direct TCP connection fails, that target is remembered as upstream-only and later connections skip the direct attempt. UDP targets keep the conservative rule: internal targets go direct, other targets go upstream.
 
 ## Upstream Protocol
 
@@ -235,9 +241,9 @@ Running `proxy` without a subcommand defaults to local mode. If `config.json` co
 
 `proxy client` keeps the local mixed proxy listener, but upstream TCP and UDP traffic with a parsed target is encapsulated to the tunnel server. Use `--server-addr` for the server address and the same `--token` value used by the server.
 
-By default, `proxy server` reads `server.json` next to the executable and `proxy client` reads `client.json` next to the executable. Passing `--config <path>` still overrides those mode defaults; passing `--config ""` disables config loading and write-back.
+By default, `proxy server` reads `server.json` next to the executable and `proxy client` reads `client.json` next to the executable. Passing `--config <path>` still overrides those mode defaults; passing `--config ""` disables runtime config loading.
 
-`proxy config` generates ready-to-edit JSON config files without starting the proxy. Running it without flags starts an interactive wizard backed by the command runtime; press Enter to accept defaults, or enter values for the fields you want to customize. Passing flags keeps non-interactive generation for scripts. By default it writes both `server.json` and `client.json`, shares one generated token between them, and accepts `--protocol custom|vless|vmess|trojan`.
+`proxy config` generates ready-to-edit JSON config files without starting the proxy. Running it without flags starts an interactive wizard backed by the command runtime; press Enter to accept defaults, or enter values for the fields you want to customize. Passing flags keeps non-interactive generation for scripts. By default it writes `server.json`, `client.json`, and `route.json`, shares one generated token between server/client configs, and accepts `--protocol custom|vless|vmess|trojan`.
 
 ```sh
 bin/proxy config
@@ -307,37 +313,27 @@ bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-pat
 
 ## Route Config
 
-By default, local mode and `proxy` without a subcommand read `config.json` next to the executable, `proxy server` reads `server.json`, and `proxy client` reads `client.json`. Relative `--config` paths are resolved from the executable directory; absolute paths are used as provided. The included `config.json` sends `x.com`, `twitter.com`, and related subdomains upstream. If the selected config file does not exist, the proxy runs without custom route rules and creates it before exit when new direct failures are learned. Use `--config <path>` to choose another file, or `--config ""` to disable config loading and write-back.
+Runtime configuration and route rules live in separate files. By default, local mode and `proxy` without a subcommand read runtime settings from `config.json`, `proxy server` reads runtime settings from `server.json`, and `proxy client` reads runtime settings from `client.json`. Route rules are always read from `route.json` next to the executable unless `--route-config <path>` is provided. Use `--route-config ""` to disable route loading and write-back.
 
-Example:
+Runtime config example:
 
 ```json
 {
   "mode": "local",
   "listen_addr": "127.0.0.1:1080",
   "upstream_protocol": "socks5",
-  "server_addr": "",
-  "token": "",
   "tunnel_protocol": "custom",
   "tunnel_transport": "raw",
   "tunnel_security": "none",
-  "tunnel_flow": "",
   "tunnel_path": "/proxy",
-  "tunnel_tls": false,
-  "tunnel_tls_cert": "",
-  "tunnel_tls_key": "",
-  "tunnel_tls_server_name": "",
-  "tunnel_tls_insecure": false,
-  "reality_server_name": "",
-  "reality_server_names": [],
-  "reality_fingerprint": "chrome",
-  "reality_public_key": "",
-  "reality_private_key": "",
-  "reality_short_id": "",
-  "reality_short_ids": [],
-  "reality_dest": "",
-  "reality_spider_x": "/",
-  "tunnel_mux": true,
+  "tunnel_mux": true
+}
+```
+
+Route config example:
+
+```json
+{
   "force_upstream": {
     "domains": ["x.com", "twitter.com"],
     "domain_prefixes": ["api.", "pbs.twimg."],
@@ -351,15 +347,13 @@ Example:
 
 Rule behavior:
 
-- `mode`: runtime mode used when `proxy` is started without a subcommand. Supported values are `local`, `client`, and `server`.
-- `listen_addr`: listen address used by local, client, or server mode when no explicit `--listen` flag overrides it.
 - `domains`: exact host match.
 - `domain_prefixes`: host starts with the configured value.
 - `domain_suffixes`: matches the domain itself and its subdomains.
 - `ips`: exact IP match.
 - `ip_cidrs` and `ip_ranges`: CIDR prefix match. `ip_ranges` is an alias for CIDR-style ranges.
 
-Before exit, learned direct TCP failures are merged into this file. Failed domain targets are appended to `domains`, and failed IP targets are appended to `ips`. If an existing exact domain, domain prefix, domain suffix, exact IP, or IP CIDR/range already covers the target, nothing is added.
+Before exit, learned direct TCP failures are merged into `route.json` or the configured `--route-config` file. Failed domain targets are appended to `domains`, and failed IP targets are appended to `ips`. If an existing exact domain, domain prefix, domain suffix, exact IP, or IP CIDR/range already covers the target, nothing is added.
 
 ## UDP Support
 
@@ -379,7 +373,8 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 
 ```text
 --buffer-size <int>         per-direction copy buffer size in bytes [default: 32768]
--c, --config <string>       JSON route config path; defaults by mode; empty disables config loading [default: "config.json"]
+-c, --config <string>       JSON runtime config path; defaults by mode; empty disables runtime config loading [default: "config.json"]
+--route-config <string>     JSON route config path; empty disables route loading and write-back [default: "route.json"]
 --dial-timeout <duration>   upstream dial timeout [default: 5s]
 --gateway-ip <string>       gateway IP; empty means auto-detect
 -p, --gateway-port <int>    gateway proxy port [default: 1080]
@@ -442,12 +437,13 @@ make run      # Run with Makefile defaults
 make clean    # Remove build output and local Go cache
 ```
 
-`make run` uses this repository's `config.json` by default and accepts overrides:
+`make run` uses this repository's `config.json` and `route.json` by default and accepts overrides:
 
 ```sh
 make run LISTEN=127.0.0.1:1081 GATEWAY_PORT=7890
 make run GATEWAY_IP=192.168.1.1
 make run CONFIG=/path/to/config.json
+make run ROUTE_CONFIG=/path/to/route.json
 make run UPSTREAM_PROTOCOL=mixed
 make run MODE=local
 make run MODE=server LISTEN=0.0.0.0:9443 TOKEN=change-me
