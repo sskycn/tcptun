@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"bufio"
@@ -55,6 +55,17 @@ type customUDPUpstream struct {
 }
 
 func runTunnelServer(ctx context.Context, cfg config, log io.Writer) error {
+	switch cfg.TunnelTransport {
+	case tunnelTransportRaw:
+		return runRawTunnelServer(ctx, cfg, log)
+	case tunnelTransportWS, tunnelTransportH2, tunnelTransportH3:
+		return runHTTPTunnelServer(ctx, cfg, log)
+	default:
+		return fmt.Errorf("unsupported tunnel transport %q", cfg.TunnelTransport)
+	}
+}
+
+func runRawTunnelServer(ctx context.Context, cfg config, log io.Writer) error {
 	listener, err := net.Listen("tcp", cfg.ListenAddr)
 	if err != nil {
 		return err
@@ -80,7 +91,7 @@ func runTunnelServer(ctx context.Context, cfg config, log io.Writer) error {
 		return &buf
 	}
 
-	if err := logf(log, "tunnel server listening on %s\n", listener.Addr()); err != nil {
+	if err := logf(log, "tunnel server listening on %s via %s\n", listener.Addr(), cfg.TunnelTransport); err != nil {
 		return err
 	}
 
@@ -289,7 +300,7 @@ func (s *proxyServer) tunnelUDPRemoteToClient(ctx context.Context, conn net.Conn
 
 func (s *proxyServer) connectViaTunnelTCP(ctx context.Context, req socksRequest) (net.Conn, string, error) {
 	target := s.cfg.ServerAddr
-	conn, err := s.dialer.DialContext(ctx, "tcp", target)
+	conn, err := s.dialTunnelTransport(ctx)
 	if err != nil {
 		return nil, target, err
 	}
@@ -312,7 +323,7 @@ func (s *proxyServer) connectViaTunnelTCP(ctx context.Context, req socksRequest)
 
 func (s *proxyServer) connectViaTunnelUDP(ctx context.Context) (*customUDPUpstream, error) {
 	target := s.cfg.ServerAddr
-	conn, err := s.dialer.DialContext(ctx, "tcp", target)
+	conn, err := s.dialTunnelTransport(ctx)
 	if err != nil {
 		return nil, err
 	}

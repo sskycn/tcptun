@@ -13,6 +13,7 @@ English | [简体中文](README.zh-CN.md)
 - Accepts mixed local proxy traffic such as SOCKS5, HTTP proxy, and HTTP CONNECT.
 - Uses SOCKS5 for upstream traffic by default; `mixed` upstream mode is also supported.
 - Supports `proxy`, `proxy client`, and `proxy server` commands with a compact custom tunnel protocol.
+- Carries the client/server tunnel over raw TCP, WebSocket, HTTP/2, or HTTP/3 transport.
 - Supports SOCKS5 UDP ASSOCIATE for UDP relay traffic.
 - Prints compact terminal access logs; direct connections omit the proxy field.
 - Auto-detects the default gateway IP.
@@ -44,7 +45,7 @@ bin/proxy
 You can also build directly with Go:
 
 ```sh
-go build -trimpath -ldflags "-s -w" -o bin/proxy .
+go build -trimpath -ldflags "-s -w" -o bin/proxy ./cmd/proxy
 ```
 
 ## Run
@@ -103,6 +104,27 @@ Run as a tunnel client:
 bin/proxy client --listen 127.0.0.1:1080 --server-addr 203.0.113.10:9443 --token change-me
 ```
 
+Run through an HTTP reverse proxy or CDN with WebSocket:
+
+```sh
+bin/proxy server --listen 127.0.0.1:9443 --transport ws --tunnel-path /proxy --token change-me
+bin/proxy client --listen 127.0.0.1:1080 --server-addr proxy.example.com:443 --transport ws --tunnel-path /proxy --tls --token change-me
+```
+
+Run over HTTP/2:
+
+```sh
+bin/proxy server --listen 127.0.0.1:9443 --transport h2 --tunnel-path /proxy --token change-me
+bin/proxy client --server-addr 127.0.0.1:9443 --transport h2 --tunnel-path /proxy --token change-me
+```
+
+Run over HTTP/3 with TLS certificates:
+
+```sh
+bin/proxy server --listen 0.0.0.0:9443 --transport h3 --tunnel-path /proxy --tls-cert server.crt --tls-key server.key --token change-me
+bin/proxy client --server-addr proxy.example.com:9443 --transport h3 --tunnel-path /proxy --token change-me
+```
+
 ## Gateway Discovery
 
 When `--gateway-ip` is not set, startup works like this:
@@ -139,7 +161,40 @@ Running `proxy` without a subcommand keeps the original local behavior: the loca
 
 `proxy client` keeps the local mixed proxy listener, but upstream TCP and UDP traffic with a parsed target is encapsulated to the tunnel server. Use `--server-addr` for the server address and the same `--token` value used by the server.
 
+The tunnel transport is selected with `--transport` or `tunnel_transport` in `config.json`:
+
+- `raw`: direct TCP connection to the server. This is the default and has the least overhead.
+- `ws`: WebSocket over HTTP/1.1. This is the most practical option behind nginx HTTP reverse proxy or common CDNs.
+- `h2`: HTTP/2 bidirectional request/response stream. Without server certificates it runs as h2c; with `--tls-cert` and `--tls-key` it serves TLS HTTP/2.
+- `h3`: HTTP/3 over QUIC. The server requires `--tls-cert` and `--tls-key`, and the client always uses `https`.
+
 The custom tunnel is intentionally small and currently carries TCP streams and SOCKS5 UDP packets. It is not VLESS-compatible.
+
+### nginx WebSocket Example
+
+For nginx HTTP reverse proxy, run the server on loopback:
+
+```sh
+bin/proxy server --listen 127.0.0.1:9443 --transport ws --tunnel-path /proxy --token change-me
+```
+
+Then proxy a WebSocket location:
+
+```nginx
+location /proxy {
+    proxy_pass http://127.0.0.1:9443;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+```
+
+The client should connect to the public HTTPS name:
+
+```sh
+bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-path /proxy --tls --token change-me
+```
 
 ## Route Config
 
@@ -152,6 +207,11 @@ Example:
   "upstream_protocol": "socks5",
   "server_addr": "",
   "token": "",
+  "tunnel_transport": "raw",
+  "tunnel_path": "/proxy",
+  "tunnel_tls": false,
+  "tunnel_tls_server_name": "",
+  "tunnel_tls_insecure": false,
   "force_upstream": {
     "domains": ["x.com", "twitter.com"],
     "domain_prefixes": ["api.", "pbs.twimg."],
@@ -208,12 +268,21 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 ```text
 --server-addr <string>      custom tunnel server address
 --token <string>            shared token for custom tunnel auth
+--transport <string>        tunnel transport: raw, ws, h2, or h3 [default: raw]
+--tunnel-path <string>      HTTP/WebSocket tunnel path [default: /proxy]
+--tls                       use TLS for ws/h2 transport
+--tls-server-name <string>  TLS server name override
+--tls-insecure              skip TLS certificate verification
 ```
 
 `proxy server` adds:
 
 ```text
 --token <string>            shared token for custom tunnel auth
+--transport <string>        tunnel transport: raw, ws, h2, or h3 [default: raw]
+--tunnel-path <string>      HTTP/WebSocket tunnel path [default: /proxy]
+--tls-cert <string>         TLS certificate file for h2/h3 server
+--tls-key <string>          TLS private key file for h2/h3 server
 ```
 
 ## Make Targets
@@ -236,6 +305,8 @@ make run CONFIG=/path/to/config.json
 make run UPSTREAM_PROTOCOL=mixed
 make run MODE=server LISTEN=0.0.0.0:9443 TOKEN=change-me
 make run MODE=client SERVER_ADDR=203.0.113.10:9443 TOKEN=change-me
+make run MODE=server LISTEN=127.0.0.1:9443 TRANSPORT=ws TUNNEL_PATH=/proxy TOKEN=change-me
+make run MODE=client SERVER_ADDR=proxy.example.com:443 TRANSPORT=ws TUNNEL_PATH=/proxy TLS=1 TOKEN=change-me
 ```
 
 `MODE=server` and `MODE=client` are Makefile shortcuts that run `proxy server` and `proxy client`.

@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"bufio"
@@ -7,50 +7,76 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
-	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-
-	"pkg.gostartkit.com/cmd"
 )
 
 const (
-	version                = "v0.1.0"
-	proxyModeLocal         = "local"
-	proxyModeClient        = "client"
-	proxyModeServer        = "server"
-	upstreamProtocolSOCKS5 = "socks5"
-	upstreamProtocolMixed  = "mixed"
+	Version                = "v0.1.0"
+	ProxyModeLocal         = "local"
+	ProxyModeClient        = "client"
+	ProxyModeServer        = "server"
+	UpstreamProtocolSOCKS5 = "socks5"
+	UpstreamProtocolMixed  = "mixed"
+	TunnelTransportRaw     = "raw"
+	TunnelTransportWS      = "ws"
+	TunnelTransportH2      = "h2"
+	TunnelTransportH3      = "h3"
+
+	version                = Version
+	proxyModeLocal         = ProxyModeLocal
+	proxyModeClient        = ProxyModeClient
+	proxyModeServer        = ProxyModeServer
+	upstreamProtocolSOCKS5 = UpstreamProtocolSOCKS5
+	upstreamProtocolMixed  = UpstreamProtocolMixed
+	tunnelTransportRaw     = TunnelTransportRaw
+	tunnelTransportWS      = TunnelTransportWS
+	tunnelTransportH2      = TunnelTransportH2
+	tunnelTransportH3      = TunnelTransportH3
 )
 
 var errListenerClosedByContext = errors.New("listener closed after context cancellation")
 
-type config struct {
-	ListenAddr       string
-	Mode             string
-	ServerAddr       string
-	Token            string
-	GatewayIP        string
-	GatewayPort      int
-	UpstreamProtocol string
-	ConfigPath       string
-	DialTimeout      time.Duration
-	RefreshInterval  time.Duration
-	ScanTimeout      time.Duration
-	ScanWorkers      int
-	BufferSize       int
-	Verbose          bool
+type Config struct {
+	ListenAddr          string
+	Mode                string
+	ServerAddr          string
+	Token               string
+	TunnelTransport     string
+	TunnelPath          string
+	TunnelTLS           bool
+	TunnelTLSCert       string
+	TunnelTLSKey        string
+	TunnelTLSServerName string
+	TunnelTLSInsecure   bool
+	GatewayIP           string
+	GatewayPort         int
+	UpstreamProtocol    string
+	ConfigPath          string
+	DialTimeout         time.Duration
+	RefreshInterval     time.Duration
+	ScanTimeout         time.Duration
+	ScanWorkers         int
+	BufferSize          int
+	Verbose             bool
 }
 
-func defaultConfig() config {
-	return config{
+type config = Config
+
+func DefaultConfig() Config {
+	return defaultConfig()
+}
+
+func defaultConfig() Config {
+	return Config{
 		ListenAddr:       "127.0.0.1:1080",
 		Mode:             proxyModeLocal,
+		TunnelTransport:  tunnelTransportRaw,
+		TunnelPath:       "/proxy",
 		GatewayPort:      1080,
 		UpstreamProtocol: upstreamProtocolSOCKS5,
 		ConfigPath:       "config.json",
@@ -59,137 +85,6 @@ func defaultConfig() config {
 		ScanTimeout:      250 * time.Millisecond,
 		ScanWorkers:      max(64, runtime.GOMAXPROCS(0)*32),
 		BufferSize:       32 * 1024,
-	}
-}
-
-func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	app := buildApp()
-	os.Exit(app.MainDefault(ctx, os.Args[1:]))
-}
-
-func buildApp() *cmd.App {
-	cfg := defaultConfig()
-	upstreamProtocolFlag := ""
-
-	app := cmd.NewApp("proxy")
-	app.Short = "Local mixed proxy forwarder"
-	app.Root = &cmd.Command{
-		UsageLine: "proxy [flags]",
-		Short:     "forward local mixed proxy traffic through the gateway proxy port",
-		Long: "Starts a local TCP listener for mixed proxy clients and forwards each connection " +
-			"through the default gateway's proxy port. Upstream protocol defaults to SOCKS5.",
-		Examples: []string{
-			"proxy",
-			"proxy --listen 127.0.0.1:1081 --gateway-port 1080",
-			"proxy --gateway-ip 192.168.1.1",
-			"proxy client --server-addr 203.0.113.10:9443",
-			"proxy server --listen 0.0.0.0:9443",
-			"proxy --upstream-protocol mixed",
-		},
-		SetFlags: func(f *cmd.FlagSet) {
-			f.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "local listen address", "l")
-			f.StringVar(&cfg.GatewayIP, "gateway-ip", cfg.GatewayIP, "gateway IP; empty means auto-detect", "")
-			f.IntVar(&cfg.GatewayPort, "gateway-port", cfg.GatewayPort, "gateway proxy port", "p")
-			f.StringVar(&upstreamProtocolFlag, "upstream-protocol", upstreamProtocolFlag, "upstream protocol: socks5 or mixed [default: socks5]", "")
-			f.StringVar(&cfg.ConfigPath, "config", cfg.ConfigPath, "JSON route config path; empty disables config loading", "c")
-			f.DurationVar(&cfg.DialTimeout, "dial-timeout", cfg.DialTimeout, "upstream dial timeout", "")
-			f.DurationVar(&cfg.RefreshInterval, "refresh-interval", cfg.RefreshInterval, "interval for checking local IPv4 changes; 0 disables refresh", "")
-			f.DurationVar(&cfg.ScanTimeout, "scan-timeout", cfg.ScanTimeout, "per-IP timeout when scanning local IPv4 networks", "")
-			f.IntVar(&cfg.ScanWorkers, "scan-workers", cfg.ScanWorkers, "parallel workers used for IPv4 network scanning", "")
-			f.IntVar(&cfg.BufferSize, "buffer-size", cfg.BufferSize, "per-direction copy buffer size in bytes", "")
-			f.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable debug logs", "v")
-		},
-		Run: func(ctx context.Context, c *cmd.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("unexpected args: %v", args)
-			}
-			cfg.Mode = proxyModeLocal
-			if strings.TrimSpace(upstreamProtocolFlag) != "" {
-				cfg.UpstreamProtocol = upstreamProtocolFlag
-			} else {
-				cfg.UpstreamProtocol = ""
-			}
-			return runProxy(ctx, cfg, os.Stderr)
-		},
-	}
-	app.AddCommands(buildClientCommand(&cfg), buildServerCommand(&cfg), &cmd.Command{
-		Name:      "version",
-		UsageLine: "proxy version",
-		Short:     "print version",
-		Run: func(ctx context.Context, c *cmd.Command, args []string) error {
-			_, err := fmt.Fprintln(os.Stdout, version)
-			return err
-		},
-	})
-
-	return app
-}
-
-func buildClientCommand(cfg *config) *cmd.Command {
-	serverAddrFlag := ""
-	tokenFlag := ""
-	return &cmd.Command{
-		Name:      "client",
-		UsageLine: "proxy client [flags]",
-		Short:     "run local mixed proxy and forward upstream traffic through a tunnel server",
-		Examples: []string{
-			"proxy client --server-addr 203.0.113.10:9443 --token change-me",
-			"proxy client --listen 127.0.0.1:1081 --server-addr 203.0.113.10:9443",
-		},
-		SetFlags: func(f *cmd.FlagSet) {
-			f.StringVar(&serverAddrFlag, "server-addr", serverAddrFlag, "custom tunnel server address", "")
-			f.StringVar(&tokenFlag, "token", tokenFlag, "shared token for custom tunnel auth", "")
-		},
-		Run: func(ctx context.Context, c *cmd.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("unexpected args: %v", args)
-			}
-			cfg.Mode = proxyModeClient
-			if strings.TrimSpace(serverAddrFlag) != "" {
-				cfg.ServerAddr = serverAddrFlag
-			} else {
-				cfg.ServerAddr = ""
-			}
-			if strings.TrimSpace(tokenFlag) != "" {
-				cfg.Token = tokenFlag
-			} else {
-				cfg.Token = ""
-			}
-			return runProxy(ctx, *cfg, os.Stderr)
-		},
-	}
-}
-
-func buildServerCommand(cfg *config) *cmd.Command {
-	tokenFlag := ""
-	return &cmd.Command{
-		Name:      "server",
-		UsageLine: "proxy server [flags]",
-		Short:     "run a custom tunnel server",
-		Examples: []string{
-			"proxy server --listen 0.0.0.0:9443 --token change-me",
-		},
-		SetFlags: func(f *cmd.FlagSet) {
-			f.StringVar(&tokenFlag, "token", tokenFlag, "shared token for custom tunnel auth", "")
-		},
-		Run: func(ctx context.Context, c *cmd.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("unexpected args: %v", args)
-			}
-			cfg.Mode = proxyModeServer
-			if cfg.ListenAddr == defaultConfig().ListenAddr {
-				cfg.ListenAddr = "0.0.0.0:9443"
-			}
-			if strings.TrimSpace(tokenFlag) != "" {
-				cfg.Token = tokenFlag
-			} else {
-				cfg.Token = ""
-			}
-			return runProxy(ctx, *cfg, os.Stderr)
-		},
 	}
 }
 
@@ -244,6 +139,10 @@ func (c *directCache) upstreamOnlyHosts() []string {
 	return hosts
 }
 
+func RunProxy(ctx context.Context, cfg Config, log io.Writer) error {
+	return runProxy(ctx, cfg, log)
+}
+
 func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	if cfg.GatewayPort == 0 {
 		cfg.GatewayPort = defaultConfig().GatewayPort
@@ -284,6 +183,11 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	if err != nil {
 		return err
 	}
+	cfg.TunnelTransport, err = normalizeTunnelTransport(cfg.TunnelTransport)
+	if err != nil {
+		return err
+	}
+	cfg.TunnelPath = normalizeTunnelPath(cfg.TunnelPath)
 	if cfg.Mode == proxyModeClient && strings.TrimSpace(cfg.ServerAddr) == "" {
 		return errors.New("server address is required in client mode")
 	}
@@ -426,6 +330,32 @@ func normalizeProxyMode(value string) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid mode %q; supported values: %s, %s, %s", value, proxyModeLocal, proxyModeClient, proxyModeServer)
 	}
+}
+
+func normalizeTunnelTransport(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", tunnelTransportRaw:
+		return tunnelTransportRaw, nil
+	case "websocket", tunnelTransportWS:
+		return tunnelTransportWS, nil
+	case "http2", tunnelTransportH2:
+		return tunnelTransportH2, nil
+	case "http3", tunnelTransportH3:
+		return tunnelTransportH3, nil
+	default:
+		return "", fmt.Errorf("invalid tunnel transport %q; supported values: %s, %s, %s, %s", value, tunnelTransportRaw, tunnelTransportWS, tunnelTransportH2, tunnelTransportH3)
+	}
+}
+
+func normalizeTunnelPath(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return defaultConfig().TunnelPath
+	}
+	if strings.HasPrefix(trimmed, "/") {
+		return trimmed
+	}
+	return "/" + trimmed
 }
 
 func (s *proxyServer) upstreamTarget() string {

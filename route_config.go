@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"encoding/json"
@@ -12,11 +12,18 @@ import (
 )
 
 type routeConfigFile struct {
-	Mode             string              `json:"mode,omitempty"`
-	ServerAddr       string              `json:"server_addr,omitempty"`
-	Token            string              `json:"token,omitempty"`
-	UpstreamProtocol string              `json:"upstream_protocol,omitempty"`
-	ForceUpstream    forceUpstreamConfig `json:"force_upstream"`
+	Mode                string              `json:"mode,omitempty"`
+	ServerAddr          string              `json:"server_addr,omitempty"`
+	Token               string              `json:"token,omitempty"`
+	TunnelTransport     string              `json:"tunnel_transport,omitempty"`
+	TunnelPath          string              `json:"tunnel_path,omitempty"`
+	TunnelTLS           bool                `json:"tunnel_tls,omitempty"`
+	TunnelTLSCert       string              `json:"tunnel_tls_cert,omitempty"`
+	TunnelTLSKey        string              `json:"tunnel_tls_key,omitempty"`
+	TunnelTLSServerName string              `json:"tunnel_tls_server_name,omitempty"`
+	TunnelTLSInsecure   bool                `json:"tunnel_tls_insecure,omitempty"`
+	UpstreamProtocol    string              `json:"upstream_protocol,omitempty"`
+	ForceUpstream       forceUpstreamConfig `json:"force_upstream"`
 }
 
 type forceUpstreamConfig struct {
@@ -93,6 +100,27 @@ func applyRuntimeConfigDefaults(cfg *config) error {
 	}
 	if strings.TrimSpace(cfg.Token) == "" {
 		cfg.Token = fileCfg.Token
+	}
+	if strings.TrimSpace(cfg.TunnelTransport) == "" {
+		cfg.TunnelTransport = fileCfg.TunnelTransport
+	}
+	if strings.TrimSpace(cfg.TunnelPath) == "" {
+		cfg.TunnelPath = fileCfg.TunnelPath
+	}
+	if !cfg.TunnelTLS {
+		cfg.TunnelTLS = fileCfg.TunnelTLS
+	}
+	if strings.TrimSpace(cfg.TunnelTLSCert) == "" {
+		cfg.TunnelTLSCert = fileCfg.TunnelTLSCert
+	}
+	if strings.TrimSpace(cfg.TunnelTLSKey) == "" {
+		cfg.TunnelTLSKey = fileCfg.TunnelTLSKey
+	}
+	if strings.TrimSpace(cfg.TunnelTLSServerName) == "" {
+		cfg.TunnelTLSServerName = fileCfg.TunnelTLSServerName
+	}
+	if !cfg.TunnelTLSInsecure {
+		cfg.TunnelTLSInsecure = fileCfg.TunnelTLSInsecure
 	}
 	if strings.TrimSpace(cfg.UpstreamProtocol) == "" {
 		cfg.UpstreamProtocol = fileCfg.UpstreamProtocol

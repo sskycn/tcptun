@@ -13,6 +13,7 @@
 - 本地支持 mixed 代理流量，包括 SOCKS5、HTTP 代理、HTTP CONNECT。
 - 默认使用 SOCKS5 作为上游协议，也支持 `mixed` 上游模式。
 - 支持 `proxy`、`proxy client`、`proxy server` 三种命令形态，并带一个轻量自定义隧道协议。
+- client/server 隧道可承载在 raw TCP、WebSocket、HTTP/2 或 HTTP/3 transport 上。
 - 支持 SOCKS5 UDP ASSOCIATE，可转发 UDP 流量。
 - 在终端输出紧凑访问日志；直连日志会省略代理字段。
 - 自动发现默认网关 IP。
@@ -44,7 +45,7 @@ bin/proxy
 也可以直接使用 Go 构建：
 
 ```sh
-go build -trimpath -ldflags "-s -w" -o bin/proxy .
+go build -trimpath -ldflags "-s -w" -o bin/proxy ./cmd/proxy
 ```
 
 ## 运行
@@ -103,6 +104,27 @@ bin/proxy server --listen 0.0.0.0:9443 --token change-me
 bin/proxy client --listen 127.0.0.1:1080 --server-addr 203.0.113.10:9443 --token change-me
 ```
 
+通过 HTTP 反向代理或 CDN 使用 WebSocket：
+
+```sh
+bin/proxy server --listen 127.0.0.1:9443 --transport ws --tunnel-path /proxy --token change-me
+bin/proxy client --listen 127.0.0.1:1080 --server-addr proxy.example.com:443 --transport ws --tunnel-path /proxy --tls --token change-me
+```
+
+使用 HTTP/2：
+
+```sh
+bin/proxy server --listen 127.0.0.1:9443 --transport h2 --tunnel-path /proxy --token change-me
+bin/proxy client --server-addr 127.0.0.1:9443 --transport h2 --tunnel-path /proxy --token change-me
+```
+
+使用带 TLS 证书的 HTTP/3：
+
+```sh
+bin/proxy server --listen 0.0.0.0:9443 --transport h3 --tunnel-path /proxy --tls-cert server.crt --tls-key server.key --token change-me
+bin/proxy client --server-addr proxy.example.com:9443 --transport h3 --tunnel-path /proxy --token change-me
+```
+
 ## 网关发现逻辑
 
 未设置 `--gateway-ip` 时，启动流程如下：
@@ -139,7 +161,40 @@ bin/proxy client --listen 127.0.0.1:1080 --server-addr 203.0.113.10:9443 --token
 
 `proxy client` 保持本地 mixed 代理入口，但会把已解析出目标的 TCP 和 UDP 上游流量封装到隧道服务端。使用 `--server-addr` 指定服务端地址，`--token` 需要和服务端一致。
 
+隧道承载层可通过 `--transport` 或 `config.json` 里的 `tunnel_transport` 选择：
+
+- `raw`：直接 TCP 连接到服务端。默认值，开销最低。
+- `ws`：HTTP/1.1 WebSocket。最适合放在 nginx HTTP 反向代理或常见 CDN 后面。
+- `h2`：HTTP/2 双向 request/response 流。服务端不配置证书时使用 h2c；配置 `--tls-cert` 和 `--tls-key` 后提供 TLS HTTP/2。
+- `h3`：基于 QUIC 的 HTTP/3。服务端必须配置 `--tls-cert` 和 `--tls-key`，客户端固定使用 `https`。
+
 自定义隧道刻意保持很小，目前承载 TCP 流和 SOCKS5 UDP 数据包，不兼容 VLESS。
+
+### nginx WebSocket 示例
+
+服务端监听在本机回环地址：
+
+```sh
+bin/proxy server --listen 127.0.0.1:9443 --transport ws --tunnel-path /proxy --token change-me
+```
+
+nginx 配置 WebSocket location：
+
+```nginx
+location /proxy {
+    proxy_pass http://127.0.0.1:9443;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+```
+
+客户端连接公开 HTTPS 域名：
+
+```sh
+bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-path /proxy --tls --token change-me
+```
 
 ## 路由配置
 
@@ -152,6 +207,11 @@ bin/proxy client --listen 127.0.0.1:1080 --server-addr 203.0.113.10:9443 --token
   "upstream_protocol": "socks5",
   "server_addr": "",
   "token": "",
+  "tunnel_transport": "raw",
+  "tunnel_path": "/proxy",
+  "tunnel_tls": false,
+  "tunnel_tls_server_name": "",
+  "tunnel_tls_insecure": false,
   "force_upstream": {
     "domains": ["x.com", "twitter.com"],
     "domain_prefixes": ["api.", "pbs.twimg."],
@@ -208,12 +268,21 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 ```text
 --server-addr <string>      自定义隧道服务端地址
 --token <string>            自定义隧道共享 token
+--transport <string>        隧道承载层：raw、ws、h2 或 h3 [默认: raw]
+--tunnel-path <string>      HTTP/WebSocket 隧道路由路径 [默认: /proxy]
+--tls                       ws/h2 transport 使用 TLS
+--tls-server-name <string>  TLS server name 覆盖值
+--tls-insecure              跳过 TLS 证书校验
 ```
 
 `proxy server` 额外支持：
 
 ```text
 --token <string>            自定义隧道共享 token
+--transport <string>        隧道承载层：raw、ws、h2 或 h3 [默认: raw]
+--tunnel-path <string>      HTTP/WebSocket 隧道路由路径 [默认: /proxy]
+--tls-cert <string>         h2/h3 服务端 TLS 证书文件
+--tls-key <string>          h2/h3 服务端 TLS 私钥文件
 ```
 
 ## Make 命令
@@ -236,6 +305,8 @@ make run CONFIG=/path/to/config.json
 make run UPSTREAM_PROTOCOL=mixed
 make run MODE=server LISTEN=0.0.0.0:9443 TOKEN=change-me
 make run MODE=client SERVER_ADDR=203.0.113.10:9443 TOKEN=change-me
+make run MODE=server LISTEN=127.0.0.1:9443 TRANSPORT=ws TUNNEL_PATH=/proxy TOKEN=change-me
+make run MODE=client SERVER_ADDR=proxy.example.com:443 TRANSPORT=ws TUNNEL_PATH=/proxy TLS=1 TOKEN=change-me
 ```
 
 `MODE=server` 和 `MODE=client` 是 Makefile 快捷入口，会分别运行 `proxy server` 和 `proxy client`。

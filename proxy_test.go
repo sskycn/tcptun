@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"bufio"
@@ -1625,186 +1625,285 @@ func TestRunProxyConvertsHTTPProxyRequestUpstreamToSocks5(t *testing.T) {
 }
 
 func TestRunProxyClientServerHTTPConnectTunnel(t *testing.T) {
-	direct, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := direct.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			t.Errorf("close direct listener: %v", err)
-		}
-	})
-	directErr := make(chan error, 1)
-	go echoOnce(direct, directErr)
+	for _, transport := range []string{tunnelTransportRaw, tunnelTransportWS, tunnelTransportH2} {
+		t.Run(transport, func(t *testing.T) {
+			direct, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := direct.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+					t.Errorf("close direct listener: %v", err)
+				}
+			})
+			directErr := make(chan error, 1)
+			go echoOnce(direct, directErr)
 
-	serverAddr := reserveTCPAddr(t)
-	serverCtx, serverCancel := context.WithCancel(context.Background())
-	defer serverCancel()
-	serverErr := make(chan error, 1)
-	go func() {
-		serverErr <- runProxy(serverCtx, config{
-			Mode:        proxyModeServer,
-			ListenAddr:  serverAddr,
-			Token:       "secret",
-			DialTimeout: time.Second,
-			BufferSize:  4096,
-		}, io.Discard)
-	}()
-	waitForTCP(t, serverAddr)
+			serverAddr := reserveTCPAddr(t)
+			serverCtx, serverCancel := context.WithCancel(context.Background())
+			defer serverCancel()
+			serverErr := make(chan error, 1)
+			go func() {
+				serverErr <- runProxy(serverCtx, config{
+					Mode:            proxyModeServer,
+					ListenAddr:      serverAddr,
+					Token:           "secret",
+					TunnelTransport: transport,
+					TunnelPath:      "/tunnel",
+					DialTimeout:     time.Second,
+					BufferSize:      4096,
+				}, io.Discard)
+			}()
+			waitForTCP(t, serverAddr)
 
-	configPath := filepath.Join(t.TempDir(), "config.json")
-	configBody := []byte(`{
-		"mode": "client",
-		"server_addr": "` + serverAddr + `",
-		"token": "secret",
-		"force_upstream": {
-			"ip_cidrs": ["127.0.0.1/32"]
-		}
-	}`)
-	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
-		t.Fatal(err)
-	}
+			configPath := filepath.Join(t.TempDir(), "config.json")
+			configBody := []byte(`{
+				"force_upstream": {
+					"ip_cidrs": ["127.0.0.1/32"]
+				}
+			}`)
+			if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+				t.Fatal(err)
+			}
 
-	clientAddr := reserveTCPAddr(t)
-	clientCtx, clientCancel := context.WithCancel(context.Background())
-	defer clientCancel()
-	clientErr := make(chan error, 1)
-	go func() {
-		clientErr <- runProxy(clientCtx, config{
-			ListenAddr:  clientAddr,
-			ConfigPath:  configPath,
-			DialTimeout: time.Second,
-			BufferSize:  4096,
-		}, io.Discard)
-	}()
-	waitForTCP(t, clientAddr)
+			clientAddr := reserveTCPAddr(t)
+			clientCtx, clientCancel := context.WithCancel(context.Background())
+			defer clientCancel()
+			clientErr := make(chan error, 1)
+			go func() {
+				clientErr <- runProxy(clientCtx, config{
+					Mode:            proxyModeClient,
+					ListenAddr:      clientAddr,
+					ServerAddr:      serverAddr,
+					Token:           "secret",
+					TunnelTransport: transport,
+					TunnelPath:      "/tunnel",
+					ConfigPath:      configPath,
+					DialTimeout:     time.Second,
+					BufferSize:      4096,
+				}, io.Discard)
+			}()
+			waitForTCP(t, clientAddr)
 
-	client := dialHTTPConnect(t, clientAddr, direct.Addr().String())
-	if _, err := client.Write([]byte("hi")); err != nil {
-		t.Fatal(err)
-	}
-	reply := make([]byte, 2)
-	if _, err := io.ReadFull(client, reply); err != nil {
-		t.Fatal(err)
-	}
-	if string(reply) != "OK" {
-		t.Fatalf("reply = %q, want OK", reply)
-	}
-	if err := client.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-		t.Fatal(err)
-	}
-	select {
-	case err := <-directErr:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("direct target did not receive tunneled TCP")
-	}
+			client := dialHTTPConnect(t, clientAddr, direct.Addr().String())
+			if _, err := client.Write([]byte("hi")); err != nil {
+				t.Fatal(err)
+			}
+			reply := make([]byte, 2)
+			if _, err := io.ReadFull(client, reply); err != nil {
+				t.Fatal(err)
+			}
+			if string(reply) != "OK" {
+				t.Fatalf("reply = %q, want OK", reply)
+			}
+			if err := client.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+				t.Fatal(err)
+			}
+			select {
+			case err := <-directErr:
+				if err != nil {
+					t.Fatal(err)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("direct target did not receive tunneled TCP")
+			}
 
-	stopProxy(t, clientCancel, clientErr)
-	stopProxy(t, serverCancel, serverErr)
+			stopProxy(t, clientCancel, clientErr)
+			stopProxy(t, serverCancel, serverErr)
+		})
+	}
 }
 
 func TestRunProxyClientServerSOCKS5UDPTunnel(t *testing.T) {
-	direct, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := direct.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			t.Errorf("close direct udp listener: %v", err)
-		}
-	})
-	directErr := make(chan error, 1)
-	go udpEchoOnce(direct, directErr)
+	for _, transport := range []string{tunnelTransportRaw, tunnelTransportWS, tunnelTransportH2} {
+		t.Run(transport, func(t *testing.T) {
+			direct, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := direct.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+					t.Errorf("close direct udp listener: %v", err)
+				}
+			})
+			directErr := make(chan error, 1)
+			go udpEchoOnce(direct, directErr)
 
-	serverAddr := reserveTCPAddr(t)
-	serverCtx, serverCancel := context.WithCancel(context.Background())
-	defer serverCancel()
-	serverErr := make(chan error, 1)
-	go func() {
-		serverErr <- runProxy(serverCtx, config{
-			Mode:        proxyModeServer,
-			ListenAddr:  serverAddr,
-			Token:       "secret",
-			DialTimeout: time.Second,
-			BufferSize:  4096,
-		}, io.Discard)
-	}()
-	waitForTCP(t, serverAddr)
+			serverAddr := reserveTCPAddr(t)
+			serverCtx, serverCancel := context.WithCancel(context.Background())
+			defer serverCancel()
+			serverErr := make(chan error, 1)
+			go func() {
+				serverErr <- runProxy(serverCtx, config{
+					Mode:            proxyModeServer,
+					ListenAddr:      serverAddr,
+					Token:           "secret",
+					TunnelTransport: transport,
+					TunnelPath:      "/tunnel",
+					DialTimeout:     time.Second,
+					BufferSize:      4096,
+				}, io.Discard)
+			}()
+			waitForTCP(t, serverAddr)
 
-	configPath := filepath.Join(t.TempDir(), "config.json")
-	configBody := []byte(`{
-		"mode": "client",
-		"server_addr": "` + serverAddr + `",
-		"token": "secret",
-		"force_upstream": {
-			"ip_cidrs": ["127.0.0.1/32"]
-		}
-	}`)
-	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
-		t.Fatal(err)
-	}
+			configPath := filepath.Join(t.TempDir(), "config.json")
+			configBody := []byte(`{
+				"force_upstream": {
+					"ip_cidrs": ["127.0.0.1/32"]
+				}
+			}`)
+			if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+				t.Fatal(err)
+			}
 
-	clientAddr := reserveTCPAddr(t)
-	clientCtx, clientCancel := context.WithCancel(context.Background())
-	defer clientCancel()
-	clientErr := make(chan error, 1)
-	go func() {
-		clientErr <- runProxy(clientCtx, config{
-			ListenAddr:  clientAddr,
-			ConfigPath:  configPath,
-			DialTimeout: time.Second,
-			BufferSize:  4096,
-		}, io.Discard)
-	}()
-	waitForTCP(t, clientAddr)
+			clientAddr := reserveTCPAddr(t)
+			clientCtx, clientCancel := context.WithCancel(context.Background())
+			defer clientCancel()
+			clientErr := make(chan error, 1)
+			go func() {
+				clientErr <- runProxy(clientCtx, config{
+					Mode:            proxyModeClient,
+					ListenAddr:      clientAddr,
+					ServerAddr:      serverAddr,
+					Token:           "secret",
+					TunnelTransport: transport,
+					TunnelPath:      "/tunnel",
+					ConfigPath:      configPath,
+					DialTimeout:     time.Second,
+					BufferSize:      4096,
+				}, io.Discard)
+			}()
+			waitForTCP(t, clientAddr)
 
-	control, relayAddr := dialSocks5UDPAssociate(t, clientAddr)
-	defer func() {
-		if err := control.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			t.Errorf("close socks control: %v", err)
-		}
-	}()
+			control, relayAddr := dialSocks5UDPAssociate(t, clientAddr)
+			defer func() {
+				if err := control.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+					t.Errorf("close socks control: %v", err)
+				}
+			}()
 
-	udpClient, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := udpClient.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			t.Errorf("close udp client: %v", err)
-		}
-	})
-	targetPort := uint16(direct.LocalAddr().(*net.UDPAddr).Port)
-	packet := buildSocksUDPDatagram("127.0.0.1", targetPort, []byte("hi"))
-	if _, err := udpClient.WriteToUDP(packet, relayAddr); err != nil {
-		t.Fatal(err)
-	}
-	if err := udpClient.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
-		t.Fatal(err)
-	}
-	buf := make([]byte, udpBufferSize)
-	n, _, err := udpClient.ReadFromUDP(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dgram, err := parseSocksUDPDatagram(buf[:n])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(dgram.payload) != "OK" {
-		t.Fatalf("udp payload = %q, want OK", dgram.payload)
-	}
-	select {
-	case err := <-directErr:
-		if err != nil {
-			t.Fatal(err)
-		}
-	default:
-	}
+			udpClient, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := udpClient.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+					t.Errorf("close udp client: %v", err)
+				}
+			})
+			targetPort := uint16(direct.LocalAddr().(*net.UDPAddr).Port)
+			packet := buildSocksUDPDatagram("127.0.0.1", targetPort, []byte("hi"))
+			if _, err := udpClient.WriteToUDP(packet, relayAddr); err != nil {
+				t.Fatal(err)
+			}
+			if err := udpClient.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+				t.Fatal(err)
+			}
+			buf := make([]byte, udpBufferSize)
+			n, _, err := udpClient.ReadFromUDP(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dgram, err := parseSocksUDPDatagram(buf[:n])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(dgram.payload) != "OK" {
+				t.Fatalf("udp payload = %q, want OK", dgram.payload)
+			}
+			select {
+			case err := <-directErr:
+				if err != nil {
+					t.Fatal(err)
+				}
+			default:
+			}
 
-	stopProxy(t, clientCancel, clientErr)
-	stopProxy(t, serverCancel, serverErr)
+			stopProxy(t, clientCancel, clientErr)
+			stopProxy(t, serverCancel, serverErr)
+		})
+	}
+}
+
+func TestBuildTunnelURLTransports(t *testing.T) {
+	tests := []struct {
+		name      string
+		cfg       config
+		transport string
+		want      string
+		wantErr   bool
+	}{
+		{
+			name: "websocket cleartext",
+			cfg: config{
+				ServerAddr: "example.com:443",
+				TunnelPath: "/ws",
+			},
+			transport: tunnelTransportWS,
+			want:      "ws://example.com:443/ws",
+		},
+		{
+			name: "websocket tls",
+			cfg: config{
+				ServerAddr: "example.com:443",
+				TunnelPath: "ws",
+				TunnelTLS:  true,
+			},
+			transport: tunnelTransportWS,
+			want:      "wss://example.com:443/ws",
+		},
+		{
+			name: "h2 cleartext",
+			cfg: config{
+				ServerAddr: "example.com:80",
+				TunnelPath: "/h2",
+			},
+			transport: tunnelTransportH2,
+			want:      "http://example.com:80/h2",
+		},
+		{
+			name: "h2 tls",
+			cfg: config{
+				ServerAddr: "example.com:443",
+				TunnelPath: "/h2",
+				TunnelTLS:  true,
+			},
+			transport: tunnelTransportH2,
+			want:      "https://example.com:443/h2",
+		},
+		{
+			name: "h3 always https",
+			cfg: config{
+				ServerAddr: "example.com:443",
+				TunnelPath: "/h3",
+			},
+			transport: tunnelTransportH3,
+			want:      "https://example.com:443/h3",
+		},
+		{
+			name: "h3 rejects http URL",
+			cfg: config{
+				ServerAddr: "http://example.com:443/h3",
+			},
+			transport: tunnelTransportH3,
+			wantErr:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := buildTunnelURL(tt.cfg, tt.transport)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("buildTunnelURL succeeded, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.String() != tt.want {
+				t.Fatalf("url = %q, want %q", got.String(), tt.want)
+			}
+		})
+	}
 }
