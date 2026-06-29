@@ -16,31 +16,35 @@ type routeConfigFile struct {
 }
 
 type runtimeConfigFile struct {
-	Mode                string   `json:"mode,omitempty"`
-	ListenAddr          string   `json:"listen_addr,omitempty"`
-	ServerAddr          string   `json:"server_addr,omitempty"`
-	Token               string   `json:"token,omitempty"`
-	TunnelProtocol      string   `json:"tunnel_protocol,omitempty"`
-	TunnelTransport     string   `json:"tunnel_transport,omitempty"`
-	TunnelPath          string   `json:"tunnel_path,omitempty"`
-	TunnelTLS           bool     `json:"tunnel_tls,omitempty"`
-	TunnelTLSCert       string   `json:"tunnel_tls_cert,omitempty"`
-	TunnelTLSKey        string   `json:"tunnel_tls_key,omitempty"`
-	TunnelTLSServerName string   `json:"tunnel_tls_server_name,omitempty"`
-	TunnelTLSInsecure   bool     `json:"tunnel_tls_insecure,omitempty"`
-	TunnelSecurity      string   `json:"tunnel_security,omitempty"`
-	TunnelFlow          string   `json:"tunnel_flow,omitempty"`
-	RealityServerName   string   `json:"reality_server_name,omitempty"`
-	RealityServerNames  []string `json:"reality_server_names,omitempty"`
-	RealityFingerprint  string   `json:"reality_fingerprint,omitempty"`
-	RealityPublicKey    string   `json:"reality_public_key,omitempty"`
-	RealityPrivateKey   string   `json:"reality_private_key,omitempty"`
-	RealityShortID      string   `json:"reality_short_id,omitempty"`
-	RealityShortIDs     []string `json:"reality_short_ids,omitempty"`
-	RealityDest         string   `json:"reality_dest,omitempty"`
-	RealitySpiderX      string   `json:"reality_spider_x,omitempty"`
-	TunnelMux           *bool    `json:"tunnel_mux,omitempty"`
-	UpstreamProtocol    string   `json:"upstream_protocol,omitempty"`
+	Mode                   string   `json:"mode,omitempty"`
+	ListenAddr             string   `json:"listen_addr,omitempty"`
+	ServerAddr             string   `json:"server_addr,omitempty"`
+	Token                  string   `json:"token,omitempty"`
+	TunnelProtocol         string   `json:"tunnel_protocol,omitempty"`
+	TunnelTransport        string   `json:"tunnel_transport,omitempty"`
+	TunnelPath             string   `json:"tunnel_path,omitempty"`
+	TunnelTLS              bool     `json:"tunnel_tls,omitempty"`
+	TunnelTLSCert          string   `json:"tunnel_tls_cert,omitempty"`
+	TunnelTLSKey           string   `json:"tunnel_tls_key,omitempty"`
+	TunnelTLSServerName    string   `json:"tunnel_tls_server_name,omitempty"`
+	TunnelTLSInsecure      bool     `json:"tunnel_tls_insecure,omitempty"`
+	TunnelSecurity         string   `json:"tunnel_security,omitempty"`
+	TunnelFlow             string   `json:"tunnel_flow,omitempty"`
+	RealityServerName      string   `json:"reality_server_name,omitempty"`
+	RealityServerNames     []string `json:"reality_server_names,omitempty"`
+	RealityFingerprint     string   `json:"reality_fingerprint,omitempty"`
+	RealityPublicKey       string   `json:"reality_public_key,omitempty"`
+	RealityPrivateKey      string   `json:"reality_private_key,omitempty"`
+	RealityShortID         string   `json:"reality_short_id,omitempty"`
+	RealityShortIDs        []string `json:"reality_short_ids,omitempty"`
+	RealityDest            string   `json:"reality_dest,omitempty"`
+	RealitySpiderX         string   `json:"reality_spider_x,omitempty"`
+	TunnelMux              *bool    `json:"tunnel_mux,omitempty"`
+	UpstreamProtocol       string   `json:"upstream_protocol,omitempty"`
+	SOCKS5Username         string   `json:"socks5_username,omitempty"`
+	SOCKS5Password         string   `json:"socks5_password,omitempty"`
+	UpstreamSOCKS5Username string   `json:"upstream_socks5_username,omitempty"`
+	UpstreamSOCKS5Password string   `json:"upstream_socks5_password,omitempty"`
 }
 
 type forceUpstreamConfig struct {
@@ -183,6 +187,18 @@ func applyRuntimeConfigDefaults(cfg *config) error {
 	}
 	if strings.TrimSpace(cfg.UpstreamProtocol) == "" {
 		cfg.UpstreamProtocol = fileCfg.UpstreamProtocol
+	}
+	if strings.TrimSpace(cfg.SOCKS5Username) == "" {
+		cfg.SOCKS5Username = fileCfg.SOCKS5Username
+	}
+	if strings.TrimSpace(cfg.SOCKS5Password) == "" {
+		cfg.SOCKS5Password = fileCfg.SOCKS5Password
+	}
+	if strings.TrimSpace(cfg.UpstreamSOCKS5Username) == "" {
+		cfg.UpstreamSOCKS5Username = fileCfg.UpstreamSOCKS5Username
+	}
+	if strings.TrimSpace(cfg.UpstreamSOCKS5Password) == "" {
+		cfg.UpstreamSOCKS5Password = fileCfg.UpstreamSOCKS5Password
 	}
 	return nil
 }

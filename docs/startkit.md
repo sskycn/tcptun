@@ -87,6 +87,10 @@ bin/proxy client --config /etc/proxy/client.json
 | `tunnel_flow` | server/client | VLESS flow, for example `xtls-rprx-vision`. |
 | `tunnel_mux` | server/client | Enables this project's tunnel multiplexing. Currently supported by `custom`. |
 | `upstream_protocol` | client/local | Upstream protocol used for parsed proxy traffic: `socks5` or `mixed`. |
+| `socks5_username` | client/local | Local SOCKS5 username. Setting username or password enables username/password auth for SOCKS5 clients. |
+| `socks5_password` | client/local | Local SOCKS5 password. |
+| `upstream_socks5_username` | local | Username used when dialing an upstream SOCKS5 gateway. |
+| `upstream_socks5_password` | local | Password used when dialing an upstream SOCKS5 gateway. |
 
 ## Route Fields
 

@@ -986,6 +986,87 @@ func socks5ConnectUpstream(listener net.Listener, targets chan<- string, errCh c
 	errCh <- nil
 }
 
+func socks5ConnectUpstreamWithAuth(listener net.Listener, targetCh chan<- string, username string, password string, errCh chan<- error) {
+	defer close(targetCh)
+	conn, err := listener.Accept()
+	if err != nil {
+		if !errors.Is(err, net.ErrClosed) {
+			errCh <- err
+		}
+		return
+	}
+	reader := bufio.NewReader(conn)
+	target, err := readSocks5ConnectTargetWithAuth(reader, conn, username, password)
+	if err != nil {
+		errCh <- err
+		return
+	}
+	targetCh <- target
+	if err := writeSocks5Reply(conn, socksReplySucceeded); err != nil {
+		errCh <- errors.Join(err, conn.Close())
+		return
+	}
+	if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		errCh <- err
+		return
+	}
+	errCh <- nil
+}
+
+func readSocks5ConnectTargetWithAuth(reader *bufio.Reader, conn net.Conn, username string, password string) (string, error) {
+	head := make([]byte, 2)
+	if _, err := io.ReadFull(reader, head); err != nil {
+		return "", errors.Join(err, conn.Close())
+	}
+	if head[0] != socksVersion5 {
+		return "", errors.Join(fmt.Errorf("socks version = %d, want 5", head[0]), conn.Close())
+	}
+	methods := make([]byte, int(head[1]))
+	if _, err := io.ReadFull(reader, methods); err != nil {
+		return "", errors.Join(err, conn.Close())
+	}
+	hasUserPass := false
+	for _, method := range methods {
+		if method == socksMethodUserPass {
+			hasUserPass = true
+			break
+		}
+	}
+	if !hasUserPass {
+		return "", errors.Join(fmt.Errorf("socks methods = %v, want username/password", methods), conn.Close())
+	}
+	if err := writeAll(conn, []byte{socksVersion5, socksMethodUserPass}); err != nil {
+		return "", errors.Join(err, conn.Close())
+	}
+	ok, err := readSocks5UserPassAuth(reader, username, password)
+	if err != nil {
+		return "", errors.Join(err, conn.Close())
+	}
+	if !ok {
+		return "", errors.Join(errors.New("invalid upstream socks username/password"), conn.Close())
+	}
+	if err := writeAll(conn, []byte{socksAuthVersion, 0x00}); err != nil {
+		return "", errors.Join(err, conn.Close())
+	}
+	reqHead := make([]byte, 4)
+	if _, err := io.ReadFull(reader, reqHead); err != nil {
+		return "", errors.Join(err, conn.Close())
+	}
+	if reqHead[0] != socksVersion5 || reqHead[1] != socksCmdConnect {
+		return "", errors.Join(fmt.Errorf("socks request head = %v", reqHead), conn.Close())
+	}
+	host, err := readSocksAddr(reader, reqHead[3])
+	if err != nil {
+		return "", errors.Join(err, conn.Close())
+	}
+	portBytes := make([]byte, 2)
+	if _, err := io.ReadFull(reader, portBytes); err != nil {
+		return "", errors.Join(err, conn.Close())
+	}
+	port := binary.BigEndian.Uint16(portBytes)
+	return net.JoinHostPort(host, strconv.Itoa(int(port))), nil
+}
+
 func socks5HTTPUpstream(listener net.Listener, targetCh chan<- string, lineCh chan<- string, errCh chan<- error) {
 	defer close(targetCh)
 	defer close(lineCh)
@@ -1242,6 +1323,202 @@ func TestRunProxyDirectsInternalSOCKS5(t *testing.T) {
 	select {
 	case <-upstreamHit:
 		t.Fatal("internal SOCKS5 was forwarded to upstream")
+	default:
+	}
+
+	cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("proxy did not stop")
+	}
+}
+
+func TestRunProxyAcceptsLocalSOCKS5UsernamePassword(t *testing.T) {
+	direct, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := direct.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close direct listener: %v", err)
+		}
+	})
+	directErr := make(chan error, 1)
+	go echoOnce(direct, directErr)
+
+	upstream, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := upstream.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close upstream listener: %v", err)
+		}
+	})
+	upstreamHit := make(chan struct{}, 1)
+	go acceptSignal(upstream, upstreamHit)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	listenAddr := reserveTCPAddr(t)
+	_, upstreamPortText, err := net.SplitHostPort(upstream.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstreamPort, err := strconv.Atoi(upstreamPortText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- runProxy(ctx, config{
+			ListenAddr:     listenAddr,
+			GatewayIP:      "127.0.0.1",
+			GatewayPort:    upstreamPort,
+			SOCKS5Username: "user",
+			SOCKS5Password: "pass",
+			DialTimeout:    time.Second,
+			BufferSize:     4096,
+		}, io.Discard)
+	}()
+	waitForTCP(t, listenAddr)
+
+	client, err := net.DialTimeout("tcp", listenAddr, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close client: %v", err)
+		}
+	})
+	if _, err := client.Write([]byte{socksVersion5, 0x01, socksMethodUserPass}); err != nil {
+		t.Fatal(err)
+	}
+	method := make([]byte, 2)
+	if _, err := io.ReadFull(client, method); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(method, []byte{socksVersion5, socksMethodUserPass}) {
+		t.Fatalf("method = %v", method)
+	}
+	if err := writeSocks5UserPassAuth(client, "user", "pass"); err != nil {
+		t.Fatal(err)
+	}
+	_, directPortText, err := net.SplitHostPort(direct.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	directPort, err := strconv.Atoi(directPortText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := []byte{socksVersion5, socksCmdConnect, 0x00, socksAtypIPv4, 127, 0, 0, 1, byte(directPort >> 8), byte(directPort)}
+	if _, err := client.Write(req); err != nil {
+		t.Fatal(err)
+	}
+	reply := make([]byte, 10)
+	if _, err := io.ReadFull(client, reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply[1] != socksReplySucceeded {
+		t.Fatalf("socks reply = %v", reply)
+	}
+	if _, err := client.Write([]byte("hi")); err != nil {
+		t.Fatal(err)
+	}
+	echo := make([]byte, 2)
+	if _, err := io.ReadFull(client, echo); err != nil {
+		t.Fatal(err)
+	}
+	if string(echo) != "OK" {
+		t.Fatalf("reply = %q, want OK", echo)
+	}
+	select {
+	case err := <-directErr:
+		if err != nil {
+			t.Fatal(err)
+		}
+	default:
+	}
+
+	cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("proxy did not stop")
+	}
+}
+
+func TestRunProxyUsesUpstreamSOCKS5UsernamePassword(t *testing.T) {
+	upstream, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := upstream.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("close upstream listener: %v", err)
+		}
+	})
+	upstreamTargets := make(chan string, 1)
+	upstreamErr := make(chan error, 1)
+	go socks5ConnectUpstreamWithAuth(upstream, upstreamTargets, "upuser", "uppass", upstreamErr)
+
+	configPath := filepath.Join(t.TempDir(), "route.json")
+	configBody := []byte(`{"force_upstream":{"ip_cidrs":["127.0.0.1/32"]}}`)
+	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	listenAddr := reserveTCPAddr(t)
+	_, upstreamPortText, err := net.SplitHostPort(upstream.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstreamPort, err := strconv.Atoi(upstreamPortText)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- runProxy(ctx, config{
+			ListenAddr:             listenAddr,
+			GatewayIP:              "127.0.0.1",
+			GatewayPort:            upstreamPort,
+			UpstreamSOCKS5Username: "upuser",
+			UpstreamSOCKS5Password: "uppass",
+			RouteConfigPath:        configPath,
+			DialTimeout:            time.Second,
+			BufferSize:             4096,
+		}, io.Discard)
+	}()
+	waitForTCP(t, listenAddr)
+
+	targetAddr := net.JoinHostPort("127.0.0.1", "80")
+	client := dialHTTPConnect(t, listenAddr, targetAddr)
+	if err := client.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		t.Fatal(err)
+	}
+	if target := <-upstreamTargets; target != targetAddr {
+		t.Fatalf("upstream target = %q, want %s", target, targetAddr)
+	}
+	select {
+	case err := <-upstreamErr:
+		if err != nil {
+			t.Fatal(err)
+		}
 	default:
 	}
 

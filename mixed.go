@@ -16,6 +16,10 @@ import (
 
 const (
 	socksVersion5        = byte(0x05)
+	socksAuthVersion     = byte(0x01)
+	socksMethodNoAuth    = byte(0x00)
+	socksMethodUserPass  = byte(0x02)
+	socksMethodNoAccept  = byte(0xff)
 	socksCmdConnect      = byte(0x01)
 	socksCmdUDPAssociate = byte(0x03)
 	socksAtypIPv4        = byte(0x01)
@@ -87,14 +91,20 @@ func (s *proxyServer) routeMixed(ctx context.Context, client net.Conn, reader *b
 }
 
 func (s *proxyServer) handleSocks5(ctx context.Context, client net.Conn, reader *bufio.Reader) error {
-	if err := readSocks5Greeting(reader); err != nil {
+	method, err := readSocks5Greeting(reader, s.localSOCKS5AuthRequired())
+	if err != nil {
 		if errors.Is(err, errSocksUnsupportedMethod) {
-			return writeAll(client, []byte{socksVersion5, 0xff})
+			return writeAll(client, []byte{socksVersion5, socksMethodNoAccept})
 		}
 		return err
 	}
-	if err := writeAll(client, []byte{socksVersion5, 0x00}); err != nil {
+	if err := writeAll(client, []byte{socksVersion5, method}); err != nil {
 		return err
+	}
+	if method == socksMethodUserPass {
+		if err := s.authenticateLocalSOCKS5(reader, client); err != nil {
+			return err
+		}
 	}
 
 	req, err := readSocks5Request(reader)
@@ -381,15 +391,8 @@ func (s *proxyServer) connectViaUpstreamSocks5(ctx context.Context, req socksReq
 	if err != nil {
 		return nil, target, err
 	}
-	if err := writeAll(upstream, []byte{socksVersion5, 0x01, 0x00}); err != nil {
+	if err := s.authenticateUpstreamSOCKS5(upstream); err != nil {
 		return nil, target, closeAfterError(upstream, err)
-	}
-	reply := make([]byte, 2)
-	if _, err := io.ReadFull(upstream, reply); err != nil {
-		return nil, target, closeAfterError(upstream, err)
-	}
-	if reply[0] != socksVersion5 || reply[1] != 0x00 {
-		return nil, target, closeAfterError(upstream, fmt.Errorf("upstream socks auth reply %v", reply))
 	}
 	if err := writeAll(upstream, buildSocks5ConnectRequest(req)); err != nil {
 		return nil, target, closeAfterError(upstream, err)
@@ -404,24 +407,135 @@ func (s *proxyServer) connectViaUpstreamTCP(ctx context.Context, req socksReques
 	return s.upstreamDialer().dialTCP(ctx, req)
 }
 
-func readSocks5Greeting(reader *bufio.Reader) error {
-	head := make([]byte, 2)
-	if _, err := io.ReadFull(reader, head); err != nil {
+func (s *proxyServer) localSOCKS5AuthRequired() bool {
+	return strings.TrimSpace(s.cfg.SOCKS5Username) != "" || strings.TrimSpace(s.cfg.SOCKS5Password) != ""
+}
+
+func (s *proxyServer) upstreamSOCKS5AuthRequired() bool {
+	return strings.TrimSpace(s.cfg.UpstreamSOCKS5Username) != "" || strings.TrimSpace(s.cfg.UpstreamSOCKS5Password) != ""
+}
+
+func (s *proxyServer) authenticateLocalSOCKS5(reader *bufio.Reader, client net.Conn) error {
+	ok, err := readSocks5UserPassAuth(reader, s.cfg.SOCKS5Username, s.cfg.SOCKS5Password)
+	if err != nil {
+		if writeErr := writeAll(client, []byte{socksAuthVersion, 0x01}); writeErr != nil {
+			return errors.Join(err, writeErr)
+		}
 		return err
 	}
+	if !ok {
+		if err := writeAll(client, []byte{socksAuthVersion, 0x01}); err != nil {
+			return err
+		}
+		return errors.New("invalid socks username/password")
+	}
+	return writeAll(client, []byte{socksAuthVersion, 0x00})
+}
+
+func (s *proxyServer) authenticateUpstreamSOCKS5(upstream net.Conn) error {
+	if s.upstreamSOCKS5AuthRequired() {
+		if err := writeAll(upstream, []byte{socksVersion5, 0x01, socksMethodUserPass}); err != nil {
+			return err
+		}
+	} else if err := writeAll(upstream, []byte{socksVersion5, 0x01, socksMethodNoAuth}); err != nil {
+		return err
+	}
+	reply := make([]byte, 2)
+	if _, err := io.ReadFull(upstream, reply); err != nil {
+		return err
+	}
+	if reply[0] != socksVersion5 {
+		return fmt.Errorf("upstream socks auth reply %v", reply)
+	}
+	switch reply[1] {
+	case socksMethodNoAuth:
+		if s.upstreamSOCKS5AuthRequired() {
+			return fmt.Errorf("upstream socks selected no-auth when username/password was required")
+		}
+		return nil
+	case socksMethodUserPass:
+		if !s.upstreamSOCKS5AuthRequired() {
+			return fmt.Errorf("upstream socks requested username/password but no credentials are configured")
+		}
+		return writeSocks5UserPassAuth(upstream, s.cfg.UpstreamSOCKS5Username, s.cfg.UpstreamSOCKS5Password)
+	default:
+		return fmt.Errorf("upstream socks auth reply %v", reply)
+	}
+}
+
+func readSocks5Greeting(reader *bufio.Reader, requireUserPass bool) (byte, error) {
+	head := make([]byte, 2)
+	if _, err := io.ReadFull(reader, head); err != nil {
+		return 0, err
+	}
 	if head[0] != socksVersion5 {
-		return errSocksUnsupportedVersion
+		return 0, errSocksUnsupportedVersion
 	}
 	methods := make([]byte, int(head[1]))
 	if _, err := io.ReadFull(reader, methods); err != nil {
-		return err
+		return 0, err
+	}
+	want := socksMethodNoAuth
+	if requireUserPass {
+		want = socksMethodUserPass
 	}
 	for _, method := range methods {
-		if method == 0x00 {
-			return nil
+		if method == want {
+			return want, nil
 		}
 	}
-	return errSocksUnsupportedMethod
+	return 0, errSocksUnsupportedMethod
+}
+
+func readSocks5UserPassAuth(reader *bufio.Reader, username string, password string) (bool, error) {
+	version, err := reader.ReadByte()
+	if err != nil {
+		return false, err
+	}
+	if version != socksAuthVersion {
+		return false, fmt.Errorf("unsupported socks username/password auth version %d", version)
+	}
+	ulen, err := reader.ReadByte()
+	if err != nil {
+		return false, err
+	}
+	user := make([]byte, int(ulen))
+	if _, err := io.ReadFull(reader, user); err != nil {
+		return false, err
+	}
+	plen, err := reader.ReadByte()
+	if err != nil {
+		return false, err
+	}
+	pass := make([]byte, int(plen))
+	if _, err := io.ReadFull(reader, pass); err != nil {
+		return false, err
+	}
+	return string(user) == username && string(pass) == password, nil
+}
+
+func writeSocks5UserPassAuth(conn io.ReadWriter, username string, password string) error {
+	if len(username) > 255 {
+		return fmt.Errorf("socks username is too long: %d bytes", len(username))
+	}
+	if len(password) > 255 {
+		return fmt.Errorf("socks password is too long: %d bytes", len(password))
+	}
+	packet := []byte{socksAuthVersion, byte(len(username))}
+	packet = append(packet, []byte(username)...)
+	packet = append(packet, byte(len(password)))
+	packet = append(packet, []byte(password)...)
+	if err := writeAll(conn, packet); err != nil {
+		return err
+	}
+	reply := make([]byte, 2)
+	if _, err := io.ReadFull(conn, reply); err != nil {
+		return err
+	}
+	if reply[0] != socksAuthVersion || reply[1] != 0x00 {
+		return fmt.Errorf("upstream socks username/password auth failed with reply %v", reply)
+	}
+	return nil
 }
 
 func readSocks5Request(reader *bufio.Reader) (socksRequest, error) {

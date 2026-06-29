@@ -28,31 +28,35 @@ const (
 )
 
 type generatedRouteConfig struct {
-	Mode                string   `json:"mode,omitempty"`
-	ListenAddr          string   `json:"listen_addr,omitempty"`
-	ServerAddr          string   `json:"server_addr,omitempty"`
-	Token               string   `json:"token,omitempty"`
-	TunnelProtocol      string   `json:"tunnel_protocol,omitempty"`
-	TunnelTransport     string   `json:"tunnel_transport,omitempty"`
-	TunnelPath          string   `json:"tunnel_path,omitempty"`
-	TunnelTLS           bool     `json:"tunnel_tls,omitempty"`
-	TunnelTLSCert       string   `json:"tunnel_tls_cert,omitempty"`
-	TunnelTLSKey        string   `json:"tunnel_tls_key,omitempty"`
-	TunnelTLSServerName string   `json:"tunnel_tls_server_name,omitempty"`
-	TunnelTLSInsecure   bool     `json:"tunnel_tls_insecure,omitempty"`
-	TunnelSecurity      string   `json:"tunnel_security,omitempty"`
-	TunnelFlow          string   `json:"tunnel_flow,omitempty"`
-	RealityServerName   string   `json:"reality_server_name,omitempty"`
-	RealityServerNames  []string `json:"reality_server_names,omitempty"`
-	RealityFingerprint  string   `json:"reality_fingerprint,omitempty"`
-	RealityPublicKey    string   `json:"reality_public_key,omitempty"`
-	RealityPrivateKey   string   `json:"reality_private_key,omitempty"`
-	RealityShortID      string   `json:"reality_short_id,omitempty"`
-	RealityShortIDs     []string `json:"reality_short_ids,omitempty"`
-	RealityDest         string   `json:"reality_dest,omitempty"`
-	RealitySpiderX      string   `json:"reality_spider_x,omitempty"`
-	TunnelMux           *bool    `json:"tunnel_mux,omitempty"`
-	UpstreamProtocol    string   `json:"upstream_protocol,omitempty"`
+	Mode                   string   `json:"mode,omitempty"`
+	ListenAddr             string   `json:"listen_addr,omitempty"`
+	ServerAddr             string   `json:"server_addr,omitempty"`
+	Token                  string   `json:"token,omitempty"`
+	TunnelProtocol         string   `json:"tunnel_protocol,omitempty"`
+	TunnelTransport        string   `json:"tunnel_transport,omitempty"`
+	TunnelPath             string   `json:"tunnel_path,omitempty"`
+	TunnelTLS              bool     `json:"tunnel_tls,omitempty"`
+	TunnelTLSCert          string   `json:"tunnel_tls_cert,omitempty"`
+	TunnelTLSKey           string   `json:"tunnel_tls_key,omitempty"`
+	TunnelTLSServerName    string   `json:"tunnel_tls_server_name,omitempty"`
+	TunnelTLSInsecure      bool     `json:"tunnel_tls_insecure,omitempty"`
+	TunnelSecurity         string   `json:"tunnel_security,omitempty"`
+	TunnelFlow             string   `json:"tunnel_flow,omitempty"`
+	RealityServerName      string   `json:"reality_server_name,omitempty"`
+	RealityServerNames     []string `json:"reality_server_names,omitempty"`
+	RealityFingerprint     string   `json:"reality_fingerprint,omitempty"`
+	RealityPublicKey       string   `json:"reality_public_key,omitempty"`
+	RealityPrivateKey      string   `json:"reality_private_key,omitempty"`
+	RealityShortID         string   `json:"reality_short_id,omitempty"`
+	RealityShortIDs        []string `json:"reality_short_ids,omitempty"`
+	RealityDest            string   `json:"reality_dest,omitempty"`
+	RealitySpiderX         string   `json:"reality_spider_x,omitempty"`
+	TunnelMux              *bool    `json:"tunnel_mux,omitempty"`
+	UpstreamProtocol       string   `json:"upstream_protocol,omitempty"`
+	SOCKS5Username         string   `json:"socks5_username,omitempty"`
+	SOCKS5Password         string   `json:"socks5_password,omitempty"`
+	UpstreamSOCKS5Username string   `json:"upstream_socks5_username,omitempty"`
+	UpstreamSOCKS5Password string   `json:"upstream_socks5_password,omitempty"`
 }
 
 type generatedRouteRulesConfig struct {
@@ -69,38 +73,42 @@ type generatedForceUpstreamConfig struct {
 }
 
 type generateConfigOptions struct {
-	target              string
-	protocol            string
-	transport           string
-	token               string
-	outDir              string
-	serverOutput        string
-	clientOutput        string
-	routeOutput         string
-	serverListen        string
-	clientListen        string
-	serverAddr          string
-	tunnelPath          string
-	tunnelTLS           bool
-	tunnelTLSCert       string
-	tunnelTLSKey        string
-	tunnelTLSServerName string
-	tunnelTLSInsecure   bool
-	tunnelSecurity      string
-	tunnelFlow          string
-	realityServerName   string
-	realityServerNames  string
-	realityFingerprint  string
-	realityPublicKey    string
-	realityPrivateKey   string
-	realityShortID      string
-	realityShortIDs     string
-	realityDest         string
-	realitySpiderX      string
-	tunnelMux           string
-	upstreamProtocol    string
-	forceCIDRs          string
-	overwrite           bool
+	target                 string
+	protocol               string
+	transport              string
+	token                  string
+	outDir                 string
+	serverOutput           string
+	clientOutput           string
+	routeOutput            string
+	serverListen           string
+	clientListen           string
+	serverAddr             string
+	tunnelPath             string
+	tunnelTLS              bool
+	tunnelTLSCert          string
+	tunnelTLSKey           string
+	tunnelTLSServerName    string
+	tunnelTLSInsecure      bool
+	tunnelSecurity         string
+	tunnelFlow             string
+	realityServerName      string
+	realityServerNames     string
+	realityFingerprint     string
+	realityPublicKey       string
+	realityPrivateKey      string
+	realityShortID         string
+	realityShortIDs        string
+	realityDest            string
+	realitySpiderX         string
+	tunnelMux              string
+	upstreamProtocol       string
+	socks5Username         string
+	socks5Password         string
+	upstreamSOCKS5Username string
+	upstreamSOCKS5Password string
+	forceCIDRs             string
+	overwrite              bool
 }
 
 func buildConfigCommand() *cmd.Command {
@@ -160,6 +168,10 @@ func buildConfigCommand() *cmd.Command {
 			f.StringVar(&opts.realitySpiderX, "reality-spider-x", opts.realitySpiderX, "REALITY spiderX path", "")
 			f.StringVar(&opts.tunnelMux, "mux", opts.tunnelMux, "tunnel mux setting: true or false; empty keeps default", "")
 			f.StringVar(&opts.upstreamProtocol, "client-upstream-protocol", opts.upstreamProtocol, "client upstream protocol: socks5 or mixed", "")
+			f.StringVar(&opts.socks5Username, "socks5-username", opts.socks5Username, "local SOCKS5 username written to client config", "")
+			f.StringVar(&opts.socks5Password, "socks5-password", opts.socks5Password, "local SOCKS5 password written to client config", "")
+			f.StringVar(&opts.upstreamSOCKS5Username, "upstream-socks5-username", opts.upstreamSOCKS5Username, "upstream SOCKS5 username written to client config", "")
+			f.StringVar(&opts.upstreamSOCKS5Password, "upstream-socks5-password", opts.upstreamSOCKS5Password, "upstream SOCKS5 password written to client config", "")
 			f.StringVar(&opts.forceCIDRs, "force-ip-cidrs", opts.forceCIDRs, "comma-separated IP CIDRs to force upstream in route config", "")
 			f.BoolVar(&opts.overwrite, "overwrite", opts.overwrite, "overwrite existing output files", "")
 		},
@@ -297,6 +309,10 @@ var configGenerateFlagNames = map[string]struct{}{
 	"reality-spider-x":         {},
 	"mux":                      {},
 	"client-upstream-protocol": {},
+	"socks5-username":          {},
+	"socks5-password":          {},
+	"upstream-socks5-username": {},
+	"upstream-socks5-password": {},
 	"force-ip-cidrs":           {},
 	"overwrite":                {},
 }
@@ -538,6 +554,22 @@ func (w *configWizard) collect(ctx context.Context) (generateConfigOptions, erro
 	if err != nil {
 		return generateConfigOptions{}, err
 	}
+	opts.socks5Username, err = w.readString("Client local SOCKS5 username", opts.socks5Username)
+	if err != nil {
+		return generateConfigOptions{}, err
+	}
+	opts.socks5Password, err = w.readString("Client local SOCKS5 password", opts.socks5Password)
+	if err != nil {
+		return generateConfigOptions{}, err
+	}
+	opts.upstreamSOCKS5Username, err = w.readString("Client upstream SOCKS5 username", opts.upstreamSOCKS5Username)
+	if err != nil {
+		return generateConfigOptions{}, err
+	}
+	opts.upstreamSOCKS5Password, err = w.readString("Client upstream SOCKS5 password", opts.upstreamSOCKS5Password)
+	if err != nil {
+		return generateConfigOptions{}, err
+	}
 	opts.forceCIDRs, err = w.readString("Client force-upstream IP CIDRs", opts.forceCIDRs)
 	if err != nil {
 		return generateConfigOptions{}, err
@@ -701,14 +733,18 @@ func buildGeneratedConfigs(protocol string, transport string, token string, opts
 		TunnelPath:      normalizeGeneratedPath(opts.tunnelPath),
 	}
 	clientCfg := generatedRouteConfig{
-		Mode:             proxypkg.ProxyModeClient,
-		ListenAddr:       strings.TrimSpace(opts.clientListen),
-		ServerAddr:       strings.TrimSpace(opts.serverAddr),
-		Token:            token,
-		TunnelProtocol:   protocol,
-		TunnelTransport:  transport,
-		TunnelPath:       normalizeGeneratedPath(opts.tunnelPath),
-		UpstreamProtocol: strings.TrimSpace(opts.upstreamProtocol),
+		Mode:                   proxypkg.ProxyModeClient,
+		ListenAddr:             strings.TrimSpace(opts.clientListen),
+		ServerAddr:             strings.TrimSpace(opts.serverAddr),
+		Token:                  token,
+		TunnelProtocol:         protocol,
+		TunnelTransport:        transport,
+		TunnelPath:             normalizeGeneratedPath(opts.tunnelPath),
+		UpstreamProtocol:       strings.TrimSpace(opts.upstreamProtocol),
+		SOCKS5Username:         strings.TrimSpace(opts.socks5Username),
+		SOCKS5Password:         opts.socks5Password,
+		UpstreamSOCKS5Username: strings.TrimSpace(opts.upstreamSOCKS5Username),
+		UpstreamSOCKS5Password: opts.upstreamSOCKS5Password,
 	}
 	if muxSet {
 		serverCfg.TunnelMux = &mux
@@ -877,6 +913,22 @@ func validateGeneratedOptions(target string, protocol string, opts generateConfi
 		if opts.tunnelTLS {
 			return errors.New("REALITY cannot be combined with --tls")
 		}
+	}
+	if err := validateGeneratedSOCKS5Credentials("socks5", opts.socks5Username, opts.socks5Password); err != nil {
+		return err
+	}
+	if err := validateGeneratedSOCKS5Credentials("upstream socks5", opts.upstreamSOCKS5Username, opts.upstreamSOCKS5Password); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateGeneratedSOCKS5Credentials(name string, username string, password string) error {
+	if len(username) > 255 {
+		return fmt.Errorf("%s username is too long: %d bytes", name, len(username))
+	}
+	if len(password) > 255 {
+		return fmt.Errorf("%s password is too long: %d bytes", name, len(password))
 	}
 	return nil
 }

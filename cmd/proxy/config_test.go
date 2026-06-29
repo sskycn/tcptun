@@ -13,18 +13,22 @@ import (
 func TestGenerateConfigFilesBoth(t *testing.T) {
 	dir := t.TempDir()
 	opts := generateConfigOptions{
-		target:       configTargetBoth,
-		protocol:     proxypkg.TunnelProtocolVLESS,
-		transport:    proxypkg.TunnelTransportRaw,
-		outDir:       dir,
-		serverOutput: "server.json",
-		clientOutput: "client.json",
-		serverListen: "0.0.0.0:9443",
-		clientListen: "127.0.0.1:1080",
-		serverAddr:   "proxy.example.com:9443",
-		tunnelPath:   "/proxy",
-		forceCIDRs:   "127.0.0.1/32,10.0.0.0/8",
-		overwrite:    true,
+		target:                 configTargetBoth,
+		protocol:               proxypkg.TunnelProtocolVLESS,
+		transport:              proxypkg.TunnelTransportRaw,
+		outDir:                 dir,
+		serverOutput:           "server.json",
+		clientOutput:           "client.json",
+		serverListen:           "0.0.0.0:9443",
+		clientListen:           "127.0.0.1:1080",
+		serverAddr:             "proxy.example.com:9443",
+		tunnelPath:             "/proxy",
+		socks5Username:         "local-user",
+		socks5Password:         "local-pass",
+		upstreamSOCKS5Username: "up-user",
+		upstreamSOCKS5Password: "up-pass",
+		forceCIDRs:             "127.0.0.1/32,10.0.0.0/8",
+		overwrite:              true,
 	}
 	if err := generateConfigFiles(opts); err != nil {
 		t.Fatal(err)
@@ -47,6 +51,12 @@ func TestGenerateConfigFilesBoth(t *testing.T) {
 	}
 	if client.ServerAddr != "proxy.example.com:9443" {
 		t.Fatalf("client server_addr = %q", client.ServerAddr)
+	}
+	if client.SOCKS5Username != "local-user" || client.SOCKS5Password != "local-pass" {
+		t.Fatalf("client local socks credentials = %q/%q", client.SOCKS5Username, client.SOCKS5Password)
+	}
+	if client.UpstreamSOCKS5Username != "up-user" || client.UpstreamSOCKS5Password != "up-pass" {
+		t.Fatalf("client upstream socks credentials = %q/%q", client.UpstreamSOCKS5Username, client.UpstreamSOCKS5Password)
 	}
 	if len(route.ForceUpstream.IPCIDRs) != 2 {
 		t.Fatalf("force CIDRs = %v", route.ForceUpstream.IPCIDRs)
@@ -161,6 +171,10 @@ func TestRunInteractiveConfigGeneratesBothConfigs(t *testing.T) {
 		"",
 		"",
 		"",
+		"",
+		"",
+		"",
+		"",
 		dir,
 		"",
 		"",
@@ -230,6 +244,10 @@ func TestRunInteractiveConfigRealityAutoGeneratesKeys(t *testing.T) {
 		"",
 		"",
 		"example.com:443",
+		"",
+		"",
+		"",
+		"",
 		"",
 		"",
 		"",

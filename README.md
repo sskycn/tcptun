@@ -11,7 +11,9 @@ English | [简体中文](README.zh-CN.md)
 - Listens locally on `127.0.0.1:1080` by default.
 - Forwards to the gateway proxy port `1080` by default.
 - Accepts mixed local proxy traffic such as SOCKS5, HTTP proxy, and HTTP CONNECT.
+- Supports username/password authentication for the local SOCKS5 listener.
 - Uses SOCKS5 for upstream traffic by default; `mixed` upstream mode is also supported.
+- Supports username/password authentication when dialing an upstream SOCKS5 gateway.
 - Supports `proxy`, `proxy local`, `proxy client`, and `proxy server` commands with configurable tunnel protocols: `custom`, `vless`, `vmess`, and `trojan`.
 - Carries the client/server tunnel over raw TCP, WebSocket, HTTP/2, or HTTP/3 transport.
 - Multiplexes client/server tunnel streams by default, so many TCP connections and UDP relays can share one upstream tunnel transport connection.
@@ -322,6 +324,10 @@ Runtime config example:
   "mode": "local",
   "listen_addr": "127.0.0.1:1080",
   "upstream_protocol": "socks5",
+  "socks5_username": "",
+  "socks5_password": "",
+  "upstream_socks5_username": "",
+  "upstream_socks5_password": "",
   "tunnel_protocol": "custom",
   "tunnel_transport": "raw",
   "tunnel_security": "none",
@@ -379,10 +385,14 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 --gateway-ip <string>       gateway IP; empty means auto-detect
 -p, --gateway-port <int>    gateway proxy port [default: 1080]
 -l, --listen <string>       local listen address [default: "127.0.0.1:1080"]
+--socks5-username <string>  local SOCKS5 username; enables username/password auth when set with username or password
+--socks5-password <string>  local SOCKS5 password
 --refresh-interval <duration> interval for checking local IPv4 changes; 0 disables refresh [default: 5s]
 --scan-timeout <duration>   per-IP timeout when scanning local IPv4 networks [default: 250ms]
 --scan-workers <int>        parallel workers used for IPv4 network scanning
 --upstream-protocol <string> upstream protocol: socks5 or mixed [default: socks5]
+--upstream-socks5-username <string> upstream SOCKS5 username
+--upstream-socks5-password <string> upstream SOCKS5 password
 -v, --verbose               enable debug logs
 ```
 

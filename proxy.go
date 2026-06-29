@@ -54,41 +54,45 @@ const (
 var errListenerClosedByContext = errors.New("listener closed after context cancellation")
 
 type Config struct {
-	ListenAddr          string
-	Mode                string
-	ServerAddr          string
-	Token               string
-	TunnelProtocol      string
-	TunnelTransport     string
-	TunnelPath          string
-	TunnelTLS           bool
-	TunnelTLSCert       string
-	TunnelTLSKey        string
-	TunnelTLSServerName string
-	TunnelTLSInsecure   bool
-	TunnelSecurity      string
-	TunnelFlow          string
-	RealityServerName   string
-	RealityServerNames  []string
-	RealityFingerprint  string
-	RealityPublicKey    string
-	RealityPrivateKey   string
-	RealityShortID      string
-	RealityShortIDs     []string
-	RealityDest         string
-	RealitySpiderX      string
-	TunnelMux           bool
-	GatewayIP           string
-	GatewayPort         int
-	UpstreamProtocol    string
-	ConfigPath          string
-	RouteConfigPath     string
-	DialTimeout         time.Duration
-	RefreshInterval     time.Duration
-	ScanTimeout         time.Duration
-	ScanWorkers         int
-	BufferSize          int
-	Verbose             bool
+	ListenAddr             string
+	Mode                   string
+	ServerAddr             string
+	Token                  string
+	TunnelProtocol         string
+	TunnelTransport        string
+	TunnelPath             string
+	TunnelTLS              bool
+	TunnelTLSCert          string
+	TunnelTLSKey           string
+	TunnelTLSServerName    string
+	TunnelTLSInsecure      bool
+	TunnelSecurity         string
+	TunnelFlow             string
+	RealityServerName      string
+	RealityServerNames     []string
+	RealityFingerprint     string
+	RealityPublicKey       string
+	RealityPrivateKey      string
+	RealityShortID         string
+	RealityShortIDs        []string
+	RealityDest            string
+	RealitySpiderX         string
+	TunnelMux              bool
+	GatewayIP              string
+	GatewayPort            int
+	UpstreamProtocol       string
+	SOCKS5Username         string
+	SOCKS5Password         string
+	UpstreamSOCKS5Username string
+	UpstreamSOCKS5Password string
+	ConfigPath             string
+	RouteConfigPath        string
+	DialTimeout            time.Duration
+	RefreshInterval        time.Duration
+	ScanTimeout            time.Duration
+	ScanWorkers            int
+	BufferSize             int
+	Verbose                bool
 }
 
 type config = Config
@@ -210,6 +214,12 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 	}
 	if cfg.BufferSize < 4096 {
 		cfg.BufferSize = 4096
+	}
+	if err := validateSOCKS5Credentials("socks5", cfg.SOCKS5Username, cfg.SOCKS5Password); err != nil {
+		return err
+	}
+	if err := validateSOCKS5Credentials("upstream socks5", cfg.UpstreamSOCKS5Username, cfg.UpstreamSOCKS5Password); err != nil {
+		return err
 	}
 
 	configPath, err := resolveConfigPath(cfg.ConfigPath)
@@ -372,6 +382,16 @@ func runProxy(ctx context.Context, cfg config, log io.Writer) (retErr error) {
 		tempDelay = 0
 		go server.handle(ctx, conn)
 	}
+}
+
+func validateSOCKS5Credentials(name string, username string, password string) error {
+	if len(username) > 255 {
+		return fmt.Errorf("%s username is too long: %d bytes", name, len(username))
+	}
+	if len(password) > 255 {
+		return fmt.Errorf("%s password is too long: %d bytes", name, len(password))
+	}
+	return nil
 }
 
 func normalizeUpstreamProtocol(value string) (string, error) {

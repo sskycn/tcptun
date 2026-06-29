@@ -87,6 +87,10 @@ bin/proxy client --config /etc/proxy/client.json
 | `tunnel_flow` | server/client | VLESS flow，例如 `xtls-rprx-vision`。 |
 | `tunnel_mux` | server/client | 是否开启本项目 tunnel 多路复用。当前只有 custom 协议支持。 |
 | `upstream_protocol` | client/local | 走上游时使用的本地上游协议，支持 `socks5` 和 `mixed`。 |
+| `socks5_username` | client/local | 本地 SOCKS5 用户名。用户名或密码任一非空时，会对 SOCKS5 客户端启用 username/password 认证。 |
+| `socks5_password` | client/local | 本地 SOCKS5 密码。 |
+| `upstream_socks5_username` | local | 连接上游 SOCKS5 网关时使用的用户名。 |
+| `upstream_socks5_password` | local | 连接上游 SOCKS5 网关时使用的密码。 |
 
 ## 路由配置字段
 

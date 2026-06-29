@@ -11,7 +11,9 @@
 - 默认监听本机 `127.0.0.1:1080`。
 - 默认转发到网关代理端口 `1080`。
 - 本地支持 mixed 代理流量，包括 SOCKS5、HTTP 代理、HTTP CONNECT。
+- 本地 SOCKS5 入口支持 username/password 认证。
 - 默认使用 SOCKS5 作为上游协议，也支持 `mixed` 上游模式。
+- 连接上游 SOCKS5 网关时支持 username/password 认证。
 - 支持 `proxy`、`proxy local`、`proxy client`、`proxy server` 四种命令形态，并支持 `custom`、`vless`、`vmess`、`trojan` 隧道协议。
 - client/server 隧道可承载在 raw TCP、WebSocket、HTTP/2 或 HTTP/3 transport 上。
 - client/server 隧道默认启用多路复用，多条 TCP 连接和 UDP relay 可以共享同一条上游 tunnel transport 连接。
@@ -322,6 +324,10 @@ bin/proxy client --server-addr proxy.example.com:443 --transport ws --tunnel-pat
   "mode": "local",
   "listen_addr": "127.0.0.1:1080",
   "upstream_protocol": "socks5",
+  "socks5_username": "",
+  "socks5_password": "",
+  "upstream_socks5_username": "",
+  "upstream_socks5_password": "",
   "tunnel_protocol": "custom",
   "tunnel_transport": "raw",
   "tunnel_security": "none",
@@ -379,10 +385,14 @@ socks5-udp/localhost:53002 -> 10.207.20.78:1080 -> 8.8.8.8:53 ok
 --gateway-ip <string>       网关 IP；为空表示自动发现
 -p, --gateway-port <int>    网关代理端口 [默认: 1080]
 -l, --listen <string>       本机监听地址 [默认: "127.0.0.1:1080"]
+--socks5-username <string>  本地 SOCKS5 用户名；用户名或密码任一非空时启用 username/password 认证
+--socks5-password <string>  本地 SOCKS5 密码
 --refresh-interval <duration> 检查本机 IPv4 变化的间隔；0 表示禁用刷新 [默认: 5s]
 --scan-timeout <duration>   扫描 IPv4 网段时每个 IP 的探测超时 [默认: 250ms]
 --scan-workers <int>        IPv4 网段扫描并发数
 --upstream-protocol <string> 上游协议：socks5 或 mixed [默认: socks5]
+--upstream-socks5-username <string> 上游 SOCKS5 用户名
+--upstream-socks5-password <string> 上游 SOCKS5 密码
 -v, --verbose               输出调试日志
 ```
 

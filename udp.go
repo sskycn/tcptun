@@ -341,15 +341,8 @@ func (s *proxyServer) connectViaUpstreamUDP(ctx context.Context) (*udpUpstream, 
 	if err != nil {
 		return nil, err
 	}
-	if err := writeAll(upstream, []byte{socksVersion5, 0x01, 0x00}); err != nil {
+	if err := s.authenticateUpstreamSOCKS5(upstream); err != nil {
 		return nil, closeAfterError(upstream, err)
-	}
-	reply := make([]byte, 2)
-	if _, err := io.ReadFull(upstream, reply); err != nil {
-		return nil, closeAfterError(upstream, err)
-	}
-	if reply[0] != socksVersion5 || reply[1] != 0x00 {
-		return nil, closeAfterError(upstream, fmt.Errorf("upstream socks auth reply %v", reply))
 	}
 	if err := writeAll(upstream, buildSocks5UDPAssociateRequest("0.0.0.0", 0)); err != nil {
 		return nil, closeAfterError(upstream, err)
