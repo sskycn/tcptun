@@ -21,7 +21,10 @@
       </a>
       <nav class="nav" aria-label="Primary">
         <a href="#features">Features</a>
+        <a href="#guide">Guide</a>
         <a href="#deploy">Deploy</a>
+        <a href="#generator">Generator</a>
+        <a href="#converter">Converter</a>
         <a href="#download">Download</a>
         <a href="https://github.com/sskycn/tcptun">GitHub</a>
       </nav>
@@ -104,6 +107,208 @@ tcptun client --config client.json</code></pre>
         </div>
       </section>
 
+      <section id="guide" class="section guide">
+        <div class="section-heading">
+          <p class="eyebrow">Usage Guide</p>
+          <h2>From a fresh server to a local proxy port.</h2>
+          <p>
+            The fastest path is to generate matching JSON files, copy the server
+            file to your VPS, and keep the client file on your computer.
+          </p>
+        </div>
+        <div class="steps">
+          <article>
+            <span class="step-index">1</span>
+            <h3>Generate config</h3>
+            <p>Create server, client, and route files with one shared token.</p>
+            <pre><code>tcptun config --protocol vless \
+  --transport raw \
+  --server-addr proxy.example.com:443</code></pre>
+          </article>
+          <article>
+            <span class="step-index">2</span>
+            <h3>Run the server</h3>
+            <p>On public servers, tcptun only dials public destination IPs and drops private ranges.</p>
+            <pre><code>tcptun server --config server.json</code></pre>
+          </article>
+          <article>
+            <span class="step-index">3</span>
+            <h3>Run the client</h3>
+            <p>The client opens a local mixed proxy endpoint for SOCKS5, HTTP proxy, and CONNECT traffic.</p>
+            <pre><code>tcptun client --config client.json</code></pre>
+          </article>
+          <article>
+            <span class="step-index">4</span>
+            <h3>Use the proxy</h3>
+            <p>Point your browser, app, or CLI tool at the local listener.</p>
+            <pre><code>curl -x socks5h://127.0.0.1:1080 \
+  https://ifconfig.me</code></pre>
+          </article>
+        </div>
+        <div class="guide-notes">
+          <div>
+            <h3>REALITY/Vision</h3>
+            <p>
+              Use VLESS over raw transport with <code>tunnel_security</code> set
+              to <code>reality</code> and <code>flow</code> set to
+              <code>xtls-rprx-vision</code>. The server needs a private key,
+              allowed server names, and a fallback destination; the client needs
+              the matching public key, server name, UUID, and short ID.
+            </p>
+          </div>
+          <div>
+            <h3>Behind nginx</h3>
+            <p>
+              Use WebSocket transport when placing tcptun behind a standard HTTP
+              reverse proxy. Run the server on loopback and proxy the configured
+              tunnel path to that local port.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="converter" class="section converter-section">
+        <div id="generator" class="section-heading">
+          <p class="eyebrow">Config Generator</p>
+          <h2>Generate ready-to-run config files.</h2>
+          <p>
+            Fill in the deployment details and generate matching
+            <code>server.json</code>, <code>client.json</code>, and
+            <code>route.json</code>. Tokens and REALITY keys are generated in
+            your browser.
+          </p>
+        </div>
+        <div class="generator">
+          <div class="generator-form">
+            <div class="field-row">
+              <label for="gen-protocol">Protocol</label>
+              <select id="gen-protocol">
+                <option value="native">native</option>
+                <option value="vless">vless</option>
+                <option value="vmess">vmess</option>
+                <option value="trojan">trojan</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="gen-transport">Transport</label>
+              <select id="gen-transport">
+                <option value="raw">raw</option>
+                <option value="ws">ws</option>
+                <option value="h2">h2</option>
+                <option value="h3">h3</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="gen-security">Security</label>
+              <select id="gen-security">
+                <option value="none">none</option>
+                <option value="tls">tls</option>
+                <option value="reality">reality</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="gen-server-addr">Server addr</label>
+              <input id="gen-server-addr" type="text" value="proxy.example.com:443">
+            </div>
+            <div class="field-row">
+              <label for="gen-server-listen">Server listen</label>
+              <input id="gen-server-listen" type="text" value="0.0.0.0:443">
+            </div>
+            <div class="field-row">
+              <label for="gen-client-listen">Client listen</label>
+              <input id="gen-client-listen" type="text" value="127.0.0.1:1080">
+            </div>
+            <div class="field-row">
+              <label for="gen-path">Tunnel path</label>
+              <input id="gen-path" type="text" value="/proxy">
+            </div>
+            <div class="field-row">
+              <label for="gen-server-name">Server name</label>
+              <input id="gen-server-name" type="text" value="example.com">
+            </div>
+            <div class="field-row">
+              <label for="gen-reality-dest">REALITY dest</label>
+              <input id="gen-reality-dest" type="text" value="example.com:443">
+            </div>
+            <div class="field-row">
+              <label for="gen-short-id">Short ID</label>
+              <input id="gen-short-id" type="text" placeholder="empty is allowed">
+            </div>
+            <div class="field-row">
+              <label for="gen-force-cidrs">Force CIDRs</label>
+              <input id="gen-force-cidrs" type="text" placeholder="1.1.1.0/24,2001:4860::/48">
+            </div>
+            <div class="converter-actions">
+              <button class="button primary" id="generate-button" type="button">Generate</button>
+              <button class="button secondary" id="generator-copy-button" type="button">Copy current</button>
+              <button class="button secondary" id="generator-download-button" type="button">Download current</button>
+            </div>
+          </div>
+          <div class="generator-output">
+            <div class="tabs" role="tablist" aria-label="Generated files">
+              <button class="tab active" data-generated-file="server" type="button">server.json</button>
+              <button class="tab" data-generated-file="client" type="button">client.json</button>
+              <button class="tab" data-generated-file="route" type="button">route.json</button>
+            </div>
+            <pre class="converter-output" id="generator-output" aria-live="polite"><code>Click Generate to create config files.</code></pre>
+            <p class="converter-status" id="generator-status"></p>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <p class="eyebrow">Xray / V2Ray Converter</p>
+          <h2>Convert JSON configs in your browser.</h2>
+          <p>
+            Paste an Xray or V2Ray JSON config and generate a tcptun
+            <code>client.json</code> or <code>server.json</code>. Conversion runs
+            locally in this page; the config never leaves your browser.
+          </p>
+        </div>
+        <div class="converter">
+          <div class="converter-pane">
+            <div class="field-row">
+              <label for="target">Target</label>
+              <select id="target">
+                <option value="client">client.json from outbound</option>
+                <option value="server">server.json from inbound</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="tag">Tag</label>
+              <input id="tag" type="text" placeholder="optional inbound/outbound tag">
+            </div>
+            <div class="field-row">
+              <label for="listen">Listen</label>
+              <input id="listen" type="text" value="127.0.0.1:1080">
+            </div>
+            <div class="field-row" id="upstream-row">
+              <label for="upstream">Upstream</label>
+              <select id="upstream">
+                <option value="socks5">socks5</option>
+                <option value="mixed">mixed</option>
+              </select>
+            </div>
+            <label class="textarea-label" for="source-config">Xray / V2Ray JSON</label>
+            <textarea id="source-config" spellcheck="false" placeholder='{"outbounds":[{"protocol":"vless",...}]}'></textarea>
+            <div class="converter-actions">
+              <button class="button primary" id="convert-button" type="button">Convert</button>
+              <button class="button secondary" id="sample-button" type="button">Load sample</button>
+            </div>
+          </div>
+          <div class="converter-pane output-pane">
+            <div class="output-heading">
+              <span>tcptun output</span>
+              <div class="converter-actions compact">
+                <button class="button secondary" id="copy-button" type="button">Copy</button>
+                <button class="button secondary" id="download-button" type="button">Download</button>
+              </div>
+            </div>
+            <pre class="converter-output" id="converter-output" aria-live="polite"><code>Paste a config and click Convert.</code></pre>
+            <p class="converter-status" id="converter-status"></p>
+          </div>
+        </div>
+      </section>
+
       <section id="download" class="section download">
         <div>
           <p class="eyebrow">Download</p>
@@ -118,5 +323,6 @@ tcptun client --config client.json</code></pre>
       <span>tcptun</span>
       <a href="https://github.com/sskycn/tcptun">github.com/sskycn/tcptun</a>
     </footer>
+    <script src="converter.js"></script>
   </body>
 </html>
