@@ -170,6 +170,63 @@
     throw new Error(`Unsupported target: ${target}`);
   }
 
+  function sampleConfig(target) {
+    if (target === "server") {
+      return {
+        inbounds: [
+          {
+            tag: "proxy",
+            listen: "0.0.0.0",
+            port: 443,
+            protocol: "vless",
+            settings: {
+              clients: [{ id: uuidV4(), flow: "xtls-rprx-vision", encryption: "none" }],
+              decryption: "none",
+            },
+            streamSettings: {
+              network: "tcp",
+              security: "reality",
+              realitySettings: {
+                dest: "example.com:443",
+                serverNames: ["example.com"],
+                privateKey: "REALITY_PRIVATE_KEY",
+                shortIds: [""],
+              },
+            },
+          },
+        ],
+      };
+    }
+    return {
+      outbounds: [
+        {
+          tag: "proxy",
+          protocol: "vless",
+          settings: {
+            vnext: [
+              {
+                address: "proxy.example.com",
+                port: 443,
+                users: [{ id: uuidV4(), flow: "xtls-rprx-vision", encryption: "none" }],
+              },
+            ],
+          },
+          streamSettings: {
+            network: "tcp",
+            security: "reality",
+            realitySettings: {
+              serverName: "example.com",
+              fingerprint: "chrome",
+              publicKey: "REALITY_PUBLIC_KEY",
+              shortId: "",
+              spiderX: "/",
+            },
+          },
+        },
+      ],
+    };
+  }
+
   function convertClient(source, options) {
     const outbound = selectEndpoint(source.outbounds, options.tag, "outbound");
     const protocol = normalizeProtocol(outbound.protocol);
@@ -461,34 +518,8 @@
     syncTarget();
 
     document.getElementById("sample-button").addEventListener("click", () => {
-      source.value = pretty({
-        outbounds: [
-          {
-            tag: "proxy",
-            protocol: "vless",
-            settings: {
-              vnext: [
-                {
-                  address: "proxy.example.com",
-                  port: 443,
-                  users: [{ id: uuidV4(), flow: "xtls-rprx-vision", encryption: "none" }],
-                },
-              ],
-            },
-            streamSettings: {
-              network: "tcp",
-              security: "reality",
-              realitySettings: {
-                serverName: "example.com",
-                fingerprint: "chrome",
-                publicKey: "REALITY_PUBLIC_KEY",
-                shortId: "",
-                spiderX: "/",
-              },
-            },
-          },
-        ],
-      });
+      source.value = pretty(sampleConfig(target.value));
+      setStatus(status, "", "");
     });
 
     document.getElementById("convert-button").addEventListener("click", () => {
@@ -528,6 +559,7 @@
     module.exports = {
       convertConfig,
       generateConfigs,
+      sampleConfig,
       uuidV4,
       realityKeyPair,
     };
