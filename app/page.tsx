@@ -83,7 +83,10 @@ export default function Home() {
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <p className="eyebrow">Go TCP tunnel and mixed proxy</p>
+          <div className="hero-lockup">
+            <Image className="hero-logo" src="/tcptun-logo.png" alt="" width={72} height={72} priority />
+            <p className="eyebrow">Go TCP tunnel and mixed proxy</p>
+          </div>
           <h1>tcptun-go</h1>
           <p className="lede">
             面向现代代理部署的轻量 TCP 隧道与 mixed 代理。一个 Go 二进制即可提供本地 SOCKS5/HTTP
