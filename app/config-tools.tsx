@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 
 type JsonRecord = Record<string, unknown>;
-type GeneratedFile = "server" | "client" | "route";
+type GeneratedJSONFile = "server" | "client" | "route";
+type GeneratedFile = GeneratedJSONFile | "uri";
+type GeneratedFiles = Record<GeneratedJSONFile, JsonRecord> & { uri: string };
 type ConverterTarget = "client" | "server";
 
 const defaultClientListen = "127.0.0.1:1080";
@@ -88,7 +90,8 @@ export default function ConfigTools() {
   const [realityDest, setRealityDest] = useState("example.com:443");
   const [shortId, setShortId] = useState("");
   const [forceCidrs, setForceCidrs] = useState("1.1.1.0/24,2001:4860::/48");
-  const [generatedFiles, setGeneratedFiles] = useState<Record<GeneratedFile, JsonRecord> | null>(null);
+  const [uriName, setUriName] = useState("tcptun");
+  const [generatedFiles, setGeneratedFiles] = useState<GeneratedFiles | null>(null);
   const [activeGeneratedFile, setActiveGeneratedFile] = useState<GeneratedFile>("server");
   const [generatorStatus, setGeneratorStatus] = useState("");
 
@@ -101,8 +104,8 @@ export default function ConfigTools() {
   const [converterStatus, setConverterStatus] = useState("");
 
   const generatorOutput = generatedFiles
-    ? pretty(generatedFiles[activeGeneratedFile])
-    : "点击“生成配置”创建 server.json、client.json 和 route.json。";
+    ? formatGeneratedOutput(generatedFiles[activeGeneratedFile])
+    : "点击“生成配置”创建 server.json、client.json、route.json 和 client URI。";
 
   const targetLabel = useMemo(() => (target === "client" ? "client.json" : "server.json"), [target]);
 
@@ -120,10 +123,11 @@ export default function ConfigTools() {
         realityDest,
         shortId,
         forceCidrs,
+        uriName,
       });
       setGeneratedFiles(files);
       setActiveGeneratedFile("server");
-      setGeneratorStatus("已生成 server.json、client.json 和 route.json。");
+      setGeneratorStatus("已生成 server.json、client.json、route.json 和 client URI。");
     } catch (error) {
       setGeneratorStatus(messageFor(error));
     }
@@ -168,15 +172,15 @@ export default function ConfigTools() {
         <p className="eyebrow">在线工具</p>
         <h2>配置生成与 Xray 转换都在浏览器里完成。</h2>
         <p>
-          生成器会创建匹配的 server、client 和 route 文件；转换器支持从 Xray/V2Ray 的 VLESS、VMess、
-          Trojan 入站或出站提取 tcptun 配置。密钥、token 和配置内容不会上传。
+          生成器会创建匹配的 server、client、route 文件和客户端 URI；转换器支持从 Xray/V2Ray 的
+          VLESS、VMess、Trojan 入站或出站提取 tcptun 配置。密钥、token 和配置内容不会上传。
         </p>
       </div>
 
       <div className="tool-card" id="generator">
         <div className="tool-copy">
           <p className="eyebrow">配置生成器</p>
-          <h3>生成可直接运行的 JSON。</h3>
+          <h3>生成可直接运行的 JSON 和 URI。</h3>
           <p>
             适合新部署。VLESS/VMess 会自动生成 UUID token，native/Trojan 会生成随机十六进制 token；
             REALITY 会尝试使用浏览器 WebCrypto 生成 X25519 密钥对。
@@ -235,14 +239,18 @@ export default function ConfigTools() {
             <Field label="强制上游 CIDR">
               <input value={forceCidrs} onChange={(event) => setForceCidrs(event.target.value)} />
             </Field>
+            <Field label="URI 名称">
+              <input value={uriName} onChange={(event) => setUriName(event.target.value)} />
+            </Field>
             <div className="button-row">
               <button type="button" className="button primary" data-testid="generate-config" onClick={handleGenerate}>
                 生成配置
               </button>
               <CopyButton text={generatorOutput} onDone={setGeneratorStatus} />
               <DownloadButton
-                filename={`${activeGeneratedFile}.json`}
+                filename={generatedFilename(activeGeneratedFile)}
                 text={generatedFiles ? generatorOutput : ""}
+                mimeType={activeGeneratedFile === "uri" ? "text/plain" : "application/json"}
                 onDone={setGeneratorStatus}
               />
             </div>
@@ -250,14 +258,14 @@ export default function ConfigTools() {
           </div>
           <div className="output-panel">
             <div className="tabs" role="tablist" aria-label="已生成文件">
-              {(["server", "client", "route"] as GeneratedFile[]).map((file) => (
+              {(["server", "client", "route", "uri"] as GeneratedFile[]).map((file) => (
                 <button
                   key={file}
                   type="button"
                   className={file === activeGeneratedFile ? "active" : ""}
                   onClick={() => setActiveGeneratedFile(file)}
                 >
-                  {file}.json
+                  {generatedLabel(file)}
                 </button>
               ))}
             </div>
@@ -369,15 +377,17 @@ function CopyButton({ text, onDone }: { text: string; onDone: (message: string) 
 function DownloadButton({
   filename,
   text,
+  mimeType = "application/json",
   onDone,
 }: {
   filename: string;
   text: string;
+  mimeType?: string;
   onDone: (message: string) => void;
 }) {
   function download() {
     if (!text.trim()) return;
-    const blob = new Blob([text], { type: "application/json" });
+    const blob = new Blob([text], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -394,7 +404,19 @@ function DownloadButton({
   );
 }
 
-async function generateConfigs(form: Record<string, string>) {
+function generatedLabel(file: GeneratedFile) {
+  return file === "uri" ? "client URI" : `${file}.json`;
+}
+
+function generatedFilename(file: GeneratedFile) {
+  return file === "uri" ? "client-uri.txt" : `${file}.json`;
+}
+
+function formatGeneratedOutput(value: JsonRecord | string) {
+  return typeof value === "string" ? value : pretty(value);
+}
+
+async function generateConfigs(form: Record<string, string>): Promise<GeneratedFiles> {
   if (form.security === "reality" && form.transport !== "raw") {
     throw new Error("REALITY 配置必须使用 raw 承载层。");
   }
@@ -447,7 +469,7 @@ async function generateConfigs(form: Record<string, string>) {
     }
   }
 
-  const route = {
+  const route: JsonRecord = {
     force_upstream: {
       domains: [],
       domain_regexes: [],
@@ -458,11 +480,218 @@ async function generateConfigs(form: Record<string, string>) {
     },
   };
 
+  const serverConfig = cleanObject(server);
+  const clientConfig = cleanObject(client);
+
   return {
-    server: cleanObject(server),
-    client: cleanObject(client),
+    server: serverConfig,
+    client: clientConfig,
     route,
-  } as Record<GeneratedFile, JsonRecord>;
+    uri: buildClientURI(clientConfig, form.uriName),
+  };
+}
+
+function buildClientURI(cfg: JsonRecord, name: string) {
+  const mode = stringField(cfg, "mode");
+  if (mode && mode !== "client") throw new Error(`URI 只能从 client 配置生成，当前 mode 是 ${mode}。`);
+
+  const protocol = stringField(cfg, "tunnel_protocol") || "native";
+  const transport = stringField(cfg, "tunnel_transport") || "raw";
+  const { host, port } = splitURIHostPort(stringField(cfg, "server_addr"));
+  const token = stringField(cfg, "token");
+  if (!token) throw new Error("生成 URI 需要 token。");
+
+  switch (protocol) {
+    case "native":
+      return buildNativeURI(cfg, transport, host, port, token, name);
+    case "vless":
+      return buildVLESSURI(cfg, transport, host, port, token, name);
+    case "vmess":
+      return buildVMessURI(cfg, transport, host, port, token, name);
+    case "trojan":
+      return buildTrojanURI(cfg, transport, host, port, token, name);
+    default:
+      throw new Error(`不支持生成 URI 的协议: ${protocol}`);
+  }
+}
+
+function buildNativeURI(cfg: JsonRecord, transport: string, host: string, port: string, token: string, name: string) {
+  const query = new URLSearchParams();
+  query.set("protocol", "native");
+  addTransportQuery(query, cfg, transport);
+  addSecurityQuery(query, cfg);
+  return buildStandardURI("tcptun", token, host, port, query, name);
+}
+
+function buildVLESSURI(cfg: JsonRecord, transport: string, host: string, port: string, token: string, name: string) {
+  const query = new URLSearchParams();
+  query.set("encryption", "none");
+  query.set("type", xrayURITransportType(transport));
+  addTransportQuery(query, cfg, transport);
+  addSecurityQuery(query, cfg);
+  const flow = stringField(cfg, "tunnel_flow");
+  if (flow) query.set("flow", flow);
+  return buildStandardURI("vless", token, host, port, query, name);
+}
+
+function buildTrojanURI(cfg: JsonRecord, transport: string, host: string, port: string, token: string, name: string) {
+  const query = new URLSearchParams();
+  query.set("type", xrayURITransportType(transport));
+  addTransportQuery(query, cfg, transport);
+  addSecurityQuery(query, cfg);
+  return buildStandardURI("trojan", token, host, port, query, name);
+}
+
+function buildVMessURI(cfg: JsonRecord, transport: string, host: string, port: string, token: string, name: string) {
+  const vmess: JsonRecord = {
+    v: "2",
+    ps: normalizeURIName(name),
+    add: host,
+    port,
+    id: token,
+    aid: "0",
+    scy: "none",
+    net: vmessURITransportNetwork(transport),
+    type: "none",
+    host: "",
+    path: "",
+    tls: "",
+  };
+  const path = normalizePath(stringField(cfg, "tunnel_path"));
+  if (path && transport !== "raw") vmess.path = path;
+  if (booleanField(cfg, "tunnel_tls")) {
+    vmess.tls = "tls";
+    vmess.sni = stringField(cfg, "tunnel_tls_server_name");
+  }
+  return `vmess://${base64Encode(JSON.stringify(vmess))}`;
+}
+
+function buildStandardURI(
+  scheme: string,
+  token: string,
+  host: string,
+  port: string,
+  query: URLSearchParams,
+  name: string,
+) {
+  const queryText = query.toString();
+  return `${scheme}://${encodeURIComponent(token)}@${formatURIHostPort(host, port)}?${queryText}#${encodeURIComponent(
+    normalizeURIName(name),
+  )}`;
+}
+
+function addTransportQuery(query: URLSearchParams, cfg: JsonRecord, transport: string) {
+  query.set("transport", transport);
+  const path = normalizePath(stringField(cfg, "tunnel_path"));
+  if (path && transport !== "raw") query.set("path", path);
+}
+
+function addSecurityQuery(query: URLSearchParams, cfg: JsonRecord) {
+  if (stringField(cfg, "tunnel_security") === "reality") {
+    query.set("security", "reality");
+    setQueryIfPresent(query, "sni", stringField(cfg, "reality_server_name"));
+    setQueryIfPresent(query, "fp", stringField(cfg, "reality_fingerprint"));
+    setQueryIfPresent(query, "pbk", stringField(cfg, "reality_public_key"));
+    setQueryIfPresent(query, "sid", stringField(cfg, "reality_short_id"));
+    setQueryIfPresent(query, "spx", stringField(cfg, "reality_spider_x"));
+    return;
+  }
+  if (booleanField(cfg, "tunnel_tls")) {
+    query.set("security", "tls");
+    setQueryIfPresent(query, "sni", stringField(cfg, "tunnel_tls_server_name"));
+    if (booleanField(cfg, "tunnel_tls_insecure")) query.set("allowInsecure", "1");
+    return;
+  }
+  query.set("security", "none");
+}
+
+function setQueryIfPresent(query: URLSearchParams, key: string, value: string) {
+  if (value) query.set(key, value);
+}
+
+function xrayURITransportType(transport: string) {
+  switch (transport) {
+    case "raw":
+      return "tcp";
+    case "h2":
+      return "http";
+    case "h3":
+      return "quic";
+    default:
+      return transport;
+  }
+}
+
+function vmessURITransportNetwork(transport: string) {
+  switch (transport) {
+    case "raw":
+      return "tcp";
+    case "h2":
+      return "h2";
+    case "h3":
+      return "quic";
+    default:
+      return transport;
+  }
+}
+
+function splitURIHostPort(address: string) {
+  const trimmed = address.trim();
+  if (!trimmed) throw new Error("生成 URI 需要 server_addr。");
+
+  let host = "";
+  let port = "";
+  if (trimmed.startsWith("[")) {
+    const closingBracket = trimmed.indexOf("]");
+    if (closingBracket <= 1 || trimmed[closingBracket + 1] !== ":") {
+      throw new Error("server_addr 必须是 host:port，IPv6 请使用 [::1]:443 格式。");
+    }
+    host = trimmed.slice(1, closingBracket);
+    port = trimmed.slice(closingBracket + 2);
+  } else {
+    const lastColon = trimmed.lastIndexOf(":");
+    if (lastColon <= 0 || lastColon === trimmed.length - 1 || trimmed.slice(0, lastColon).includes(":")) {
+      throw new Error("server_addr 必须是 host:port，IPv6 请使用 [::1]:443 格式。");
+    }
+    host = trimmed.slice(0, lastColon);
+    port = trimmed.slice(lastColon + 1);
+  }
+
+  const parsedPort = Number(port);
+  if (!host.trim()) throw new Error("server_addr host 为空。");
+  if (!Number.isInteger(parsedPort) || parsedPort <= 0 || parsedPort > 65535) {
+    throw new Error(`server_addr 端口无效: ${port}`);
+  }
+  return { host: host.trim(), port };
+}
+
+function formatURIHostPort(host: string, port: string) {
+  return host.includes(":") && !host.startsWith("[") ? `[${host}]:${port}` : `${host}:${port}`;
+}
+
+function normalizeURIName(name: string) {
+  return name.trim() || "tcptun";
+}
+
+function stringField(source: JsonRecord, key: string) {
+  return String(source[key] ?? "").trim();
+}
+
+function booleanField(source: JsonRecord, key: string) {
+  const value = source[key];
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") return ["1", "true", "yes"].includes(value.trim().toLowerCase());
+  return false;
+}
+
+function base64Encode(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
 }
 
 function convertConfig(source: JsonRecord, options: Record<string, string>) {
