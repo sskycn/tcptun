@@ -77,8 +77,7 @@ export default function Home() {
           <a href="#guide">教程</a>
           <a href="#tools">工具</a>
           <a href="#converter">转换</a>
-          <a href="#download">下载</a>
-          <a href="https://github.com/sskycn/tcptun-go">GitHub</a>
+          <a href="#install">安装</a>
         </nav>
       </header>
 
@@ -97,8 +96,8 @@ export default function Home() {
             <a className="button secondary" href="#converter">
               转换 Xray 配置
             </a>
-            <a className="button ghost" href="https://github.com/sskycn/tcptun-go/releases/latest">
-              下载最新版
+            <a className="button ghost" href="#install">
+              安装 tcptun
             </a>
           </div>
         </div>
@@ -109,7 +108,10 @@ export default function Home() {
             <span />
           </div>
           <pre>
-            <code>{`$ tcptun server \\
+            <code>{`$ pnpm add -g tcptun
+# or: npm install -g tcptun
+
+$ tcptun server \\
   --listen 0.0.0.0:9443 \\
   --tunnel-protocol native \\
   --transport raw \\
@@ -149,13 +151,16 @@ $ tcptun client \\
           <p className="eyebrow">部署路径</p>
           <h2>从配置文件开始，而不是从一长串命令开始。</h2>
           <p>
-            推荐先生成 `server.json`、`client.json` 和 `route.json`，把服务端配置放到 VPS，本地保留客户端配置。
-            之后升级协议、承载层或 REALITY 参数时，只需要改 JSON。
+            先通过 npm 包安装 `tcptun`，再生成 `server.json`、`client.json` 和 `route.json`。
+            把服务端配置放到 VPS，本地保留客户端配置；之后升级协议、承载层或 REALITY 参数时，只需要改 JSON。
           </p>
         </div>
         <div className="code-panel">
           <pre>
-            <code>{`tcptun config --protocol native \\
+            <code>{`pnpm add -g tcptun
+# or: npm install -g tcptun
+
+tcptun config --protocol native \\
   --transport raw \\
   --server-addr proxy.example.com:9443
 
@@ -204,25 +209,30 @@ tcptun client --config client.json`}</code>
 
       <ConfigTools />
 
-      <section className="section download-section" id="download">
+      <section className="section download-section" id="install">
         <div>
-          <p className="eyebrow">下载</p>
-          <h2>预编译二进制与源码都在 GitHub。</h2>
-          <p>release 包通常包含常见平台二进制、中英文 README、协议文档和 SHA-256 校验文件。</p>
+          <p className="eyebrow">安装</p>
+          <h2>通过 npm 包安装 tcptun。</h2>
+          <p>推荐使用 pnpm 或 npm 全局安装命令行程序；npm 页面提供当前发布版本和包信息。</p>
+          <pre className="install-code">
+            <code>{`pnpm add -g tcptun
+# or
+npm install -g tcptun`}</code>
+          </pre>
         </div>
         <div className="download-actions">
-          <a className="button primary" href="https://github.com/sskycn/tcptun-go/releases/latest">
-            打开 Releases
+          <a className="button primary" href="https://www.npmjs.com/package/tcptun">
+            打开 npm 包
           </a>
-          <a className="button secondary" href="https://github.com/sskycn/tcptun-go">
-            查看源码
+          <a className="button secondary" href="#generator">
+            生成配置
           </a>
         </div>
       </section>
 
       <footer className="footer">
         <span>tcptun-go</span>
-        <a href="https://github.com/sskycn/tcptun-go">github.com/sskycn/tcptun-go</a>
+        <a href="https://www.npmjs.com/package/tcptun">npmjs.com/package/tcptun</a>
       </footer>
     </main>
   );

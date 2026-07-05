@@ -222,6 +222,14 @@ p {
   overflow: hidden;
 }
 
+.install-code {
+  max-width: 520px;
+  margin-top: 18px;
+  border: 1px solid rgba(118, 184, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(7, 12, 15, 0.58);
+}
+
 .terminal {
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
 }
