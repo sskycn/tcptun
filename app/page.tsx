@@ -1,65 +1,220 @@
-import Image from "next/image";
+import ConfigTools from "./config-tools";
+
+const features = [
+  {
+    title: "Mixed 本地代理",
+    body: "一个本地监听同时接收 SOCKS5、SOCKS5 UDP ASSOCIATE、HTTP proxy 和 HTTP CONNECT，适合浏览器、CLI 与桌面应用共用。",
+  },
+  {
+    title: "Client / Server 隧道",
+    body: "通过 tcptun client 和 tcptun server 形成稳定转发链路，服务端只连接公网目标，客户端保留本地代理体验。",
+  },
+  {
+    title: "多协议兼容",
+    body: "native 覆盖能力最完整；VLESS、VMess、Trojan 适合与 Xray 生态配置迁移或保持协议习惯。",
+  },
+  {
+    title: "多承载层",
+    body: "支持 raw TCP、WebSocket、HTTP/2、HTTP/3。WebSocket 便于放在 nginx 或 CDN 后，raw 更直接。",
+  },
+  {
+    title: "REALITY / Vision",
+    body: "VLESS over raw 可配置 REALITY 与 xtls-rprx-vision；native 也可以使用 REALITY 作为安全层。",
+  },
+  {
+    title: "路由与学习",
+    body: "默认私有网段、localhost、.local 直连；失败目标会被记忆，也可用 route.json 强制走上游。",
+  },
+];
+
+const modes = [
+  {
+    name: "local",
+    title: "本地 mixed 转发",
+    command: "tcptun local --listen 127.0.0.1:1080 --gateway-port 7890",
+    body: "自动发现网关代理，或者显式指定 gateway-ip、gateway-port 和 upstream-protocol。",
+  },
+  {
+    name: "client",
+    title: "本地隧道客户端",
+    command:
+      "tcptun client --config client.json\ncurl -x socks5h://127.0.0.1:1080 https://ifconfig.me",
+    body: "打开本机 mixed 代理端口，把访问请求发送到远端 tcptun server 或兼容 Xray 入站。",
+  },
+  {
+    name: "server",
+    title: "公网隧道服务端",
+    command: "tcptun server --config server.json",
+    body: "监听公网端口，接收 client 隧道请求，再根据目标地址发起出站连接。",
+  },
+  {
+    name: "config",
+    title: "配置与分享",
+    command: "tcptun config\ntcptun config uri client.json --name proxy.example.com",
+    body: "交互式生成配置，也能从 client.json 输出 tcptun、vless、vmess 或 trojan 分享 URI。",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main>
+      <header className="topbar">
+        <a className="brand" href="#top" aria-label="tcptun 首页">
+          <span className="brand-mark">tcp</span>
+          <span>tcptun-go</span>
+        </a>
+        <nav className="nav" aria-label="主要导航">
+          <a href="#features">功能</a>
+          <a href="#guide">教程</a>
+          <a href="#tools">工具</a>
+          <a href="#converter">转换</a>
+          <a href="#download">下载</a>
+          <a href="https://github.com/sskycn/tcptun-go">GitHub</a>
+        </nav>
+      </header>
+
+      <section className="hero" id="top">
+        <div className="hero-copy">
+          <p className="eyebrow">Go TCP tunnel and mixed proxy</p>
+          <h1>tcptun-go</h1>
+          <p className="lede">
+            面向现代代理部署的轻量 TCP 隧道与 mixed 代理。一个 Go 二进制即可提供本地 SOCKS5/HTTP
+            入口、client-server 隧道、VLESS/VMess/Trojan 兼容模式，以及 REALITY/Vision 配置能力。
+          </p>
+          <div className="hero-actions">
+            <a className="button primary" href="#generator">
+              生成配置
+            </a>
+            <a className="button secondary" href="#converter">
+              转换 Xray 配置
+            </a>
+            <a className="button ghost" href="https://github.com/sskycn/tcptun-go/releases/latest">
+              下载最新版
+            </a>
+          </div>
+        </div>
+        <div className="terminal" aria-label="tcptun 命令预览">
+          <div className="terminal-bar">
+            <span />
+            <span />
+            <span />
+          </div>
+          <pre>
+            <code>{`$ tcptun server \\
+  --listen 0.0.0.0:9443 \\
+  --tunnel-protocol native \\
+  --transport raw \\
+  --token change-me
+
+$ tcptun client \\
+  --listen 127.0.0.1:1080 \\
+  --server-addr proxy.example.com:9443 \\
+  --tunnel-protocol native \\
+  --transport raw \\
+  --token change-me`}</code>
+          </pre>
+        </div>
+      </section>
+
+      <section className="section feature-section" id="features">
+        <div className="section-heading">
+          <p className="eyebrow">核心能力</p>
+          <h2>一个二进制覆盖本地代理、隧道转发和 Xray 兼容部署。</h2>
+          <p>
+            tcptun-go 的目标是把常见代理入口和 TCP 隧道收敛成简单可部署的组件，既能跑在笔记本上，也能放进 VPS、
+            Android bridge 或反向代理后面。
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
+        <div className="feature-grid">
+          {features.map((feature) => (
+            <article key={feature.title}>
+              <h3>{feature.title}</h3>
+              <p>{feature.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section split-section" id="deploy">
+        <div>
+          <p className="eyebrow">部署路径</p>
+          <h2>从配置文件开始，而不是从一长串命令开始。</h2>
+          <p>
+            推荐先生成 `server.json`、`client.json` 和 `route.json`，把服务端配置放到 VPS，本地保留客户端配置。
+            之后升级协议、承载层或 REALITY 参数时，只需要改 JSON。
+          </p>
+        </div>
+        <div className="code-panel">
+          <pre>
+            <code>{`tcptun config --protocol native \\
+  --transport raw \\
+  --server-addr proxy.example.com:9443
+
+tcptun server --config server.json
+tcptun client --config client.json`}</code>
+          </pre>
+        </div>
+      </section>
+
+      <section className="section guide-section" id="guide">
+        <div className="section-heading">
+          <p className="eyebrow">使用教程</p>
+          <h2>四个命令跑通从服务器到本地端口。</h2>
+          <p>下面是最小闭环。需要 nginx/CDN 时，把承载层改成 `ws` 并设置 tunnel_path；需要 REALITY 时使用 raw。</p>
+        </div>
+        <div className="mode-grid">
+          {modes.map((mode) => (
+            <article key={mode.name}>
+              <span>{mode.name}</span>
+              <h3>{mode.title}</h3>
+              <p>{mode.body}</p>
+              <pre>
+                <code>{mode.command}</code>
+              </pre>
+            </article>
+          ))}
+        </div>
+        <div className="notes-grid">
+          <article>
+            <h3>VLESS REALITY / Vision</h3>
+            <p>
+              `tunnel_security` 设置为 `reality`，承载层保持 `raw`。兼容 Vision 时协议选 `vless`，并设置
+              `tunnel_flow` 为 `xtls-rprx-vision`。服务端需要 private key、server names、dest；客户端需要
+              public key、server name、fingerprint 和 short id。
+            </p>
+          </article>
+          <article>
+            <h3>放在 nginx 后面</h3>
+            <p>
+              使用 `ws` 承载层，把 tcptun server 监听在 `127.0.0.1:9443`，nginx 将 `/tcptun` 这类路径反代到本地端口。
+              客户端连接公开域名和 443 端口，并启用 TLS server name。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <ConfigTools />
+
+      <section className="section download-section" id="download">
+        <div>
+          <p className="eyebrow">下载</p>
+          <h2>预编译二进制与源码都在 GitHub。</h2>
+          <p>release 包通常包含常见平台二进制、中英文 README、协议文档和 SHA-256 校验文件。</p>
+        </div>
+        <div className="download-actions">
+          <a className="button primary" href="https://github.com/sskycn/tcptun-go/releases/latest">
+            打开 Releases
           </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
+          <a className="button secondary" href="https://github.com/sskycn/tcptun-go">
+            查看源码
           </a>
         </div>
-      </main>
-    </div>
+      </section>
+
+      <footer className="footer">
+        <span>tcptun-go</span>
+        <a href="https://github.com/sskycn/tcptun-go">github.com/sskycn/tcptun-go</a>
+      </footer>
+    </main>
   );
 }
