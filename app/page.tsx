@@ -1,3 +1,4 @@
+import Image from "next/image";
 import ConfigTools from "./config-tools";
 
 const features = [
@@ -60,7 +61,15 @@ export default function Home() {
     <main>
       <header className="topbar">
         <a className="brand" href="#top" aria-label="tcptun 首页">
-          <span className="brand-mark">tcp</span>
+          <Image
+            className="brand-logo"
+            src="/tcptun-logo.webp"
+            alt=""
+            width={38}
+            height={38}
+            aria-hidden="true"
+            priority
+          />
           <span>tcptun-go</span>
         </a>
         <nav className="nav" aria-label="主要导航">
