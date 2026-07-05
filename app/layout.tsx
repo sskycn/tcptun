@@ -1,6 +1,23 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const themeInitScript = `
+(() => {
+  try {
+    const storageKey = "tcptun-theme";
+    const saved = localStorage.getItem(storageKey);
+    const theme = saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
+    const resolved = theme === "system"
+      ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : theme;
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = resolved;
+  } catch (_) {
+    document.documentElement.dataset.theme = "system";
+  }
+})();
+`;
+
 export const metadata: Metadata = {
   title: "tcptun-go - 高性能 TCP 隧道和 mixed 代理",
   description:
@@ -20,7 +37,11 @@ export default function RootLayout({
     <html
       lang="zh-CN"
       className="h-full antialiased"
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

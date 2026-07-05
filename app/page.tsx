@@ -1,5 +1,6 @@
 import Image from "next/image";
 import ConfigTools from "./config-tools";
+import ThemeToggle from "./theme-toggle";
 
 const features = [
   {
@@ -72,13 +73,16 @@ export default function Home() {
           />
           <span>tcptun-go</span>
         </a>
-        <nav className="nav" aria-label="主要导航">
-          <a href="#features">功能</a>
-          <a href="#guide">教程</a>
-          <a href="#tools">工具</a>
-          <a href="#converter">转换</a>
-          <a href="#install">安装</a>
-        </nav>
+        <div className="topbar-actions">
+          <nav className="nav" aria-label="主要导航">
+            <a href="#features">功能</a>
+            <a href="#guide">教程</a>
+            <a href="#tools">工具</a>
+            <a href="#converter">转换</a>
+            <a href="#install">安装</a>
+          </nav>
+          <ThemeToggle />
+        </div>
       </header>
 
       <section className="hero" id="top">
