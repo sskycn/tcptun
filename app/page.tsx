@@ -63,7 +63,7 @@ export default function Home() {
         <a className="brand" href="#top" aria-label="tcptun 首页">
           <Image
             className="brand-logo"
-            src="/tcptun-logo.webp"
+            src="/tcptun-logo.png"
             alt=""
             width={38}
             height={38}

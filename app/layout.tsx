@@ -6,8 +6,8 @@ export const metadata: Metadata = {
   description:
     "tcptun-go 项目介绍、npm 安装方式、配置生成器，以及 Xray/V2Ray JSON 到 tcptun 配置的浏览器本地转换工具。",
   icons: {
-    icon: "/tcptun-logo.webp",
-    apple: "/tcptun-logo.webp",
+    icon: "/tcptun-logo.png",
+    apple: "/tcptun-logo.png",
   },
 };
 
