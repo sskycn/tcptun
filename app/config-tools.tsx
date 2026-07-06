@@ -89,6 +89,8 @@ export default function ConfigTools() {
   const [serverName, setServerName] = useState("example.com");
   const [realityDest, setRealityDest] = useState("example.com:443");
   const [shortId, setShortId] = useState("");
+  const [clientSocks5Username, setClientSocks5Username] = useState("");
+  const [clientSocks5Password, setClientSocks5Password] = useState("");
   const [forceCidrs, setForceCidrs] = useState("1.1.1.0/24,2001:4860::/48");
   const [uriName, setUriName] = useState("tcptun");
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFiles | null>(null);
@@ -105,7 +107,7 @@ export default function ConfigTools() {
 
   const generatorOutput = generatedFiles
     ? formatGeneratedOutput(generatedFiles[activeGeneratedFile])
-    : "点击“生成配置”创建 server.json、client.json、route.json 和 client URI。";
+    : "点击“生成配置”创建带 tunnel_mux 的 server.json、client.json、route.json 和 client URI。";
 
   const targetLabel = useMemo(() => (target === "client" ? "client.json" : "server.json"), [target]);
 
@@ -122,6 +124,8 @@ export default function ConfigTools() {
         serverName,
         realityDest,
         shortId,
+        clientSocks5Username,
+        clientSocks5Password,
         forceCidrs,
         uriName,
       });
@@ -172,7 +176,8 @@ export default function ConfigTools() {
         <p className="eyebrow">在线工具</p>
         <h2>配置生成与 Xray 转换都在浏览器里完成。</h2>
         <p>
-          生成器会创建匹配的 server、client、route 文件和客户端 URI；转换器支持从 Xray/V2Ray 的
+          生成器会创建匹配的 server、client、route 文件和客户端 URI；默认显式写出 `tunnel_mux`，也支持客户端
+          SOCKS5 入口认证。转换器支持从 Xray/V2Ray 的
           VLESS、VMess、Trojan 入站或出站提取 tcptun 配置。密钥、token 和配置内容不会上传。
         </p>
       </div>
@@ -183,7 +188,7 @@ export default function ConfigTools() {
           <h3>生成可直接运行的 JSON 和 URI。</h3>
           <p>
             适合新部署。VLESS/VMess 会自动生成 UUID token，native/Trojan 会生成随机十六进制 token；
-            REALITY 会尝试使用浏览器 WebCrypto 生成 X25519 密钥对。
+            REALITY 会尝试使用浏览器 WebCrypto 生成 X25519 密钥对，client/server 隧道默认显式启用 mux。
           </p>
         </div>
         <div className="tool-grid">
@@ -236,6 +241,21 @@ export default function ConfigTools() {
                 onChange={(event) => setShortId(event.target.value)}
               />
             </Field>
+            <Field label="SOCKS5 用户">
+              <input
+                placeholder="可选客户端本地认证"
+                value={clientSocks5Username}
+                onChange={(event) => setClientSocks5Username(event.target.value)}
+              />
+            </Field>
+            <Field label="SOCKS5 密码">
+              <input
+                type="password"
+                placeholder="可选客户端本地认证"
+                value={clientSocks5Password}
+                onChange={(event) => setClientSocks5Password(event.target.value)}
+              />
+            </Field>
             <Field label="强制上游 CIDR">
               <input value={forceCidrs} onChange={(event) => setForceCidrs(event.target.value)} />
             </Field>
@@ -282,7 +302,7 @@ export default function ConfigTools() {
           <h3>从已有配置生成 tcptun 配置。</h3>
           <p>
             从 outbound 生成 client.json，或从 inbound 生成 server.json。当前支持 raw TCP、WebSocket、
-            HTTP/2，以及 TLS 和 REALITY 字段映射。
+            HTTP/2，以及 TLS 和 REALITY 字段映射；Xray QUIC 不会自动映射成 tcptun HTTP/3。
           </p>
         </div>
         <div className="converter-grid">
@@ -420,6 +440,8 @@ async function generateConfigs(form: Record<string, string>): Promise<GeneratedF
   if (form.security === "reality" && form.transport !== "raw") {
     throw new Error("REALITY 配置必须使用 raw 承载层。");
   }
+  validateSOCKS5Credential("SOCKS5 用户", form.clientSocks5Username);
+  validateSOCKS5Credential("SOCKS5 密码", form.clientSocks5Password);
 
   const token = tokenForProtocol(form.protocol);
   const tunnelPath = normalizePath(form.path);
@@ -430,6 +452,7 @@ async function generateConfigs(form: Record<string, string>): Promise<GeneratedF
     tunnel_protocol: form.protocol,
     tunnel_transport: form.transport,
     tunnel_path: tunnelPath,
+    tunnel_mux: true,
   };
   const client: JsonRecord = {
     mode: "client",
@@ -439,8 +462,11 @@ async function generateConfigs(form: Record<string, string>): Promise<GeneratedF
     tunnel_protocol: form.protocol,
     tunnel_transport: form.transport,
     tunnel_path: tunnelPath,
+    tunnel_mux: true,
     upstream_protocol: "socks5",
   };
+  if (form.clientSocks5Username.trim()) client.socks5_username = form.clientSocks5Username.trim();
+  if (form.clientSocks5Password) client.socks5_password = form.clientSocks5Password;
 
   if (form.security === "tls" || form.transport === "h3") {
     server.tunnel_tls_cert = "server.crt";
@@ -903,6 +929,12 @@ function commaList(value: unknown) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function validateSOCKS5Credential(label: string, value: string) {
+  if (new TextEncoder().encode(value).length > 255) {
+    throw new Error(`${label} 不能超过 255 字节。`);
+  }
 }
 
 function cleanObject(value: unknown): JsonRecord {
