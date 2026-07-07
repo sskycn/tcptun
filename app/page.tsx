@@ -2,6 +2,10 @@ import Image from "next/image";
 import ConfigTools from "./config-tools";
 import ThemeToggle from "./theme-toggle";
 
+const cliVersion = "0.1.4";
+const displayVersion = `v${cliVersion}`;
+const installPackage = `tcptun@${cliVersion}`;
+
 const features = [
   {
     title: "Mixed 本地代理",
@@ -40,7 +44,7 @@ const features = [
     body: "gomobile AAR 保持 Kotlin 反射路径兼容，并新增主动状态回调，能上报 starting、running、degraded、reconnecting、error 等状态。",
   },
   {
-    title: "v0.1.3 热路径优化",
+    title: `${displayVersion} 热路径优化`,
     body: "优化 mixed SOCKS5、直连探测和 native REALITY 热路径，减少 native REALITY 指纹处理开销，降低高频代理场景下的额外成本。",
   },
 ];
@@ -107,13 +111,13 @@ export default function Home() {
         <div className="hero-copy">
           <div className="hero-lockup">
             <Image className="hero-logo" src="/tcptun-logo.png" alt="" width={72} height={72} priority />
-            <p className="eyebrow">v0.1.3 · Go TCP tunnel and mixed proxy</p>
+            <p className="eyebrow">{displayVersion} · Go TCP tunnel and mixed proxy</p>
           </div>
           <h1>tcptun-go</h1>
           <p className="lede">
             面向现代代理部署的轻量 TCP 隧道与 mixed 代理。一个 Go 二进制即可提供本地 SOCKS5/HTTP
             入口、TCP/UDP client-server 隧道、默认多路复用、VLESS/VMess/Trojan 兼容模式，以及 REALITY/Vision
-            配置能力。v0.1.3 重点优化 mixed SOCKS5、直连探测和 native REALITY 热路径。
+            配置能力。{displayVersion} 重点优化 mixed SOCKS5、直连探测和 native REALITY 热路径。
           </p>
           <div className="hero-actions">
             <a className="button primary" href="#generator">
@@ -134,8 +138,8 @@ export default function Home() {
             <span />
           </div>
           <pre>
-            <code>{`$ pnpm add -g tcptun
-# or: npm install -g tcptun
+            <code>{`$ pnpm add -g ${installPackage}
+# or: npm install -g ${installPackage}
 
 $ tcptun server \\
   --listen 0.0.0.0:9443 \\
@@ -177,14 +181,14 @@ $ tcptun client \\
           <p className="eyebrow">部署路径</p>
           <h2>从配置文件开始，而不是从一长串命令开始。</h2>
           <p>
-            先通过 npm 包安装 `tcptun`，再生成 `server.json`、`client.json` 和 `route.json`。
+            先通过 npm 包安装 `tcptun@${cliVersion}`，再生成 `server.json`、`client.json` 和 `route.json`。
             把服务端配置放到 VPS，本地保留客户端配置；之后升级协议、承载层、mux、SOCKS5 认证或 REALITY 参数时，只需要改 JSON。
           </p>
         </div>
         <div className="code-panel">
           <pre>
-            <code>{`pnpm add -g tcptun
-# or: npm install -g tcptun
+            <code>{`pnpm add -g ${installPackage}
+# or: npm install -g ${installPackage}
 
 tcptun config --protocol native \\
   --transport raw \\
@@ -255,12 +259,12 @@ tcptun client --config client.json`}</code>
       <section className="section download-section" id="install">
         <div>
           <p className="eyebrow">安装</p>
-          <h2>通过 npm 包安装 tcptun v0.1.3。</h2>
+          <h2>通过 npm 包安装 tcptun {displayVersion}。</h2>
           <p>推荐使用 pnpm 或 npm 全局安装命令行程序；npm 页面提供当前发布版本和包信息。</p>
           <pre className="install-code">
-            <code>{`pnpm add -g tcptun
+            <code>{`pnpm add -g ${installPackage}
 # or
-npm install -g tcptun`}</code>
+npm install -g ${installPackage}`}</code>
           </pre>
         </div>
         <div className="download-actions">
