@@ -2,7 +2,7 @@ import Image from "next/image";
 import ConfigTools from "./config-tools";
 import ThemeToggle from "./theme-toggle";
 
-const cliVersion = "0.1.4";
+const cliVersion = "0.1.5";
 const displayVersion = `v${cliVersion}`;
 const installPackage = `tcptun@${cliVersion}`;
 
