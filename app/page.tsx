@@ -4,7 +4,7 @@ import ThemeToggle from "./theme-toggle";
 
 const cliVersion = "0.1.5";
 const displayVersion = `v${cliVersion}`;
-const installPackage = `tcptun@${cliVersion}`;
+const installPackage = "tcptun";
 
 const features = [
   {
@@ -181,7 +181,7 @@ $ tcptun client \\
           <p className="eyebrow">部署路径</p>
           <h2>从配置文件开始，而不是从一长串命令开始。</h2>
           <p>
-            先通过 npm 包安装 `tcptun@${cliVersion}`，再生成 `server.json`、`client.json` 和 `route.json`。
+            先通过 npm 包安装 `tcptun`，再生成 `server.json`、`client.json` 和 `route.json`。
             把服务端配置放到 VPS，本地保留客户端配置；之后升级协议、承载层、mux、SOCKS5 认证或 REALITY 参数时，只需要改 JSON。
           </p>
         </div>
