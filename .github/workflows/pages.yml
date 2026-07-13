@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-  schedule:
-    - cron: "17 * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -13,40 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  version:
-    permissions: {}
-    runs-on: ubuntu-latest
-    outputs:
-      latest: ${{ steps.check.outputs.latest }}
-      should_deploy: ${{ steps.check.outputs.should_deploy }}
-    steps:
-      - name: Check latest tcptun version
-        id: check
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          VERSION_MARKER_URL: https://tcptun.com/tcptun-version.json
-        run: |
-          latest="$(curl --fail --silent --show-error https://registry.npmjs.org/tcptun/latest | jq --raw-output .version)"
-          if ! [[ "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)*$ ]]; then
-            echo "Invalid version returned by npm: $latest" >&2
-            exit 1
-          fi
-
-          should_deploy=true
-          if [[ "$EVENT_NAME" == "schedule" ]]; then
-            deployed="$(curl --fail --silent --show-error "$VERSION_MARKER_URL" 2>/dev/null | jq --raw-output '.version // empty' 2>/dev/null || true)"
-            if [[ "$deployed" == "$latest" ]]; then
-              should_deploy=false
-            fi
-          fi
-
-          echo "latest=$latest" >> "$GITHUB_OUTPUT"
-          echo "should_deploy=$should_deploy" >> "$GITHUB_OUTPUT"
-          echo "npm latest: $latest; deployment required: $should_deploy"
-
   build:
-    needs: version
-    if: needs.version.outputs.should_deploy == 'true'
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -65,18 +30,6 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Sync protocol and config presets from tcptun
-        env:
-          TCPTUN_VERSION: ${{ needs.version.outputs.latest }}
-        run: |
-          package_tarball="$(npm pack "tcptun@$TCPTUN_VERSION" --ignore-scripts --pack-destination "$RUNNER_TEMP")"
-          package_dir="$RUNNER_TEMP/tcptun-release"
-          mkdir -p "$package_dir"
-          tar -xzf "$RUNNER_TEMP/$package_tarball" -C "$package_dir"
-          binary="$package_dir/package/dist/tcptun-linux-amd64"
-          chmod +x "$binary"
-          node scripts/sync-tcptun-release.mjs "$package_dir/package" "$binary" "$TCPTUN_VERSION"
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -84,11 +37,6 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
         run: pnpm build
-
-      - name: Write deployed version marker
-        run: |
-          jq '{package, version, protocols: (.protocols | keys), transports, securities}' \
-            app/tcptun-release.json > out/tcptun-version.json
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { displayVersion } from "./version";
+import { releaseVersion } from "./site-data";
 
 const themeInitScript = `
 (() => {
@@ -20,8 +20,8 @@ const themeInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: `tcptun-go ${displayVersion} - TCP/UDP 隧道和 mixed 代理`,
-  description: `tcptun-go ${displayVersion} 项目介绍、npm 安装方式、默认多路复用、UDP relay、REALITY/Vision、性能优化、配置生成器，以及 Xray/V2Ray JSON 到 tcptun 配置的浏览器本地转换工具。`,
+  title: `tcptun-go v${releaseVersion} - 多入口、多出口代理运行时`,
+  description: `tcptun-go v${releaseVersion} 是配置驱动的多 inbound、多 outbound 代理运行时，支持 TCP/UDP、Native、VLESS、VMess、Trojan、REALITY、mux、路由与 mDNS discovery。`,
   icons: {
     icon: "/tcptun-logo.png",
     apple: "/tcptun-logo.png",

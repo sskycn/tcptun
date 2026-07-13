@@ -1,83 +1,75 @@
 import Image from "next/image";
-import ConfigTools from "./config-tools";
 import ThemeToggle from "./theme-toggle";
-import releaseManifest from "./tcptun-release.json";
-import { displayVersion } from "./version";
+import {
+  binaryDownloads,
+  inboundTypes,
+  npmLinks,
+  outboundTypes,
+  releaseVersion,
+  topologyExample,
+  tunnelProtocols,
+} from "./site-data";
 
-const installPackage = "tcptun";
-const protocolList = Object.keys(releaseManifest.protocols).join("、");
-const transportList = releaseManifest.transports.join("、");
+const displayVersion = `v${releaseVersion}`;
+const linuxX64 = binaryDownloads.find((item) => item.platform === "linux" && item.arch === "amd64");
 
-const features = [
+const capabilities = [
   {
-    title: "Mixed 本地代理",
-    body: "一个本地监听同时接收 SOCKS5、SOCKS5 UDP ASSOCIATE、HTTP proxy 和 HTTP CONNECT，SOCKS5 入口可设置用户名和密码。",
+    label: "Runtime",
+    title: "多入口、多出口",
+    body: "一个进程编译完整代理拓扑。每个 inbound 可以直接指定 outbound，也可以交给 route 选择出口。",
   },
   {
-    title: "Client / Server 隧道",
-    body: "通过 tcptun client 和 tcptun server 形成稳定转发链路，服务端只连接公网目标，客户端保留本地 mixed 代理体验。",
+    label: "Config",
+    title: "严格 JSON 模型",
+    body: "配置拒绝未知字段，并在监听端口前校验 tag、引用、TCP/UDP capability、协议认证、TLS、REALITY 与 mux。",
   },
   {
-    title: "默认隧道多路复用",
-    body: "client/server 默认复用一条 tunnel transport 连接，多条 TCP 连接和 UDP relay 通过逻辑 stream 共享上游链路。",
+    label: "Route",
+    title: "出口图与规则路由",
+    body: "支持 direct、direct-first、blackhole、SOCKS5、mixed 与 tunnel outbound，以及域名、IP、应用身份规则。",
   },
   {
-    title: "TCP 与 UDP relay",
-    body: "所有隧道协议都支持 TCP 和 SOCKS5 UDP relay。native 使用内置 mux，VLESS/VMess 兼容 mux.cool，Trojan 可在 tcptun 两端启用私有 mux。",
+    label: "Network",
+    title: "TCP、UDP 与 mux",
+    body: "隧道端点保留 TCP/UDP、raw/ws/h2/h3、TLS 与 REALITY；Native 同版本两端可启用高吞吐 mux。",
   },
   {
-    title: `${displayVersion} 隧道协议`,
-    body: `当前 CLI 配置生成器提供 ${protocolList} 协议预设。网站会直接读取发布包的协议和标准配置，新版发布后自动同步。`,
+    label: "Discovery",
+    title: "LAN 扫描与 mDNS",
+    body: "无配置模式会扫描私有 IPv4 网络中的 SOCKS5，并发现其他 tcptun 节点发布的 mDNS 服务。",
   },
   {
-    title: "多承载层与安全层",
-    body: `当前发布版支持 ${transportList} transport，构建时会同步 CLI 公布的 security 选项和每个协议的默认安全配置。`,
-  },
-  {
-    title: "路由与学习",
-    body: "私有网段、localhost、.local 默认直连；直连失败目标会写回 route.json，也可按域名、正则、后缀、IP、CIDR 或范围强制走上游。",
-  },
-  {
-    title: "分享 URI 直接启动",
-    body: "client、server、local 都能接收 URI 作为位置参数；client 支持 tcptun://、vless://、vmess:// 和 trojan:// 分享链接。",
-  },
-  {
-    title: "Android bridge",
-    body: "gomobile AAR 保持 Kotlin 反射路径兼容，并新增主动状态回调，能上报 starting、running、degraded、reconnecting、error 等状态。",
-  },
-  {
-    title: "代理热路径优化",
-    body: "优化 mixed SOCKS5、直连探测和 native REALITY 热路径，减少 native REALITY 指纹处理开销，降低高频代理场景下的额外成本。",
+    label: "Android",
+    title: "按应用身份路由",
+    body: "Android bridge 可提供 package name、平台与 attributes，Router 用它们选择 outbound，不写入隧道协议帧。",
   },
 ];
 
-const modes = [
+const workflows = [
   {
-    name: "local",
-    title: "本地 mixed 转发",
-    command:
-      "tcptun local --listen 127.0.0.1:1080 --gateway-port 7890\n# alias: tcptun l",
-    body: "自动发现网关代理，支持 SOCKS5 或 mixed 上游，也可给本地 SOCKS5 入口和上游 SOCKS5 配置认证。",
+    name: "run",
+    title: "加载正式配置",
+    body: "读取严格 JSON，完成 Load、Validate、Compile 后才准备并启动全部入口。",
+    command: "tcptun --config config.json",
   },
   {
-    name: "client",
-    title: "本地隧道客户端",
-    command:
-      "tcptun client --config client.json\ntcptun client 'vless://...'",
-    body: "打开本机 mixed 代理端口，把 TCP 和 SOCKS5 UDP relay 发送到远端 tcptun server 或兼容 Xray 入站。",
+    name: "check",
+    title: "启动前完整校验",
+    body: "加载、校验并编译配置，但不绑定任何监听端口，适合部署前检查。",
+    command: "tcptun config check --config config.json",
   },
   {
-    name: "server",
-    title: "公网隧道服务端",
-    command: "tcptun server --config server.json\n# alias: tcptun s",
-    body: "监听公网端口，接收 client 隧道请求，再根据目标地址发起出站连接；出站会拒绝私有、保留和 CGNAT 网段。",
+    name: "generate",
+    title: "生成匹配的隧道对",
+    body: "一次创建 server.json 与 client.json，包括协议凭据和匹配的 REALITY 密钥。",
+    command: "tcptun config vless --server proxy.example.com --port 9443",
   },
   {
-    name: "config",
-    title: "配置与分享",
-    command:
-      "tcptun config vless\ntcptun config uri client.json --name proxy.example.com",
-    body: "交互式或非交互式生成 server.json、client.json、route.json，也能输出 tcptun、vless、vmess 或 trojan 分享 URI。",
+    name: "migrate",
+    title: "迁移旧版配置",
+    body: "旧的 mode 顶层结构会被明确拒绝；通过 migrate 转换为统一拓扑。",
+    command: "tcptun config migrate --input old.json --output config.json",
   },
 ];
 
@@ -85,25 +77,16 @@ export default function Home() {
   return (
     <main>
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="tcptun 首页">
-          <Image
-            className="brand-logo"
-            src="/tcptun-logo.png"
-            alt=""
-            width={38}
-            height={38}
-            aria-hidden="true"
-            priority
-          />
+        <a className="brand" href="#top" aria-label="tcptun-go 首页">
+          <Image src="/tcptun-logo.png" alt="" width={40} height={40} priority />
           <span>tcptun-go</span>
         </a>
         <div className="topbar-actions">
           <nav className="nav" aria-label="主要导航">
-            <a href="#features">功能</a>
-            <a href="#guide">教程</a>
-            <a href="#tools">工具</a>
-            <a href="#converter">转换</a>
-            <a href="#install">安装</a>
+            <a href="#architecture">架构</a>
+            <a href="#protocols">协议</a>
+            <a href="#download">下载</a>
+            <a href="#start">使用</a>
           </nav>
           <ThemeToggle />
         </div>
@@ -111,178 +94,201 @@ export default function Home() {
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <div className="hero-lockup">
-            <Image className="hero-logo" src="/tcptun-logo.png" alt="" width={72} height={72} priority />
-            <p className="eyebrow">{displayVersion} · Go TCP tunnel and mixed proxy</p>
+          <div className="release-line">
+            <span className="version-badge">{displayVersion}</span>
+            <span>configuration-driven proxy runtime</span>
           </div>
-          <h1>tcptun-go</h1>
+          <h1>用一份拓扑，组织所有代理流量。</h1>
           <p className="lede">
-            面向现代代理部署的轻量 TCP 隧道与 mixed 代理。一个 Go 二进制即可提供本地 SOCKS5/HTTP
-            入口、TCP/UDP client-server 隧道、默认多路复用、{protocolList} 协议配置，以及 REALITY/Vision
-            配置能力。网站展示的版本会随 npm 上的 tcptun 最新版自动同步。
+            tcptun-go 是使用 Go 编写的多 inbound、多 outbound 代理运行时。它以严格 JSON 编译入口、出口图、
+            路由、DNS 与发现配置，再统一启动 TCP/UDP 服务。
           </p>
           <div className="hero-actions">
-            <a className="button primary" href="#generator">
-              生成配置
-            </a>
-            <a className="button secondary" href="#converter">
-              转换 Xray 配置
-            </a>
-            <a className="button ghost" href="#install">
-              安装 tcptun
-            </a>
+            <a className="button primary" href="#download">下载 {displayVersion}</a>
+            <a className="button secondary" href={npmLinks.package}>npm 安装</a>
+            <a className="button ghost" href="#architecture">查看配置模型</a>
+          </div>
+          <div className="release-facts" aria-label="能力概览">
+            <span><strong>{inboundTypes.length}</strong> 类 inbound</span>
+            <span><strong>{outboundTypes.length}</strong> 类 outbound</span>
+            <span><strong>{binaryDownloads.length}</strong> 个平台构建</span>
           </div>
         </div>
+
         <div className="terminal" aria-label="tcptun 命令预览">
-          <div className="terminal-bar">
-            <span />
-            <span />
-            <span />
+          <div className="terminal-heading">
+            <span>tcptun</span>
+            <span>{displayVersion}</span>
           </div>
-          <pre>
-            <code>{`$ pnpm add -g ${installPackage}
-# or: npm install -g ${installPackage}
+          <pre><code>{`$ npm install -g tcptun
 
-$ tcptun server \\
-  --listen 0.0.0.0:9443 \\
-  --tunnel-protocol native \\
-  --transport raw \\
-  --token change-me
+# 加载统一拓扑配置
+$ tcptun --config config.json
 
-$ tcptun client \\
-  --listen 127.0.0.1:1080 \\
-  --server-addr proxy.example.com:9443 \\
-  --tunnel-protocol native \\
-  --transport raw \\
-  --token change-me`}</code>
-          </pre>
+# 不监听端口，先完成全部校验
+$ tcptun config check --config config.json
+
+# 生成 Xray-compatible VLESS + REALITY 配置对
+$ tcptun config vless \\
+    --server proxy.example.com \\
+    --port 9443`}</code></pre>
         </div>
       </section>
 
-      <section className="section feature-section" id="features">
+      <section className="section" id="features">
         <div className="section-heading">
-          <p className="eyebrow">核心能力</p>
-          <h2>一个二进制覆盖本地代理、隧道转发和 Xray 兼容部署。</h2>
-          <p>
-            tcptun-go 的目标是把常见代理入口和 TCP 隧道收敛成简单可部署的组件，既能跑在笔记本上，也能放进 VPS、
-            Android bridge、nginx 反向代理或 HTTP/CDN 基础设施后面。
-          </p>
+          <p className="eyebrow">运行时能力</p>
+          <h2>配置描述拓扑，Runtime 负责验证和执行。</h2>
+          <p>当前网站内容依据 tcptun-go `v0.1.8` 源码、README、FileConfig 和仓库示例手写整理。</p>
         </div>
-        <div className="feature-grid">
-          {features.map((feature) => (
-            <article key={feature.title}>
-              <h3>{feature.title}</h3>
-              <p>{feature.body}</p>
+        <div className="capability-grid">
+          {capabilities.map((item) => (
+            <article key={item.title}>
+              <span>{item.label}</span>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="section split-section" id="deploy">
-        <div>
-          <p className="eyebrow">部署路径</p>
-          <h2>从配置文件开始，而不是从一长串命令开始。</h2>
-          <p>
-            先通过 npm 包安装 `tcptun`，再生成 `server.json`、`client.json` 和 `route.json`。
-            把服务端配置放到 VPS，本地保留客户端配置；之后升级协议、承载层、mux、SOCKS5 认证或 REALITY 参数时，只需要改 JSON。
-          </p>
+      <section className="section architecture-section" id="architecture">
+        <div className="section-heading row-heading">
+          <div>
+            <p className="eyebrow">统一拓扑</p>
+            <h2>入口、路由与出口不再由 mode 隐式决定。</h2>
+            <p>旧版 `mode`、`server_addr` 和 `tunnel_*` 顶层配置已经移除。每个组件都有 tag，引用关系在启动前编译。</p>
+          </div>
+          <div className="chip-row">
+            <span>Load</span><span>Validate</span><span>Compile</span><span>Start</span>
+          </div>
         </div>
-        <div className="code-panel">
-          <pre>
-            <code>{`pnpm add -g ${installPackage}
-# or: npm install -g ${installPackage}
 
-tcptun config --protocol native \\
-  --transport raw \\
-  --server-addr proxy.example.com:9443
-
-tcptun server --config server.json
-tcptun client --config client.json`}</code>
-          </pre>
+        <div className="architecture-grid">
+          <div className="topology-panel">
+            <div className="topology-column">
+              <p>Inbounds</p>
+              {inboundTypes.map((type) => <span key={type}>{type}</span>)}
+            </div>
+            <div className="topology-router">
+              <span>Route</span>
+              <small>rules + default_outbound</small>
+            </div>
+            <div className="topology-column">
+              <p>Outbounds</p>
+              {outboundTypes.map((type) => <span key={type}>{type}</span>)}
+            </div>
+          </div>
+          <div className="config-model">
+            <div className="config-model-heading">
+              <span>config.json</span>
+              <span>strict schema</span>
+            </div>
+            <pre><code>{topologyExample}</code></pre>
+          </div>
         </div>
       </section>
 
-      <section className="section guide-section" id="guide">
+      <section className="section protocol-section" id="protocols">
+        <div className="section-heading row-heading">
+          <div>
+            <p className="eyebrow">隧道协议</p>
+            <h2>四种 wire protocol，共用同一套拓扑模型。</h2>
+            <p>外部协议兼容指 wire protocol 互操作；tcptun JSON 不能直接作为 Xray 的配置文件。</p>
+          </div>
+          <div className="chip-row"><span>raw</span><span>ws</span><span>h2</span><span>h3</span></div>
+        </div>
+
+        <div className="protocol-grid">
+          {tunnelProtocols.map((protocol, index) => (
+            <article className="protocol-card" key={protocol.name}>
+              <div className="protocol-card-heading">
+                <div>
+                  <span className="protocol-index">{String(index + 1).padStart(2, "0")}</span>
+                  <h3>{protocol.name}</h3>
+                </div>
+                <span className="security-badge">{protocol.credential}</span>
+              </div>
+              <p className="protocol-description">{protocol.description}</p>
+              <dl>
+                <div><dt>Interop</dt><dd>{protocol.interoperability}</dd></div>
+                <div><dt>Generator</dt><dd>{protocol.generatedSecurity}</dd></div>
+                <div className="wide"><dt>Mux</dt><dd>{protocol.mux}</dd></div>
+              </dl>
+              <pre className="protocol-command"><code>{protocol.command}</code></pre>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section download-section" id="download">
+        <div className="section-heading row-heading">
+          <div>
+            <p className="eyebrow">npm 二进制</p>
+            <h2>无需安装 Go，下载后直接运行。</h2>
+            <p>下面是 npm `tcptun@{releaseVersion}` 发布包内的原始二进制，通过 npm CDN 直接下载。</p>
+          </div>
+          <a className="button secondary" href={npmLinks.tarball}>下载完整 npm .tgz</a>
+        </div>
+        <div className="download-grid">
+          {binaryDownloads.map((item) => (
+            <article className="download-card" key={item.filename}>
+              <div className={`platform-mark ${item.platform}`} aria-hidden="true">{platformInitial(item.platform)}</div>
+              <div className="download-copy">
+                <div className="download-title"><h3>{item.platformLabel}</h3><span>{item.archLabel}</span></div>
+                <code>{item.filename}</code>
+                <p>{formatBytes(item.size)} · npm CDN</p>
+              </div>
+              <a className="download-link" href={item.url} download={item.filename}>下载</a>
+            </article>
+          ))}
+        </div>
+        <div className="download-note">
+          <div>
+            <strong>也可以让 npm 自动选择平台</strong>
+            <span>`npm install -g tcptun` 会安装包装命令并调用当前系统对应的二进制。</span>
+          </div>
+          <a href={npmLinks.package}>打开 npm 包 ↗</a>
+        </div>
+      </section>
+
+      <section className="section quickstart-section" id="start">
         <div className="section-heading">
-          <p className="eyebrow">使用教程</p>
-          <h2>四个命令跑通从服务器到本地端口。</h2>
-          <p>
-            下面是最小闭环。需要 nginx/CDN 时，把承载层改成 `ws` 并设置 tunnel_path；需要 HTTP/2 或 HTTP/3
-            时选择 `h2` 或 `h3`；需要 REALITY/Vision 时使用 raw。
-          </p>
+          <p className="eyebrow">CLI 工作流</p>
+          <h2>运行、检查、生成、迁移。</h2>
+          <p>根命令只保留 `--config/-c`、`--verbose/-v` 和无配置自动发现使用的 `--retry`；其余能力全部写入 JSON。</p>
         </div>
         <div className="mode-grid">
-          {modes.map((mode) => (
-            <article key={mode.name}>
-              <span>{mode.name}</span>
-              <h3>{mode.title}</h3>
-              <p>{mode.body}</p>
-              <pre>
-                <code>{mode.command}</code>
-              </pre>
+          {workflows.map((item) => (
+            <article key={item.name}>
+              <span className="mode-name">{item.name}</span>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+              <pre><code>{item.command}</code></pre>
             </article>
           ))}
         </div>
-        <div className="notes-grid">
-          <article>
-            <h3>VLESS REALITY / Vision</h3>
-            <p>
-              `tunnel_security` 设置为 `reality`，承载层保持 `raw`。兼容 Vision 时协议选 `vless`，并设置
-              `tunnel_flow` 为 `xtls-rprx-vision`。服务端需要 private key、server names、dest；客户端需要
-              public key、server name、fingerprint 和 short id。
-            </p>
-          </article>
-          <article>
-            <h3>URI 和多路复用</h3>
-            <p>
-              `tcptun client` 可直接读取分享 URI；`tcptun server` 和 `tcptun local` 也支持 `tcptun://` URI。
-              client/server 默认启用 `tunnel_mux`，降低 WebSocket、HTTP/2、HTTP/3 部署中的重复握手开销。
-            </p>
-          </article>
-          <article>
-            <h3>放在 nginx 后面</h3>
-            <p>
-              使用 `ws` 承载层，把 tcptun server 监听在 `127.0.0.1:9443`，nginx 将 `/tcptun` 这类路径反代到本地端口。
-              客户端连接公开域名和 443 端口，并启用 TLS server name。
-            </p>
-          </article>
-          <article>
-            <h3>HTTP/3 与转换边界</h3>
-            <p>
-              tcptun 的 `h3` 是基于 QUIC 的 HTTP/3，服务端需要 TLS 证书，客户端固定走 https。
-              Xray/V2Ray 转换器不会把 Xray QUIC 直接映射为 tcptun HTTP/3。
-            </p>
-          </article>
-        </div>
-      </section>
-
-      <ConfigTools />
-
-      <section className="section download-section" id="install">
-        <div>
-          <p className="eyebrow">安装</p>
-          <h2>通过 npm 包安装 tcptun {displayVersion}。</h2>
-          <p>推荐使用 pnpm 或 npm 全局安装命令行程序；npm 页面提供当前发布版本和包信息。</p>
-          <pre className="install-code">
-            <code>{`pnpm add -g ${installPackage}
-# or
-npm install -g ${installPackage}`}</code>
-          </pre>
-        </div>
-        <div className="download-actions">
-          <a className="button primary" href="https://www.npmjs.com/package/tcptun">
-            打开 npm 包
-          </a>
-          <a className="button secondary" href="#generator">
-            生成配置
-          </a>
+        <div className="next-step">
+          <Image src="/tcptun-logo.png" alt="" width={64} height={64} />
+          <div><p className="eyebrow">tcptun-go {displayVersion}</p><h2>从一份严格 JSON 开始。</h2></div>
+          <a className="button primary" href={linuxX64?.url || npmLinks.package}>下载 Linux x64</a>
         </div>
       </section>
 
       <footer className="footer">
-        <span>tcptun-go</span>
-        <a href="https://www.npmjs.com/package/tcptun">npmjs.com/package/tcptun</a>
+        <div><Image src="/tcptun-logo.png" alt="" width={34} height={34} /><span>tcptun-go {displayVersion}</span></div>
+        <div><a href={npmLinks.package}>npm package</a><a href={npmLinks.tarball}>release tarball</a><a href="#top">返回顶部 ↑</a></div>
       </footer>
     </main>
   );
+}
+
+function formatBytes(bytes: number) {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function platformInitial(platform: string) {
+  if (platform === "darwin") return "M";
+  if (platform === "windows") return "W";
+  return "L";
 }
