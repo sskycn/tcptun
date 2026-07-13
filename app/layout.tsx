@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { displayVersion } from "./version";
 
 const themeInitScript = `
 (() => {
@@ -19,9 +20,8 @@ const themeInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: "tcptun-go v0.1.5 - TCP/UDP 隧道和 mixed 代理",
-  description:
-    "tcptun-go v0.1.5 项目介绍、npm 安装方式、默认多路复用、UDP relay、REALITY/Vision、性能优化、配置生成器，以及 Xray/V2Ray JSON 到 tcptun 配置的浏览器本地转换工具。",
+  title: `tcptun-go ${displayVersion} - TCP/UDP 隧道和 mixed 代理`,
+  description: `tcptun-go ${displayVersion} 项目介绍、npm 安装方式、默认多路复用、UDP relay、REALITY/Vision、性能优化、配置生成器，以及 Xray/V2Ray JSON 到 tcptun 配置的浏览器本地转换工具。`,
   icons: {
     icon: "/tcptun-logo.png",
     apple: "/tcptun-logo.png",

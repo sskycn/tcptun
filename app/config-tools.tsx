@@ -1,15 +1,33 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import releaseManifestJSON from "./tcptun-release.json";
 
 type JsonRecord = Record<string, unknown>;
 type GeneratedJSONFile = "server" | "client" | "route";
 type GeneratedFile = GeneratedJSONFile | "uri";
 type GeneratedFiles = Record<GeneratedJSONFile, JsonRecord> & { uri: string };
 type ConverterTarget = "client" | "server";
+type ProtocolPreset = {
+  tokenKind: "uuid" | "secret";
+  server: JsonRecord;
+  client: JsonRecord;
+  route: JsonRecord;
+};
+type ReleaseManifest = {
+  version: string;
+  protocols: Record<string, ProtocolPreset>;
+  transports: string[];
+  securities: string[];
+};
 
 const defaultClientListen = "127.0.0.1:1080";
 const defaultServerListen = "0.0.0.0:9443";
+const releaseManifest = releaseManifestJSON as ReleaseManifest;
+const protocolNames = Object.keys(releaseManifest.protocols);
+const initialProtocol = protocolNames.includes("native") ? "native" : protocolNames[0];
+const initialPreset = presetDefaults(initialProtocol);
+
 const supportedProtocols = new Set(["vless", "vmess", "trojan"]);
 
 const initialXrayClient = {
@@ -79,19 +97,19 @@ const initialXrayServer = {
 };
 
 export default function ConfigTools() {
-  const [protocol, setProtocol] = useState("native");
-  const [transport, setTransport] = useState("raw");
-  const [security, setSecurity] = useState("none");
-  const [serverAddr, setServerAddr] = useState("proxy.example.com:9443");
-  const [serverListen, setServerListen] = useState(defaultServerListen);
-  const [clientListen, setClientListen] = useState(defaultClientListen);
-  const [path, setPath] = useState("/tcptun");
-  const [serverName, setServerName] = useState("example.com");
-  const [realityDest, setRealityDest] = useState("example.com:443");
-  const [shortId, setShortId] = useState("");
+  const [protocol, setProtocol] = useState(initialProtocol);
+  const [transport, setTransport] = useState(initialPreset.transport);
+  const [security, setSecurity] = useState(initialPreset.security);
+  const [serverAddr, setServerAddr] = useState(initialPreset.serverAddr);
+  const [serverListen, setServerListen] = useState(initialPreset.serverListen);
+  const [clientListen, setClientListen] = useState(initialPreset.clientListen);
+  const [path, setPath] = useState(initialPreset.path);
+  const [serverName, setServerName] = useState(initialPreset.serverName);
+  const [realityDest, setRealityDest] = useState(initialPreset.realityDest);
+  const [shortId, setShortId] = useState(initialPreset.shortId);
   const [clientSocks5Username, setClientSocks5Username] = useState("");
   const [clientSocks5Password, setClientSocks5Password] = useState("");
-  const [forceCidrs, setForceCidrs] = useState("1.1.1.0/24,2001:4860::/48");
+  const [forceCidrs, setForceCidrs] = useState(initialPreset.forceCidrs);
   const [uriName, setUriName] = useState("tcptun");
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFiles | null>(null);
   const [activeGeneratedFile, setActiveGeneratedFile] = useState<GeneratedFile>("server");
@@ -107,7 +125,7 @@ export default function ConfigTools() {
 
   const generatorOutput = generatedFiles
     ? formatGeneratedOutput(generatedFiles[activeGeneratedFile])
-    : "点击“生成配置”创建带 tunnel_mux 的 server.json、client.json、route.json 和 client URI。";
+    : "点击“生成配置”根据当前发布版 CLI 模板创建 server.json、client.json、route.json 和 client URI。";
 
   const targetLabel = useMemo(() => (target === "client" ? "client.json" : "server.json"), [target]);
 
@@ -149,6 +167,23 @@ export default function ConfigTools() {
     setListen(defaultServerListen);
   }
 
+  function handleProtocolChange(nextProtocol: string) {
+    const defaults = presetDefaults(nextProtocol);
+    setProtocol(nextProtocol);
+    setTransport(defaults.transport);
+    setSecurity(defaults.security);
+    setServerAddr(defaults.serverAddr);
+    setServerListen(defaults.serverListen);
+    setClientListen(defaults.clientListen);
+    setPath(defaults.path);
+    setServerName(defaults.serverName);
+    setRealityDest(defaults.realityDest);
+    setShortId(defaults.shortId);
+    setForceCidrs(defaults.forceCidrs);
+    setGeneratedFiles(null);
+    setGeneratorStatus(`已加载 tcptun v${releaseManifest.version} 的 ${nextProtocol} 标准配置。`);
+  }
+
   function handleConvert() {
     try {
       const parsed = JSON.parse(sourceConfig);
@@ -176,7 +211,7 @@ export default function ConfigTools() {
         <p className="eyebrow">在线工具</p>
         <h2>配置生成与 Xray 转换都在浏览器里完成。</h2>
         <p>
-          生成器会创建匹配的 server、client、route 文件和客户端 URI；默认显式写出 `tunnel_mux`，也支持客户端
+          生成器会根据当前发布版的 CLI 模板创建匹配的 server、client、route 文件和客户端 URI，也支持客户端
           SOCKS5 入口认证。转换器支持从 Xray/V2Ray 的
           VLESS、VMess、Trojan 入站或出站提取 tcptun 配置。密钥、token 和配置内容不会上传。
         </p>
@@ -187,33 +222,25 @@ export default function ConfigTools() {
           <p className="eyebrow">配置生成器</p>
           <h3>生成可直接运行的 JSON 和 URI。</h3>
           <p>
-            适合新部署。VLESS/VMess 会自动生成 UUID token，native/Trojan 会生成随机十六进制 token；
-            REALITY 会尝试使用浏览器 WebCrypto 生成 X25519 密钥对，client/server 隧道默认显式启用 mux。
+            适合新部署。协议和默认字段由 tcptun v{releaseManifest.version} 的 CLI 标准配置生成；UUID
+            协议会自动生成 token，REALITY 会尝试使用浏览器 WebCrypto 生成 X25519 密钥对。
           </p>
         </div>
         <div className="tool-grid">
           <div className="form-panel">
             <Field label="协议">
-              <select value={protocol} onChange={(event) => setProtocol(event.target.value)}>
-                <option value="native">native</option>
-                <option value="vless">vless</option>
-                <option value="vmess">vmess</option>
-                <option value="trojan">trojan</option>
+              <select value={protocol} onChange={(event) => handleProtocolChange(event.target.value)}>
+                {protocolNames.map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
             </Field>
             <Field label="承载层">
               <select value={transport} onChange={(event) => setTransport(event.target.value)}>
-                <option value="raw">raw</option>
-                <option value="ws">ws</option>
-                <option value="h2">h2</option>
-                <option value="h3">h3</option>
+                {releaseManifest.transports.map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
             </Field>
             <Field label="安全层">
               <select value={security} onChange={(event) => setSecurity(event.target.value)}>
-                <option value="none">none</option>
-                <option value="tls">tls</option>
-                <option value="reality">reality</option>
+                {releaseManifest.securities.map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
             </Field>
             <Field label="服务端地址">
@@ -443,18 +470,30 @@ async function generateConfigs(form: Record<string, string>): Promise<GeneratedF
   validateSOCKS5Credential("SOCKS5 用户", form.clientSocks5Username);
   validateSOCKS5Credential("SOCKS5 密码", form.clientSocks5Password);
 
+  const preset = releaseManifest.protocols[form.protocol];
+  if (!preset) throw new Error(`tcptun v${releaseManifest.version} 没有协议 ${form.protocol} 的配置模板。`);
+
   const token = tokenForProtocol(form.protocol);
   const tunnelPath = normalizePath(form.path);
-  const server: JsonRecord = {
+  const server = cloneRecord(preset.server);
+  const client = cloneRecord(preset.client);
+  const tlsCert = stringField(server, "tunnel_tls_cert") || "server.crt";
+  const tlsKey = stringField(server, "tunnel_tls_key") || "server.key";
+  const preserveUnknownSecurity = !["none", "tls", "reality"].includes(form.security)
+    && form.security === securityForPreset(server, client);
+  if (!preserveUnknownSecurity) {
+    removeSecurityFields(server);
+    removeSecurityFields(client);
+  }
+  Object.assign(server, {
     mode: "server",
     listen_addrs: listenAddrs(form.serverListen, defaultServerListen),
     token,
     tunnel_protocol: form.protocol,
     tunnel_transport: form.transport,
     tunnel_path: tunnelPath,
-    tunnel_mux: true,
-  };
-  const client: JsonRecord = {
+  });
+  Object.assign(client, {
     mode: "client",
     listen_addrs: listenAddrs(form.clientListen, defaultClientListen),
     server_addr: form.serverAddr.trim(),
@@ -462,15 +501,15 @@ async function generateConfigs(form: Record<string, string>): Promise<GeneratedF
     tunnel_protocol: form.protocol,
     tunnel_transport: form.transport,
     tunnel_path: tunnelPath,
-    tunnel_mux: true,
-    upstream_protocol: "socks5",
-  };
+  });
+  delete client.socks5_username;
+  delete client.socks5_password;
   if (form.clientSocks5Username.trim()) client.socks5_username = form.clientSocks5Username.trim();
   if (form.clientSocks5Password) client.socks5_password = form.clientSocks5Password;
 
   if (form.security === "tls" || form.transport === "h3") {
-    server.tunnel_tls_cert = "server.crt";
-    server.tunnel_tls_key = "server.key";
+    server.tunnel_tls_cert = tlsCert;
+    server.tunnel_tls_key = tlsKey;
     if (form.transport !== "h3") client.tunnel_tls = true;
     client.tunnel_tls_server_name = form.serverName.trim();
   }
@@ -495,16 +534,10 @@ async function generateConfigs(form: Record<string, string>): Promise<GeneratedF
     }
   }
 
-  const route: JsonRecord = {
-    force_upstream: {
-      domains: [],
-      domain_regexes: [],
-      domain_suffixes: [],
-      ips: [],
-      ip_cidrs: commaList(form.forceCidrs),
-      ip_ranges: [],
-    },
-  };
+  const route = cloneRecord(preset.route);
+  const forceUpstream = record(route.force_upstream);
+  forceUpstream.ip_cidrs = commaList(form.forceCidrs);
+  route.force_upstream = forceUpstream;
 
   const serverConfig = cleanObject(server);
   const clientConfig = cleanObject(client);
@@ -537,13 +570,25 @@ function buildClientURI(cfg: JsonRecord, name: string) {
     case "trojan":
       return buildTrojanURI(cfg, transport, host, port, token, name);
     default:
-      throw new Error(`不支持生成 URI 的协议: ${protocol}`);
+      return buildTcptunURI(cfg, protocol, transport, host, port, token, name);
   }
 }
 
 function buildNativeURI(cfg: JsonRecord, transport: string, host: string, port: string, token: string, name: string) {
+  return buildTcptunURI(cfg, "native", transport, host, port, token, name);
+}
+
+function buildTcptunURI(
+  cfg: JsonRecord,
+  protocol: string,
+  transport: string,
+  host: string,
+  port: string,
+  token: string,
+  name: string,
+) {
   const query = new URLSearchParams();
-  query.set("protocol", "native");
+  query.set("protocol", protocol);
   addTransportQuery(query, cfg, transport);
   addSecurityQuery(query, cfg);
   return buildStandardURI("tcptun", token, host, port, query, name);
@@ -960,8 +1005,68 @@ function cleanValue(value: unknown): unknown {
 }
 
 function tokenForProtocol(protocol: string) {
-  if (protocol === "vless" || protocol === "vmess") return uuidV4();
+  if (releaseManifest.protocols[protocol]?.tokenKind === "uuid") return uuidV4();
   return hexToken(32);
+}
+
+function presetDefaults(protocol: string) {
+  const preset = releaseManifest.protocols[protocol] || Object.values(releaseManifest.protocols)[0];
+  if (!preset) throw new Error("tcptun 发布清单中没有协议配置。");
+  const server = preset.server;
+  const client = preset.client;
+  const security = securityForPreset(server, client);
+  const forceUpstream = record(preset.route.force_upstream);
+
+  return {
+    transport: stringField(client, "tunnel_transport") || "raw",
+    security,
+    serverAddr: stringField(client, "server_addr") || "proxy.example.com:9443",
+    serverListen: arrayFirst(server.listen_addrs) || defaultServerListen,
+    clientListen: arrayFirst(client.listen_addrs) || defaultClientListen,
+    path: stringField(client, "tunnel_path") || "/proxy",
+    serverName: stringField(client, "reality_server_name") || stringField(client, "tunnel_tls_server_name") || "example.com",
+    realityDest: stringField(server, "reality_dest") || "example.com:443",
+    shortId: stringField(client, "reality_short_id"),
+    forceCidrs: Array.isArray(forceUpstream.ip_cidrs) ? forceUpstream.ip_cidrs.join(",") : "",
+  };
+}
+
+function securityForPreset(server: JsonRecord, client: JsonRecord) {
+  const tunnelSecurity = stringField(client, "tunnel_security") || stringField(server, "tunnel_security");
+  if (tunnelSecurity && tunnelSecurity !== "none") return tunnelSecurity;
+  if (booleanField(client, "tunnel_tls") || stringField(server, "tunnel_tls_cert")) return "tls";
+  return "none";
+}
+
+function arrayFirst(value: unknown) {
+  return Array.isArray(value) && value.length ? String(value[0]) : "";
+}
+
+function cloneRecord(value: JsonRecord) {
+  return JSON.parse(JSON.stringify(value)) as JsonRecord;
+}
+
+function removeSecurityFields(config: JsonRecord) {
+  for (const key of [
+    "tunnel_security",
+    "tunnel_flow",
+    "tunnel_tls",
+    "tunnel_tls_cert",
+    "tunnel_tls_key",
+    "tunnel_tls_server_name",
+    "tunnel_tls_insecure",
+    "reality_private_key",
+    "reality_public_key",
+    "reality_server_name",
+    "reality_server_names",
+    "reality_short_id",
+    "reality_short_ids",
+    "reality_fingerprint",
+    "reality_dest",
+    "reality_spider_x",
+  ]) {
+    delete config[key];
+  }
 }
 
 function uuidV4() {

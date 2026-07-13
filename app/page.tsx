@@ -1,10 +1,12 @@
 import Image from "next/image";
 import ConfigTools from "./config-tools";
 import ThemeToggle from "./theme-toggle";
+import releaseManifest from "./tcptun-release.json";
+import { displayVersion } from "./version";
 
-const cliVersion = "0.1.5";
-const displayVersion = `v${cliVersion}`;
 const installPackage = "tcptun";
+const protocolList = Object.keys(releaseManifest.protocols).join("、");
+const transportList = releaseManifest.transports.join("、");
 
 const features = [
   {
@@ -24,12 +26,12 @@ const features = [
     body: "所有隧道协议都支持 TCP 和 SOCKS5 UDP relay。native 使用内置 mux，VLESS/VMess 兼容 mux.cool，Trojan 可在 tcptun 两端启用私有 mux。",
   },
   {
-    title: "Xray 兼容协议",
-    body: "支持 native、VLESS、VMess AEAD 和 Trojan。VLESS/VMess 使用 UUID token，Trojan 使用 password，便于迁移常见 Xray 部署。",
+    title: `${displayVersion} 隧道协议`,
+    body: `当前 CLI 配置生成器提供 ${protocolList} 协议预设。网站会直接读取发布包的协议和标准配置，新版发布后自动同步。`,
   },
   {
     title: "多承载层与安全层",
-    body: "隧道可运行在 raw TCP、WebSocket、HTTP/2 或 HTTP/3 上；raw 可叠加 TLS 或 REALITY，VLESS 可启用 xtls-rprx-vision。",
+    body: `当前发布版支持 ${transportList} transport，构建时会同步 CLI 公布的 security 选项和每个协议的默认安全配置。`,
   },
   {
     title: "路由与学习",
@@ -44,7 +46,7 @@ const features = [
     body: "gomobile AAR 保持 Kotlin 反射路径兼容，并新增主动状态回调，能上报 starting、running、degraded、reconnecting、error 等状态。",
   },
   {
-    title: `${displayVersion} 热路径优化`,
+    title: "代理热路径优化",
     body: "优化 mixed SOCKS5、直连探测和 native REALITY 热路径，减少 native REALITY 指纹处理开销，降低高频代理场景下的额外成本。",
   },
 ];
@@ -116,8 +118,8 @@ export default function Home() {
           <h1>tcptun-go</h1>
           <p className="lede">
             面向现代代理部署的轻量 TCP 隧道与 mixed 代理。一个 Go 二进制即可提供本地 SOCKS5/HTTP
-            入口、TCP/UDP client-server 隧道、默认多路复用、VLESS/VMess/Trojan 兼容模式，以及 REALITY/Vision
-            配置能力。{displayVersion} 重点优化 mixed SOCKS5、直连探测和 native REALITY 热路径。
+            入口、TCP/UDP client-server 隧道、默认多路复用、{protocolList} 协议配置，以及 REALITY/Vision
+            配置能力。网站展示的版本会随 npm 上的 tcptun 最新版自动同步。
           </p>
           <div className="hero-actions">
             <a className="button primary" href="#generator">

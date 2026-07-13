@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# tcptun.com
 
-## Getting Started
+tcptun-go 的 Next.js 静态站点，通过 GitHub Pages 发布到 [tcptun.com](https://tcptun.com/)。
 
-First, run the development server:
+## 本地开发
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+本地构建使用已提交的 `app/tcptun-release.json` 发布清单：
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+需要在本地更新发布清单时，先解压目标 npm 包，再执行
+`node scripts/sync-tcptun-release.mjs <package-root> <tcptun-binary> <version>`。GitHub Actions 会自动完成这一步。
 
-## Learn More
+## 自动同步 tcptun 版本
 
-To learn more about Next.js, take a look at the following resources:
+`.github/workflows/pages.yml` 每小时查询 npm registry 的 `tcptun@latest`，并与线上的
+`https://tcptun.com/tcptun-version.json` 比较：
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- 版本变更时，下载该 npm 发布包，调用其 Linux CLI 生成所有协议的标准配置。
+- `scripts/sync-tcptun-release.mjs` 从 CLI help、协议文档和实际生成的 JSON 生成 `app/tcptun-release.json`。
+- 页面的版本、协议、transport、security 选项和配置模板都使用这份发布清单重新构建。
+- 版本未变更时，跳过安装、构建和部署。
+- `main` 分支提交和手动触发始终会使用 npm 最新版重新部署。
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+部署产物会生成 `tcptun-version.json`，其中记录版本、协议、transport 和 security，并作为下次定时检查的版本标记。
