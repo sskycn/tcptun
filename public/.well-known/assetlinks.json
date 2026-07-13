@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.tcptun.client",
+      "sha256_cert_fingerprints": [
+        "60:EB:86:57:BD:93:32:8F:3D:CD:9B:27:77:B8:D3:19:AC:7D:6D:14:85:56:68:B3:1E:6B:D6:ED:32:23:67:13"
+      ]
+    }
+  }
+]
