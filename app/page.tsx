@@ -3,6 +3,7 @@ import ThemeToggle from "./theme-toggle";
 import {
   binaryDownloads,
   inboundTypes,
+  installCommand,
   npmLinks,
   outboundTypes,
   releaseVersion,
@@ -32,7 +33,7 @@ const capabilities = [
   {
     label: "Network",
     title: "TCP、UDP 与 mux",
-    body: "隧道端点保留 TCP/UDP、raw/ws/h2/h3、TLS 与 REALITY；Native 同版本两端可启用高吞吐 mux。",
+    body: "隧道端点保留 TCP/UDP 与 mux；有界 PacketForwarder 支持 Direct 和 SOCKS5 UDP ASSOCIATE 出口。",
   },
   {
     label: "Discovery",
@@ -40,9 +41,9 @@ const capabilities = [
     body: "无配置模式会扫描私有 IPv4 网络中的 SOCKS5，并发现其他 tcptun 节点发布的 mDNS 服务。",
   },
   {
-    label: "Android",
-    title: "按应用身份路由",
-    body: "Android bridge 可提供 package name、平台与 attributes，Router 用它们选择 outbound，不写入隧道协议帧。",
+    label: "Library",
+    title: "可嵌入 Go 网络库",
+    body: "pkg.tcptun.com/net 提供 flow、endpoint、route、outbound、discovery、transport 与 engine 等公共包。",
   },
 ];
 
@@ -62,14 +63,14 @@ const workflows = [
   {
     name: "generate",
     title: "生成匹配的隧道对",
-    body: "一次创建 server.json 与 client.json，包括协议凭据和匹配的 REALITY 密钥。",
+    body: "一次创建 server.json、client.json 与 client.uri，包括协议凭据和匹配的 REALITY 密钥。",
     command: "tcptun config vless --server proxy.example.com --port 9443",
   },
   {
-    name: "migrate",
-    title: "迁移旧版配置",
-    body: "旧的 mode 顶层结构会被明确拒绝；通过 migrate 转换为统一拓扑。",
-    command: "tcptun config migrate --input old.json --output config.json",
+    name: "uri",
+    title: "从 URI 创建客户端",
+    body: "导入 native、VLESS、VMess 或 Trojan URI，直接生成可运行的 mixed 客户端配置。",
+    command: "tcptun uri import --input client.uri --client --output client.json",
   },
 ];
 
@@ -120,7 +121,10 @@ export default function Home() {
             <span>tcptun</span>
             <span>{displayVersion}</span>
           </div>
-          <pre><code>{`$ npm install -g tcptun
+          <pre><code>{`$ ${installCommand}
+
+# 或通过 npm 包装命令安装
+$ npm install -g tcptun
 
 # 加载统一拓扑配置
 $ tcptun --config config.json
@@ -139,7 +143,7 @@ $ tcptun config vless \\
         <div className="section-heading">
           <p className="eyebrow">运行时能力</p>
           <h2>配置描述拓扑，Runtime 负责验证和执行。</h2>
-          <p>当前网站内容依据 tcptun-go `v0.1.8` 源码、README、FileConfig 和仓库示例手写整理。</p>
+          <p>当前网站内容依据 tcptun-go `{displayVersion}` 源码、README、FileConfig 和仓库示例手写整理。</p>
         </div>
         <div className="capability-grid">
           {capabilities.map((item) => (
@@ -245,17 +249,18 @@ $ tcptun config vless \\
         </div>
         <div className="download-note">
           <div>
-            <strong>也可以让 npm 自动选择平台</strong>
-            <span>`npm install -g tcptun` 会安装包装命令并调用当前系统对应的二进制。</span>
+            <strong>一条命令自动选择平台并安装</strong>
+            <code>{installCommand}</code>
+            <span>默认安装 npm 最新版到 `/usr/local/bin`；可用 `TCPTUN_VERSION` 与 `TCPTUN_INSTALL_DIR` 覆盖。</span>
           </div>
-          <a href={npmLinks.package}>打开 npm 包 ↗</a>
+          <a href="/install.sh">查看脚本 ↗</a>
         </div>
       </section>
 
       <section className="section quickstart-section" id="start">
         <div className="section-heading">
           <p className="eyebrow">CLI 工作流</p>
-          <h2>运行、检查、生成、迁移。</h2>
+          <h2>运行、检查、生成、导入。</h2>
           <p>根命令只保留 `--config/-c`、`--verbose/-v` 和无配置自动发现使用的 `--retry`；其余能力全部写入 JSON。</p>
         </div>
         <div className="mode-grid">

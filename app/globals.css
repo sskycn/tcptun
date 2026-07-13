@@ -555,6 +555,12 @@ html[data-theme="dark"] .platform-mark.windows {
   font-size: 13px;
 }
 
+.download-note code {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font: 12px/1.6 var(--font-mono);
+}
+
 .download-note a {
   color: var(--primary);
   font-size: 13px;

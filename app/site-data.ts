@@ -1,18 +1,20 @@
-export const releaseVersion = "0.1.8";
+export const releaseVersion = "0.1.9";
 
 export const npmLinks = {
   package: "https://www.npmjs.com/package/tcptun",
   tarball: `https://registry.npmjs.org/tcptun/-/tcptun-${releaseVersion}.tgz`,
 };
 
+export const installCommand = "curl -fsSL https://tcptun.com/install.sh | sh";
+
 export const binaryDownloads = [
-  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 14_536_864),
-  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 13_436_578),
-  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 14_184_610),
-  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 13_041_826),
-  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 13_435_042),
-  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 14_562_816),
-  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 13_203_968),
+  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 14_562_096),
+  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 13_569_602),
+  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 14_213_304),
+  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 13_172_920),
+  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 13_566_136),
+  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 14_581_760),
+  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 13_304_320),
 ] as const;
 
 export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;
