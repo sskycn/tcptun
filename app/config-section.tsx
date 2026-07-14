@@ -96,12 +96,9 @@ export default function ConfigSection() {
     <section className="section config-section" id="config">
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">配置说明</p>
-          <h2>严格 JSON 拓扑：native、REALITY 与协议对照。</h2>
-          <p>
-            下面从 FileConfig 总览出发，重点讲 <strong>native</strong> 最小可运行配置，再覆盖{" "}
-            <strong>REALITY</strong> 安全层，以及 native / vless / vmess / trojan 的选型对照。
-          </p>
+          <p className="eyebrow">配置</p>
+          <h2>JSON 拓扑、native 与 REALITY。</h2>
+          <p>用一份配置描述入口、出口与安全层。先看 native，再看 REALITY 与协议选型。</p>
         </div>
         <div className="chip-row">
           <a className="chip-link" href="#config-native">
@@ -111,7 +108,7 @@ export default function ConfigSection() {
             REALITY
           </a>
           <a className="chip-link" href="#protocol-compare">
-            协议对照
+            对照
           </a>
         </div>
       </div>
@@ -129,12 +126,11 @@ export default function ConfigSection() {
       <div className="native-focus" id="config-native">
         <div className="native-focus-heading">
           <div>
-            <p className="eyebrow">Native 协议</p>
-            <h3>tcptun ↔ tcptun 的低开销认证隧道</h3>
+            <p className="eyebrow">Native</p>
+            <h3>低开销私有隧道</h3>
             <p>
-              支持 TCP / UDP relay、内置 mux，以及 raw / WebSocket / HTTP2 / HTTP3 transport。
-              TLS 与 REALITY 在端点上配置；inbound 用 <code>users[].id</code>，outbound 用{" "}
-              <code>token</code>，两端必须一致。
+              支持 TCP / UDP 与 mux，传输可选 raw / ws / h2 / h3。服务端{" "}
+              <code>users[].id</code> 与客户端 <code>token</code> 必须一致。
             </p>
           </div>
           <div className="native-auth-map" aria-label="Native 认证对应关系">
@@ -172,12 +168,10 @@ export default function ConfigSection() {
 
       <div className="native-pair-note">
         <div>
-          <strong>配对关系</strong>
+          <strong>最小拓扑</strong>
           <p>
-            服务端 <code>type: native</code> inbound 暴露隧道；客户端本地{" "}
-            <code>mixed</code>/<code>socks5</code> 入口把流量交给{" "}
-            <code>type: native</code> outbound。把示例里的 <code>change-me</code>、
-            <code>proxy.example.com</code> 换成真实值后即可对测。
+            服务端暴露 <code>native</code> 入口；客户端用本地 <code>mixed</code> 入口转发到{" "}
+            <code>native</code> 出口。替换示例中的凭据与地址即可运行。
           </p>
         </div>
         <div className="native-pair-flow" aria-hidden="true">
@@ -193,8 +187,8 @@ export default function ConfigSection() {
 
       <div className="field-groups">
         <div className="section-subheading">
-          <h3>Native 字段速查</h3>
-          <p>只列出 native 部署最常用、也最容易配错的字段。</p>
+          <h3>字段</h3>
+          <p>常用字段一览。</p>
         </div>
         <div className="field-group-grid">
           {nativeFieldGroups.map((group) => (
@@ -218,10 +212,9 @@ export default function ConfigSection() {
 
       <div className="mux-panel">
         <div className="section-subheading">
-          <h3>Mux 与 QUIC</h3>
+          <h3>Mux / QUIC</h3>
           <p>
-            同版本两端推荐开启 mux 以合并短连接；追求峰值吞吐时优先{" "}
-            <code>native + raw + mux</code>。
+            短连接场景建议开启 mux。峰值吞吐优先 <code>native + raw + mux</code>。
           </p>
         </div>
         <div className="mux-grid">
@@ -234,7 +227,7 @@ export default function ConfigSection() {
         </div>
         <div className="mux-snippet">
           <div className="mux-snippet-heading">
-            <span>outbound mux 常用片段</span>
+            <span>mux 片段</span>
             <CopyButton
               value={`"mux": {
   "enabled": true,
@@ -259,8 +252,8 @@ export default function ConfigSection() {
 
       <div className="config-workflow">
         <div className="section-subheading">
-          <h3>Native 推荐工作流</h3>
-          <p>生成 → 校验 → 启动；需要分享客户端时再用 URI 导入。</p>
+          <h3>工作流</h3>
+          <p>生成 → 校验 → 启动。</p>
         </div>
         <div className="config-workflow-grid">
           {nativeWorkflowCommands.map((item, index) => (
@@ -287,15 +280,13 @@ export default function ConfigSection() {
         <div className="section-subheading row-heading section-subheading-wide">
           <div>
             <p className="eyebrow">REALITY</p>
-            <h3>隧道端点上的伪装安全层</h3>
+            <h3>端点伪装安全层</h3>
             <p>
-              REALITY 挂在 <code>security</code> 上，不是独立 outbound 类型。生成器对四种隧道协议默认输出{" "}
-              <code>raw + REALITY</code> 配对配置；VLESS 额外带 Vision。
+              写在 <code>security</code> 中。四种隧道协议均可使用；VLESS 生成配置默认附带 Vision。
             </p>
           </div>
           <div className="chip-row">
-            <span>raw only</span>
-            <span>no transport.tls</span>
+            <span>raw</span>
             <span>X25519</span>
           </div>
         </div>
@@ -353,11 +344,10 @@ export default function ConfigSection() {
         </div>
 
         <div className="reality-warn">
-          <strong>与 QUIC / TLS 的边界</strong>
+          <strong>注意</strong>
           <p>
-            <code>mux.mode: &quot;quic&quot;</code> 要求 <code>transport.tls</code>，而 REALITY 禁止{" "}
-            <code>transport.tls</code>，二者互斥。选伪装用 REALITY；选 native QUIC 承载用证书 TLS。
-            生成器在 REALITY 场景下默认 <code>mux.enabled: false</code>，需要时再按两端版本手动打开。
+            REALITY 与 <code>transport.tls</code> / QUIC mux 互斥。需要伪装用 REALITY；需要 QUIC
+            用证书 TLS。
           </p>
         </div>
       </div>
@@ -366,12 +356,9 @@ export default function ConfigSection() {
       <div className="protocol-compare-panel" id="protocol-compare">
         <div className="section-subheading row-heading section-subheading-wide">
           <div>
-            <p className="eyebrow">协议对照</p>
-            <h3>native / vless / vmess / trojan</h3>
-            <p>
-              互操作指 <strong>wire protocol</strong> 兼容，不是配置文件兼容。tcptun JSON 不能直接当作
-              Xray 配置使用。
-            </p>
+            <p className="eyebrow">对照</p>
+            <h3>四种隧道协议</h3>
+            <p>与 Xray 兼容的是线路协议，不是配置文件。</p>
           </div>
         </div>
 
@@ -382,10 +369,10 @@ export default function ConfigSection() {
                 <th>协议</th>
                 <th>凭据</th>
                 <th>互操作</th>
-                <th>生成器默认安全</th>
-                <th>Vision / 备注</th>
+                <th>默认安全</th>
+                <th>Vision</th>
                 <th>Mux</th>
-                <th>更适合</th>
+                <th>场景</th>
               </tr>
             </thead>
             <tbody>
@@ -422,13 +409,12 @@ export default function ConfigSection() {
                 </button>
               ))}
             </div>
-            <CopyButton value={activeSnippet} label="复制片段" className="copy-button-solid" />
+            <CopyButton value={activeSnippet} label="复制" className="copy-button-solid" />
           </div>
           <pre className="config-example-code">
             <code>{activeSnippet}</code>
           </pre>
           <p className="snippet-footnote">
-            生成完整配对配置：
             <code>
               {protocolComparison.find((item) => item.name === snippetKey)?.generator ??
                 "tcptun config <protocol> --server … --port …"}

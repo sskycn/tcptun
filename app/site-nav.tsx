@@ -7,7 +7,7 @@ const links = [
   { href: "#config", id: "config", label: "配置" },
   { href: "#protocols", id: "protocols", label: "协议" },
   { href: "#download", id: "download", label: "下载" },
-  { href: "#start", id: "start", label: "使用" },
+  { href: "#start", id: "start", label: "命令" },
   { href: "#faq", id: "faq", label: "FAQ" },
 ] as const;
 

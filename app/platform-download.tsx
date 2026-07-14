@@ -94,14 +94,12 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
     <>
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">npm 二进制</p>
-          <h2>无需安装 Go，下载后直接运行。</h2>
-          <p>
-            下面是 npm `tcptun@{releaseVersion}` 发布包内的原始二进制，通过 npm CDN 直接下载。
-          </p>
+          <p className="eyebrow">下载</p>
+          <h2>多平台二进制，开箱即用。</h2>
+          <p>来自 npm 包 tcptun@{releaseVersion}，经 CDN 直链分发。</p>
         </div>
         <a className="button secondary" href={npmLinks.tarball}>
-          下载完整 npm .tgz
+          下载 .tgz
         </a>
       </div>
 

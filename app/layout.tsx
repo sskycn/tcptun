@@ -33,8 +33,8 @@ const themeInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: `tcptun-go v${releaseVersion} - 多入口、多出口代理运行时`,
-  description: `tcptun-go v${releaseVersion} 是配置驱动的多 inbound、多 outbound 代理运行时，支持 TCP/UDP、Native、VLESS、VMess、Trojan、REALITY、mux、路由与 mDNS discovery。`,
+  title: `tcptun v${releaseVersion} · 配置驱动的代理运行时`,
+  description: `tcptun 是多入口、多出口代理运行时。支持 native、VLESS、VMess、Trojan、REALITY、mux、路由与局域网发现。`,
   icons: {
     icon: "/tcptun-logo.png",
     apple: "/tcptun-logo.png",

@@ -48,7 +48,7 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
     <div className="download-note">
       <div className="download-note-copy">
         <div className="install-mode-row">
-          <strong>一条命令自动选择平台并安装</strong>
+          <strong>一键安装</strong>
           <div className="install-mode-toggle" role="group" aria-label="安装版本">
             <button
               type="button"
@@ -74,8 +74,8 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
         </div>
         <span>
           {mode === "latest"
-            ? "默认安装 npm 最新版到 `/usr/local/bin`；可用 `TCPTUN_INSTALL_DIR` 覆盖安装目录。"
-            : `固定安装 tcptun@${releaseVersion}；可用 \`TCPTUN_INSTALL_DIR\` 覆盖安装目录。`}
+            ? "安装最新版到 /usr/local/bin，可用 TCPTUN_INSTALL_DIR 改目录。"
+            : `安装 v${releaseVersion}，可用 TCPTUN_INSTALL_DIR 改目录。`}
         </span>
       </div>
       <a className="download-note-link" href="/install.sh">

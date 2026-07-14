@@ -24,58 +24,58 @@ const capabilities = [
   {
     label: "Runtime",
     title: "多入口、多出口",
-    body: "一个进程编译完整代理拓扑。每个 inbound 可以直接指定 outbound，也可以交给 route 选择出口。",
+    body: "一份配置描述完整拓扑。入口可直连出口，也可交给 route 选择。",
   },
   {
     label: "Config",
-    title: "严格 JSON 模型",
-    body: "配置拒绝未知字段，并在监听端口前校验 tag、引用、TCP/UDP capability、协议认证、TLS、REALITY 与 mux。",
+    title: "严格 JSON",
+    body: "拒绝未知字段；启动前校验 tag、引用、协议认证、TLS、REALITY 与 mux。",
   },
   {
     label: "Route",
-    title: "出口图与规则路由",
-    body: "支持 direct、direct-first、blackhole、SOCKS5、mixed 与 tunnel outbound，以及域名、IP、应用身份规则。",
+    title: "规则路由",
+    body: "支持 direct、隧道出口与 blackhole，可按域名、IP 与应用身份分流。",
   },
   {
     label: "Network",
-    title: "TCP、UDP 与 mux",
-    body: "隧道端点保留 TCP/UDP 与 mux；有界 PacketForwarder 支持 Direct 和 SOCKS5 UDP ASSOCIATE 出口。",
+    title: "TCP / UDP / mux",
+    body: "隧道同时支持 TCP 与 UDP；mux 复用物理连接，降低短连接开销。",
   },
   {
     label: "Discovery",
-    title: "LAN 扫描与 mDNS",
-    body: "无配置模式会扫描私有 IPv4 网络中的 SOCKS5，并发现其他 tcptun 节点发布的 mDNS 服务。",
+    title: "局域网发现",
+    body: "无配置时可扫描局域网 SOCKS5，并通过 mDNS 发现其他 tcptun 节点。",
   },
   {
     label: "Library",
-    title: "可嵌入 Go 网络库",
-    body: "pkg.tcptun.com/net 提供 flow、endpoint、route、outbound、discovery、transport 与 engine 等公共包。",
+    title: "可嵌入库",
+    body: "以 Go 库形式集成 flow、route、transport 与 engine，而不仅是 CLI。",
   },
 ];
 
 const workflows = [
   {
     name: "run",
-    title: "加载正式配置",
-    body: "读取严格 JSON，完成 Load、Validate、Compile 后才准备并启动全部入口。",
+    title: "运行配置",
+    body: "加载并校验 JSON，通过后启动全部入口。",
     command: "tcptun --config config.json",
   },
   {
     name: "check",
-    title: "启动前完整校验",
-    body: "加载、校验并编译配置，但不绑定任何监听端口，适合部署前检查。",
+    title: "仅校验",
+    body: "完成校验与编译，不监听端口。",
     command: "tcptun config check --config config.json",
   },
   {
     name: "generate",
-    title: "生成匹配的隧道对",
-    body: "一次创建 server.json、client.json 与 client.uri，包括协议凭据和匹配的 REALITY 密钥。",
+    title: "生成配置对",
+    body: "一次生成 server / client 配置与 URI，含协议凭据与 REALITY 密钥。",
     command: "tcptun config vless --server proxy.example.com --port 9443",
   },
   {
     name: "uri",
-    title: "从 URI 创建客户端",
-    body: "导入 native、VLESS、VMess 或 Trojan URI，直接生成可运行的 mixed 客户端配置。",
+    title: "导入 URI",
+    body: "从 native / VLESS / VMess / Trojan URI 生成客户端配置。",
     command: "tcptun uri import --input client.uri --client --output client.json",
   },
 ];
@@ -85,16 +85,12 @@ const transports = ["raw", "ws", "h2", "h3"] as const;
 
 const terminalSnippet = `$ ${installCommand}
 
-# 或通过 npm 包装命令安装
 $ npm install -g tcptun
 
-# 加载统一拓扑配置
 $ tcptun --config config.json
 
-# 不监听端口，先完成全部校验
 $ tcptun config check --config config.json
 
-# 生成 Xray-compatible VLESS + REALITY 配置对
 $ tcptun config vless \\
     --server proxy.example.com \\
     --port 9443`;
@@ -110,9 +106,9 @@ export default function Home() {
       </div>
 
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="tcptun-go 首页">
+        <a className="brand" href="#top" aria-label="tcptun 首页">
           <Image src="/tcptun-logo.png" alt="" width={36} height={36} priority />
-          <span>tcptun-go</span>
+          <span>tcptun</span>
         </a>
         <div className="topbar-actions">
           <SiteNav />
@@ -127,16 +123,15 @@ export default function Home() {
               <span className="pulse-dot" aria-hidden="true" />
               {displayVersion}
             </span>
-            <span className="release-tagline">configuration-driven proxy runtime</span>
+            <span className="release-tagline">proxy runtime</span>
           </div>
           <h1>
-            用一份拓扑，
+            一份配置，
             <br />
-            <span className="title-accent">组织所有代理流量。</span>
+            <span className="title-accent">编排全部代理流量。</span>
           </h1>
           <p className="lede">
-            tcptun-go 是使用 Go 编写的多 inbound、多 outbound 代理运行时。它以严格 JSON 编译入口、出口图、
-            路由、DNS 与发现配置，再统一启动 TCP/UDP 服务。
+            tcptun 是配置驱动的多入口、多出口代理运行时。用 JSON 描述入口、出口、路由与发现，统一启动 TCP/UDP 服务。
           </p>
           <div className="hero-actions">
             <a className="button primary" href="#download">
@@ -146,7 +141,7 @@ export default function Home() {
             <a className="button secondary" href={npmLinks.package} target="_blank" rel="noreferrer">
               npm 安装
             </a>
-            <a className="button ghost" href="#architecture">查看配置模型</a>
+            <a className="button ghost" href="#config">配置说明</a>
           </div>
 
           <InstallCommand variant="hero" />
@@ -181,9 +176,9 @@ export default function Home() {
 
       <section className="section" id="features">
         <div className="section-heading">
-          <p className="eyebrow">运行时能力</p>
-          <h2>配置描述拓扑，Runtime 负责验证和执行。</h2>
-          <p>当前网站内容依据 tcptun-go `{displayVersion}` 源码、README、FileConfig 和仓库示例手写整理。</p>
+          <p className="eyebrow">能力</p>
+          <h2>配置定义拓扑，运行时负责校验与执行。</h2>
+          <p>从入口到出口，同一套模型覆盖本地代理、隧道、路由与发现。</p>
         </div>
         <div className="capability-grid">
           {capabilities.map((item, index) => (
@@ -202,9 +197,9 @@ export default function Home() {
       <section className="section architecture-section" id="architecture">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">统一拓扑</p>
-            <h2>入口、路由与出口不再由 mode 隐式决定。</h2>
-            <p>旧版 `mode`、`server_addr` 和 `tunnel_*` 顶层配置已经移除。每个组件都有 tag，引用关系在启动前编译。</p>
+            <p className="eyebrow">架构</p>
+            <h2>入口、路由、出口显式编排。</h2>
+            <p>每个组件有唯一 tag，引用关系在启动前完成编译与校验。</p>
           </div>
           <ol className="pipeline" aria-label="启动流水线">
             {pipeline.map((step, index) => (
@@ -261,9 +256,9 @@ export default function Home() {
       <section className="section protocol-section" id="protocols">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">隧道协议</p>
-            <h2>四种 wire protocol，共用同一套拓扑模型。</h2>
-            <p>外部协议兼容指 wire protocol 互操作；tcptun JSON 不能直接作为 Xray 的配置文件。</p>
+            <p className="eyebrow">协议</p>
+            <h2>四种隧道协议，同一套拓扑。</h2>
+            <p>与 Xray 兼容的是线路协议，不是配置文件格式。</p>
           </div>
           <div className="chip-row">
             {transports.map((item) => (
@@ -288,11 +283,11 @@ export default function Home() {
               <p className="protocol-description">{protocol.description}</p>
               <dl>
                 <div>
-                  <dt>Interop</dt>
+                  <dt>互操作</dt>
                   <dd>{protocol.interoperability}</dd>
                 </div>
                 <div>
-                  <dt>Generator</dt>
+                  <dt>默认安全</dt>
                   <dd>{protocol.generatedSecurity}</dd>
                 </div>
                 <div className="wide">
@@ -308,9 +303,7 @@ export default function Home() {
                 className="protocol-doc-link"
                 href={protocol.name === "native" ? "#config-native" : "#protocol-compare"}
               >
-                {protocol.name === "native"
-                  ? "查看 native 配置说明 →"
-                  : "查看协议对照与 REALITY →"}
+                {protocol.name === "native" ? "配置说明 →" : "协议对照 →"}
               </a>
             </article>
           ))}
@@ -323,9 +316,9 @@ export default function Home() {
 
       <section className="section quickstart-section" id="start">
         <div className="section-heading">
-          <p className="eyebrow">CLI 工作流</p>
-          <h2>运行、检查、生成、导入。</h2>
-          <p>根命令只保留 `--config/-c`、`--verbose/-v` 和无配置自动发现使用的 `--retry`；其余能力全部写入 JSON。</p>
+          <p className="eyebrow">命令行</p>
+          <h2>运行、校验、生成、导入。</h2>
+          <p>常用能力都在 JSON 里；CLI 负责加载、校验与生成配置。</p>
         </div>
         <div className="mode-grid">
           {workflows.map((item, index) => (
@@ -347,8 +340,8 @@ export default function Home() {
           <div className="next-step-glow" aria-hidden="true" />
           <Image src="/tcptun-logo.png" alt="" width={64} height={64} />
           <div>
-            <p className="eyebrow">tcptun-go {displayVersion}</p>
-            <h2>从一份严格 JSON 开始。</h2>
+            <p className="eyebrow">tcptun {displayVersion}</p>
+            <h2>下载后即可运行。</h2>
           </div>
           <PlatformDownloadButton />
         </div>
@@ -362,8 +355,8 @@ export default function Home() {
             <div className="footer-brand">
               <Image src="/tcptun-logo.png" alt="" width={36} height={36} />
               <div>
-                <strong>tcptun-go {displayVersion}</strong>
-                <p>配置驱动的多入口、多出口代理运行时</p>
+                <strong>tcptun {displayVersion}</strong>
+                <p>配置驱动的代理运行时</p>
               </div>
             </div>
           </div>
@@ -371,19 +364,17 @@ export default function Home() {
           <div className="footer-columns">
             <div className="footer-column">
               <h3>产品</h3>
-              <a href="#architecture">架构模型</a>
-              <a href="#config">配置说明</a>
-              <a href="#reality">REALITY</a>
-              <a href="#protocol-compare">协议对照</a>
-              <a href="#protocols">隧道协议</a>
-              <a href="#start">CLI 工作流</a>
-              <a href="#faq">常见问题</a>
+              <a href="#architecture">架构</a>
+              <a href="#config">配置</a>
+              <a href="#protocols">协议</a>
+              <a href="#start">命令行</a>
+              <a href="#faq">FAQ</a>
             </div>
             <div className="footer-column">
-              <h3>获取</h3>
-              <a href="#download">平台二进制</a>
-              <a href={npmLinks.package} target="_blank" rel="noreferrer">npm package</a>
-              <a href={npmLinks.tarball}>release tarball</a>
+              <h3>下载</h3>
+              <a href="#download">二进制</a>
+              <a href={npmLinks.package} target="_blank" rel="noreferrer">npm</a>
+              <a href={npmLinks.tarball}>tarball</a>
               <a href="/install.sh">install.sh</a>
             </div>
             <div className="footer-column">
@@ -396,8 +387,8 @@ export default function Home() {
         </div>
 
         <div className="footer-bottom">
-          <span>内容依据 tcptun-go {displayVersion} 手写整理 · npm 仅作分发入口</span>
-          <a href="#top">返回顶部 ↑</a>
+          <span>tcptun {displayVersion}</span>
+          <a href="#top">返回顶部</a>
         </div>
       </footer>
     </main>

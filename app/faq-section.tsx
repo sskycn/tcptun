@@ -3,17 +3,9 @@ import { faqItems } from "./site-data";
 export default function FaqSection() {
   return (
     <section className="section faq-section" id="faq">
-      <div className="section-heading row-heading">
-        <div>
-          <p className="eyebrow">常见问题</p>
-          <h2>部署与配置时最常问的几件事。</h2>
-          <p>内容与当前站点版本说明一致，便于快速核对能力边界与安装方式。</p>
-        </div>
-        <div className="chip-row">
-          <span>config</span>
-          <span>install</span>
-          <span>interop</span>
-        </div>
+      <div className="section-heading">
+        <p className="eyebrow">FAQ</p>
+        <h2>常见问题</h2>
       </div>
 
       <div className="faq-list">
