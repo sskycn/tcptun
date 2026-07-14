@@ -304,11 +304,14 @@ export default function Home() {
                 <pre className="protocol-command"><code>{protocol.command}</code></pre>
                 <CopyButton value={protocol.command} label="复制" className="copy-button-on-dark" />
               </div>
-              {protocol.name === "native" ? (
-                <a className="protocol-doc-link" href="#config">
-                  查看 native 配置说明 →
-                </a>
-              ) : null}
+              <a
+                className="protocol-doc-link"
+                href={protocol.name === "native" ? "#config-native" : "#protocol-compare"}
+              >
+                {protocol.name === "native"
+                  ? "查看 native 配置说明 →"
+                  : "查看协议对照与 REALITY →"}
+              </a>
             </article>
           ))}
         </div>
@@ -370,6 +373,8 @@ export default function Home() {
               <h3>产品</h3>
               <a href="#architecture">架构模型</a>
               <a href="#config">配置说明</a>
+              <a href="#reality">REALITY</a>
+              <a href="#protocol-compare">协议对照</a>
               <a href="#protocols">隧道协议</a>
               <a href="#start">CLI 工作流</a>
               <a href="#faq">常见问题</a>

@@ -50,6 +50,16 @@ export const faqItems = [
     answer:
       "同版本两端、短连接较多时推荐 mux.enabled。mux.mode=quic 需要 raw transport + TLS，服务端提供 cert/key，客户端配置 server_name；UDP 用 udp_mode 的 reliable/auto/datagram。",
   },
+  {
+    question: "REALITY 能和 TLS 或 QUIC mux 一起用吗？",
+    answer:
+      "不能。REALITY 要求 raw transport，且不能与 transport.tls 组合；mux.mode=quic 依赖 TLS，因此也不能与 REALITY 同开。需要伪装时用 REALITY，需要 QUIC 承载时用证书 TLS。",
+  },
+  {
+    question: "四种隧道协议怎么选？",
+    answer:
+      "两端都是 tcptun、偏吞吐：native。要与 Xray 互通：vless（常配 Vision+REALITY）、vmess 或 trojan。生成器对四种协议都会默认 raw+REALITY 配对密钥；VLESS 额外启用 xtls-rprx-vision。",
+  },
 ] as const;
 
 export const binaryDownloads = [
@@ -384,6 +394,303 @@ export const configModelNotes = [
     body: "Load → Validate → Compile → Start。校验涵盖协议认证、TCP/UDP capability、TLS/REALITY、mux 约束。",
   },
 ] as const;
+
+/** VLESS + REALITY server example (keys are placeholders; use config generator in production). */
+export const vlessRealityServerExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "server",
+      "type": "vless",
+      "listen": "0.0.0.0",
+      "port": 443,
+      "network": ["tcp", "udp"],
+      "users": [
+        {
+          "id": "00000000-0000-4000-8000-000000000000",
+          "flow": "xtls-rprx-vision"
+        }
+      ],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality",
+        "private_key": "REPLACE_WITH_SERVER_PRIVATE_KEY",
+        "server_names": ["example.com"],
+        "short_ids": ["00"],
+        "dest": "example.com:443",
+        "max_time_diff": "30s"
+      },
+      "outbound": "direct"
+    }
+  ],
+  "outbounds": [
+    { "tag": "direct", "type": "direct" }
+  ],
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": {},
+  "discovery": {}
+}`;
+
+export const vlessRealityClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "listen": "127.0.0.1",
+      "port": 1080,
+      "network": ["tcp", "udp"],
+      "outbound": "proxy"
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "vless",
+      "server": "proxy.example.com",
+      "port": 443,
+      "uuid": "00000000-0000-4000-8000-000000000000",
+      "flow": "xtls-rprx-vision",
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "00",
+        "spider_x": "/"
+      }
+    }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {},
+  "discovery": {}
+}`;
+
+/** Native + REALITY pair shape produced by config generator (mux off by default). */
+export const nativeRealityServerExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "server",
+      "type": "native",
+      "listen": "0.0.0.0",
+      "port": 9443,
+      "network": ["tcp", "udp"],
+      "users": [{ "id": "change-me" }],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality",
+        "private_key": "REPLACE_WITH_SERVER_PRIVATE_KEY",
+        "server_names": ["example.com"],
+        "short_ids": ["abcd1234"],
+        "dest": "example.com:443",
+        "max_time_diff": "30s"
+      },
+      "outbound": "direct"
+    }
+  ],
+  "outbounds": [
+    { "tag": "direct", "type": "direct", "network": ["tcp", "udp"] }
+  ],
+  "route": { "default_outbound": "direct", "rules": [] }
+}`;
+
+export const nativeRealityClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "listen": "127.0.0.1",
+      "port": 1080,
+      "network": ["tcp", "udp"],
+      "outbound": "proxy"
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "native",
+      "server": "proxy.example.com",
+      "port": 9443,
+      "token": "change-me",
+      "network": ["tcp", "udp"],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "abcd1234",
+        "spider_x": "/"
+      }
+    }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] }
+}`;
+
+export const realityRules = [
+  {
+    title: "仅 raw transport",
+    body: "security.type 为 reality 时，transport.type 必须是 raw（可省略，默认 raw）。不能与 ws / h2 / h3 组合。",
+  },
+  {
+    title: "不能叠 transport.tls",
+    body: "REALITY 与 transport.tls 互斥。需要 TLS 1.3 证书场景请用普通 TLS；QUIC mux 也要求 TLS，因此不能与 REALITY 同开。",
+  },
+  {
+    title: "适用协议",
+    body: "native / vless / vmess / trojan 隧道端点可用。mixed、socks5 本地入口不支持 REALITY。",
+  },
+  {
+    title: "密钥成对",
+    body: "服务端 private_key 与客户端 public_key 必须是同一对 X25519 密钥。short_id(s) 两端一致；生成器会自动配对。",
+  },
+] as const;
+
+export const realityFieldGroups = [
+  {
+    name: "服务端 security",
+    fields: [
+      { key: "type", detail: '固定 "reality"。' },
+      { key: "private_key", detail: "X25519 私钥，base64url（无 padding）。生成器自动写入。" },
+      { key: "server_names", detail: "允许的 SNI 列表，至少一项；需与伪装站点一致。" },
+      { key: "short_ids", detail: "允许的 short id 列表（hex）。客户端 short_id 必须命中其一。" },
+      { key: "dest", detail: "回落/伪装目标，host:port，例如 example.com:443。" },
+      { key: "max_time_diff", detail: "可选时钟偏差上限，生成器默认 30s。" },
+    ],
+  },
+  {
+    name: "客户端 security",
+    fields: [
+      { key: "type", detail: '固定 "reality"。' },
+      { key: "public_key", detail: "对应服务端私钥的公钥。" },
+      { key: "server_name", detail: "SNI / 握手用名称，通常落在服务端 server_names 中。" },
+      { key: "short_id", detail: "单个 short id，必须存在于服务端 short_ids。" },
+      { key: "fingerprint", detail: "uTLS 指纹，生成器默认 chrome。" },
+      { key: "spider_x", detail: "可选路径，生成器默认 /。" },
+    ],
+  },
+] as const;
+
+export const realityCommands = [
+  {
+    title: "生成匹配 REALITY 配置对",
+    command:
+      "tcptun config vless --server proxy.example.com --port 443 --server-name example.com --dest example.com:443",
+    body: "四种隧道协议都支持该子命令形态。默认输出 server.json、client.json、client.uri，含新密钥与凭据。",
+  },
+  {
+    title: "native + REALITY",
+    command:
+      "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
+    body: "私有协议同样可挂 REALITY。生成器默认关闭 mux，便于与安全层组合；需要吞吐时两端同版本再开 mux。",
+  },
+  {
+    title: "校验后再启动",
+    command: "tcptun config check --config server.json && tcptun --config server.json",
+    body: "REALITY 字段、密钥格式、dest、short id 都在 Validate 阶段检查，避免监听后再失败。",
+  },
+] as const;
+
+export const protocolComparison = [
+  {
+    name: "native",
+    credential: "token ↔ users[].id",
+    interop: "仅 tcptun ↔ tcptun",
+    securityDefault: "raw + REALITY",
+    vision: "—",
+    muxNote: "私有 mux；同版本推荐。生成器配 REALITY 时默认关",
+    bestFor: "吞吐优先、两端都是 tcptun",
+    generator: "tcptun config native --server … --port …",
+  },
+  {
+    name: "vless",
+    credential: "uuid ↔ users[].id",
+    interop: "Xray VLESS wire",
+    securityDefault: "raw + REALITY + Vision",
+    vision: "flow: xtls-rprx-vision（要求 raw + REALITY）",
+    muxNote: "Xray 兼容 mux；生成器默认关",
+    bestFor: "与 Xray 生态互操作，伪装站点场景",
+    generator: "tcptun config vless --server … --port …",
+  },
+  {
+    name: "vmess",
+    credential: "uuid ↔ users[].id",
+    interop: "Xray VMess AEAD",
+    securityDefault: "raw + REALITY",
+    vision: "—（AEAD + security: none wire）",
+    muxNote: "Xray 兼容 mux；生成器默认关",
+    bestFor: "既有 VMess 客户端/服务端对接",
+    generator: "tcptun config vmess --server … --port …",
+  },
+  {
+    name: "trojan",
+    credential: "password ↔ users[].password",
+    interop: "Xray Trojan wire",
+    securityDefault: "raw + REALITY",
+    vision: "—",
+    muxNote: "可开 mux；生成器默认关",
+    bestFor: "密码认证、Trojan 生态",
+    generator: "tcptun config trojan --server … --port …",
+  },
+] as const;
+
+export const protocolOutboundSnippets = {
+  native: `{
+  "tag": "proxy",
+  "type": "native",
+  "server": "proxy.example.com",
+  "port": 9443,
+  "token": "change-me",
+  "transport": { "type": "raw" },
+  "mux": { "enabled": true }
+}`,
+  vless: `{
+  "tag": "proxy",
+  "type": "vless",
+  "server": "proxy.example.com",
+  "port": 443,
+  "uuid": "00000000-0000-4000-8000-000000000000",
+  "flow": "xtls-rprx-vision",
+  "transport": { "type": "raw" },
+  "security": {
+    "type": "reality",
+    "server_name": "example.com",
+    "fingerprint": "chrome",
+    "public_key": "…",
+    "short_id": "00"
+  }
+}`,
+  vmess: `{
+  "tag": "proxy",
+  "type": "vmess",
+  "server": "proxy.example.com",
+  "port": 443,
+  "uuid": "00000000-0000-4000-8000-000000000000",
+  "transport": {
+    "type": "ws",
+    "path": "/vmess",
+    "tls": true,
+    "server_name": "proxy.example.com"
+  },
+  "mux": { "enabled": true }
+}`,
+  trojan: `{
+  "tag": "proxy",
+  "type": "trojan",
+  "server": "proxy.example.com",
+  "port": 443,
+  "password": "change-me",
+  "transport": {
+    "type": "raw",
+    "tls": true,
+    "server_name": "proxy.example.com"
+  },
+  "mux": { "enabled": true }
+}`,
+} as const;
 
 function binary(
   filename: string,
