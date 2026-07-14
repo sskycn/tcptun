@@ -42,6 +42,16 @@ export const faqItems = [
     question: "四种隧道协议怎么选？",
     answer: "两端都是 tcptun、偏吞吐用 native。对接 Xray 用 vless / vmess / trojan。",
   },
+  {
+    question: "网站上的配置生成安全吗？",
+    answer:
+      "密钥与凭据在浏览器本地用 Web Crypto 生成，不会上传。也可用 CLI：tcptun config <protocol> --server …。",
+  },
+  {
+    question: "如何把 Xray 配置转成 tcptun？",
+    answer:
+      "在「转换」中粘贴 Xray JSON 或 vless/vmess/trojan 链接。支持 REALITY/TLS 与 raw/ws/h2；gRPC 等不支持的传输会提示警告。",
+  },
 ] as const;
 
 export const binaryDownloads = [

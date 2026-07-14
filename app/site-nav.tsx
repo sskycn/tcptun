@@ -5,6 +5,8 @@ import { useEffect, useId, useState } from "react";
 const links = [
   { href: "#architecture", id: "architecture", label: "架构" },
   { href: "#config", id: "config", label: "配置" },
+  { href: "#generate", id: "generate", label: "生成" },
+  { href: "#convert", id: "convert", label: "转换" },
   { href: "#protocols", id: "protocols", label: "协议" },
   { href: "#download", id: "download", label: "下载" },
   { href: "#start", id: "start", label: "命令" },

@@ -107,6 +107,9 @@ export default function ConfigSection() {
           <a className="chip-link" href="#reality">
             REALITY
           </a>
+          <a className="chip-link" href="#generate">
+            生成
+          </a>
           <a className="chip-link" href="#protocol-compare">
             对照
           </a>

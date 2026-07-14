@@ -1,4 +1,5 @@
 import Image from "next/image";
+import ConfigGenerator from "./config-generator";
 import ConfigSection from "./config-section";
 import CopyButton from "./copy-button";
 import FaqSection from "./faq-section";
@@ -7,6 +8,7 @@ import ProtocolIcon from "./protocol-icon";
 import { DownloadSection, PlatformDownloadButton } from "./platform-download";
 import SiteNav from "./site-nav";
 import ThemeToggle from "./theme-toggle";
+import XrayConverter from "./xray-converter";
 import {
   inboundTypes,
   installCommand,
@@ -141,7 +143,7 @@ export default function Home() {
             <a className="button secondary" href={npmLinks.package} target="_blank" rel="noreferrer">
               npm 安装
             </a>
-            <a className="button ghost" href="#config">配置说明</a>
+            <a className="button ghost" href="#generate">生成配置</a>
           </div>
 
           <InstallCommand variant="hero" />
@@ -252,6 +254,10 @@ export default function Home() {
       </section>
 
       <ConfigSection />
+
+      <ConfigGenerator />
+
+      <XrayConverter />
 
       <section className="section protocol-section" id="protocols">
         <div className="section-heading row-heading">
@@ -366,6 +372,8 @@ export default function Home() {
               <h3>产品</h3>
               <a href="#architecture">架构</a>
               <a href="#config">配置</a>
+              <a href="#generate">生成</a>
+              <a href="#convert">转换</a>
               <a href="#protocols">协议</a>
               <a href="#start">命令行</a>
               <a href="#faq">FAQ</a>
