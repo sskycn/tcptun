@@ -1,6 +1,19 @@
 import type { Metadata } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { releaseVersion } from "./site-data";
+
+const sans = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  display: "swap",
+});
 
 const themeInitScript = `
 (() => {
@@ -36,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
-      className="h-full antialiased"
+      className={`h-full antialiased ${sans.variable} ${mono.variable}`}
       suppressHydrationWarning
     >
       <head>

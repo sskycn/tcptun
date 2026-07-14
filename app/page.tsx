@@ -74,12 +74,22 @@ const workflows = [
   },
 ];
 
+const pipeline = ["Load", "Validate", "Compile", "Start"] as const;
+const transports = ["raw", "ws", "h2", "h3"] as const;
+
 export default function Home() {
   return (
     <main>
+      <div className="page-bg" aria-hidden="true">
+        <div className="page-bg-grid" />
+        <div className="page-bg-glow page-bg-glow-a" />
+        <div className="page-bg-glow page-bg-glow-b" />
+        <div className="page-bg-glow page-bg-glow-c" />
+      </div>
+
       <header className="topbar">
         <a className="brand" href="#top" aria-label="tcptun-go 首页">
-          <Image src="/tcptun-logo.png" alt="" width={40} height={40} priority />
+          <Image src="/tcptun-logo.png" alt="" width={36} height={36} priority />
           <span>tcptun-go</span>
         </a>
         <div className="topbar-actions">
@@ -96,32 +106,56 @@ export default function Home() {
       <section className="hero" id="top">
         <div className="hero-copy">
           <div className="release-line">
-            <span className="version-badge">{displayVersion}</span>
-            <span>configuration-driven proxy runtime</span>
+            <span className="version-badge">
+              <span className="pulse-dot" aria-hidden="true" />
+              {displayVersion}
+            </span>
+            <span className="release-tagline">configuration-driven proxy runtime</span>
           </div>
-          <h1>用一份拓扑，组织所有代理流量。</h1>
+          <h1>
+            用一份拓扑，
+            <br />
+            <span className="title-accent">组织所有代理流量。</span>
+          </h1>
           <p className="lede">
             tcptun-go 是使用 Go 编写的多 inbound、多 outbound 代理运行时。它以严格 JSON 编译入口、出口图、
             路由、DNS 与发现配置，再统一启动 TCP/UDP 服务。
           </p>
           <div className="hero-actions">
-            <a className="button primary" href="#download">下载 {displayVersion}</a>
-            <a className="button secondary" href={npmLinks.package}>npm 安装</a>
+            <a className="button primary" href="#download">
+              下载 {displayVersion}
+              <span className="button-arrow" aria-hidden="true">↓</span>
+            </a>
+            <a className="button secondary" href={npmLinks.package} target="_blank" rel="noreferrer">
+              npm 安装
+            </a>
             <a className="button ghost" href="#architecture">查看配置模型</a>
           </div>
           <div className="release-facts" aria-label="能力概览">
-            <span><strong>{inboundTypes.length}</strong> 类 inbound</span>
-            <span><strong>{outboundTypes.length}</strong> 类 outbound</span>
-            <span><strong>{binaryDownloads.length}</strong> 个平台构建</span>
+            <div className="fact">
+              <strong>{inboundTypes.length}</strong>
+              <span>类 inbound</span>
+            </div>
+            <div className="fact">
+              <strong>{outboundTypes.length}</strong>
+              <span>类 outbound</span>
+            </div>
+            <div className="fact">
+              <strong>{binaryDownloads.length}</strong>
+              <span>个平台构建</span>
+            </div>
           </div>
         </div>
 
         <div className="terminal" aria-label="tcptun 命令预览">
           <div className="terminal-heading">
-            <span>tcptun</span>
-            <span>{displayVersion}</span>
+            <div className="terminal-dots" aria-hidden="true">
+              <span /><span /><span />
+            </div>
+            <span className="terminal-title">tcptun · {displayVersion}</span>
+            <span className="terminal-status">ready</span>
           </div>
-          <pre><code>{`$ ${installCommand}
+          <pre className="terminal-body"><code>{`$ ${installCommand}
 
 # 或通过 npm 包装命令安装
 $ npm install -g tcptun
@@ -146,9 +180,12 @@ $ tcptun config vless \\
           <p>当前网站内容依据 tcptun-go `{displayVersion}` 源码、README、FileConfig 和仓库示例手写整理。</p>
         </div>
         <div className="capability-grid">
-          {capabilities.map((item) => (
-            <article key={item.title}>
-              <span>{item.label}</span>
+          {capabilities.map((item, index) => (
+            <article className="capability-card" key={item.title} data-tone={index % 3}>
+              <div className="capability-meta">
+                <span className="capability-label">{item.label}</span>
+                <span className="capability-index">{String(index + 1).padStart(2, "0")}</span>
+              </div>
               <h3>{item.title}</h3>
               <p>{item.body}</p>
             </article>
@@ -163,30 +200,47 @@ $ tcptun config vless \\
             <h2>入口、路由与出口不再由 mode 隐式决定。</h2>
             <p>旧版 `mode`、`server_addr` 和 `tunnel_*` 顶层配置已经移除。每个组件都有 tag，引用关系在启动前编译。</p>
           </div>
-          <div className="chip-row">
-            <span>Load</span><span>Validate</span><span>Compile</span><span>Start</span>
-          </div>
+          <ol className="pipeline" aria-label="启动流水线">
+            {pipeline.map((step, index) => (
+              <li key={step}>
+                <span className="pipeline-step">{step}</span>
+                {index < pipeline.length - 1 ? <span className="pipeline-connector" aria-hidden="true" /> : null}
+              </li>
+            ))}
+          </ol>
         </div>
 
         <div className="architecture-grid">
           <div className="topology-panel">
             <div className="topology-column">
               <p>Inbounds</p>
-              {inboundTypes.map((type) => <span key={type}>{type}</span>)}
+              {inboundTypes.map((type) => (
+                <span key={type}>{type}</span>
+              ))}
             </div>
             <div className="topology-router">
-              <span>Route</span>
+              <span className="topology-router-label">Route</span>
               <small>rules + default_outbound</small>
+              <div className="topology-flow" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
             </div>
             <div className="topology-column">
               <p>Outbounds</p>
-              {outboundTypes.map((type) => <span key={type}>{type}</span>)}
+              {outboundTypes.map((type) => (
+                <span key={type}>{type}</span>
+              ))}
             </div>
           </div>
           <div className="config-model">
             <div className="config-model-heading">
+              <div className="terminal-dots" aria-hidden="true">
+                <span /><span /><span />
+              </div>
               <span>config.json</span>
-              <span>strict schema</span>
+              <span className="config-badge">strict schema</span>
             </div>
             <pre><code>{topologyExample}</code></pre>
           </div>
@@ -200,7 +254,11 @@ $ tcptun config vless \\
             <h2>四种 wire protocol，共用同一套拓扑模型。</h2>
             <p>外部协议兼容指 wire protocol 互操作；tcptun JSON 不能直接作为 Xray 的配置文件。</p>
           </div>
-          <div className="chip-row"><span>raw</span><span>ws</span><span>h2</span><span>h3</span></div>
+          <div className="chip-row">
+            {transports.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
         </div>
 
         <div className="protocol-grid">
@@ -215,9 +273,18 @@ $ tcptun config vless \\
               </div>
               <p className="protocol-description">{protocol.description}</p>
               <dl>
-                <div><dt>Interop</dt><dd>{protocol.interoperability}</dd></div>
-                <div><dt>Generator</dt><dd>{protocol.generatedSecurity}</dd></div>
-                <div className="wide"><dt>Mux</dt><dd>{protocol.mux}</dd></div>
+                <div>
+                  <dt>Interop</dt>
+                  <dd>{protocol.interoperability}</dd>
+                </div>
+                <div>
+                  <dt>Generator</dt>
+                  <dd>{protocol.generatedSecurity}</dd>
+                </div>
+                <div className="wide">
+                  <dt>Mux</dt>
+                  <dd>{protocol.mux}</dd>
+                </div>
               </dl>
               <pre className="protocol-command"><code>{protocol.command}</code></pre>
             </article>
@@ -237,23 +304,33 @@ $ tcptun config vless \\
         <div className="download-grid">
           {binaryDownloads.map((item) => (
             <article className="download-card" key={item.filename}>
-              <div className={`platform-mark ${item.platform}`} aria-hidden="true">{platformInitial(item.platform)}</div>
+              <div className={`platform-mark ${item.platform}`} aria-hidden="true">
+                {platformInitial(item.platform)}
+              </div>
               <div className="download-copy">
-                <div className="download-title"><h3>{item.platformLabel}</h3><span>{item.archLabel}</span></div>
+                <div className="download-title">
+                  <h3>{item.platformLabel}</h3>
+                  <span>{item.archLabel}</span>
+                </div>
                 <code>{item.filename}</code>
                 <p>{formatBytes(item.size)} · npm CDN</p>
               </div>
-              <a className="download-link" href={item.url} download={item.filename}>下载</a>
+              <a className="download-link" href={item.url} download={item.filename}>
+                下载
+              </a>
             </article>
           ))}
         </div>
         <div className="download-note">
-          <div>
+          <div className="download-note-copy">
             <strong>一条命令自动选择平台并安装</strong>
             <code>{installCommand}</code>
             <span>默认安装 npm 最新版到 `/usr/local/bin`；可用 `TCPTUN_VERSION` 与 `TCPTUN_INSTALL_DIR` 覆盖。</span>
           </div>
-          <a href="/install.sh">查看脚本 ↗</a>
+          <a className="download-note-link" href="/install.sh">
+            查看脚本
+            <span aria-hidden="true">↗</span>
+          </a>
         </div>
       </section>
 
@@ -264,9 +341,12 @@ $ tcptun config vless \\
           <p>根命令只保留 `--config/-c`、`--verbose/-v` 和无配置自动发现使用的 `--retry`；其余能力全部写入 JSON。</p>
         </div>
         <div className="mode-grid">
-          {workflows.map((item) => (
-            <article key={item.name}>
-              <span className="mode-name">{item.name}</span>
+          {workflows.map((item, index) => (
+            <article className="mode-card" key={item.name}>
+              <div className="mode-meta">
+                <span className="mode-name">{item.name}</span>
+                <span className="mode-index">{String(index + 1).padStart(2, "0")}</span>
+              </div>
               <h3>{item.title}</h3>
               <p>{item.body}</p>
               <pre><code>{item.command}</code></pre>
@@ -274,15 +354,28 @@ $ tcptun config vless \\
           ))}
         </div>
         <div className="next-step">
+          <div className="next-step-glow" aria-hidden="true" />
           <Image src="/tcptun-logo.png" alt="" width={64} height={64} />
-          <div><p className="eyebrow">tcptun-go {displayVersion}</p><h2>从一份严格 JSON 开始。</h2></div>
-          <a className="button primary" href={linuxX64?.url || npmLinks.package}>下载 Linux x64</a>
+          <div>
+            <p className="eyebrow">tcptun-go {displayVersion}</p>
+            <h2>从一份严格 JSON 开始。</h2>
+          </div>
+          <a className="button primary" href={linuxX64?.url || npmLinks.package}>
+            下载 Linux x64
+          </a>
         </div>
       </section>
 
       <footer className="footer">
-        <div><Image src="/tcptun-logo.png" alt="" width={34} height={34} /><span>tcptun-go {displayVersion}</span></div>
-        <div><a href={npmLinks.package}>npm package</a><a href={npmLinks.tarball}>release tarball</a><a href="#top">返回顶部 ↑</a></div>
+        <div className="footer-brand">
+          <Image src="/tcptun-logo.png" alt="" width={32} height={32} />
+          <span>tcptun-go {displayVersion}</span>
+        </div>
+        <div className="footer-links">
+          <a href={npmLinks.package} target="_blank" rel="noreferrer">npm package</a>
+          <a href={npmLinks.tarball}>release tarball</a>
+          <a href="#top">返回顶部 ↑</a>
+        </div>
       </footer>
     </main>
   );
