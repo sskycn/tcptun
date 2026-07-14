@@ -1,20 +1,8 @@
 # tcptun.com
 
-tcptun-go 的 Next.js 静态网站，通过 GitHub Pages 发布到 [tcptun.com](https://tcptun.com/)。
+tcptun 的 Next.js 静态网站，通过 GitHub Pages 发布到 [tcptun.com](https://tcptun.com/)。
 
-网站内容根据本机 `../tcptun-go` 仓库的 `v0.1.9` 源码、README、`FileConfig` 和 examples 手写实现；npm 仅用于安装入口、发布包和平台二进制下载地址，不参与生成网站。
-
-`public/install.sh` 是网站公开的一键安装脚本。它自动识别 macOS/Linux（以及类 Unix shell 下的 Windows）和 CPU 架构，从 npm CDN 下载对应二进制并安装到 `/usr/local/bin`：
-
-```bash
-curl -fsSL https://tcptun.com/install.sh | sh
-```
-
-固定版本或自定义安装目录：
-
-```bash
-TCPTUN_VERSION=0.1.9 TCPTUN_INSTALL_DIR="$HOME/.local/bin" sh install.sh
-```
+网站说明与示例依据同级 `../tcptun-go` 源码整理。CLI / Android 安装包由本机编译后放入 `public/releases/`，随 Pages 一起上线。
 
 ## 本地开发
 
@@ -29,8 +17,48 @@ pnpm dev
 pnpm build
 ```
 
-## 发布
+## 发布二进制到 GitHub Pages
 
-推送到 `main` 或手动运行 GitHub Pages workflow 会构建并部署网站。没有定时 npm 检查或内容生成任务。
+在网站仓库根目录执行（默认读取同级 `../tcptun-go`、`../tcptun-kotlin`）：
 
-新版本发布后，需要根据 tcptun-go 源码人工更新 `app/site-data.ts` 与页面内容，并在提交前核对 npm 二进制直链。
+```bash
+# 编译 Go（+ Android）并写入 public/releases/<version>/ 与 latest/
+./scripts/publish-pages-assets.sh --version v0.1.9
+
+# 只编译 Go
+./scripts/publish-pages-assets.sh --version v0.1.9 --only go
+
+# 同步版本号与文件大小到 app/site-data.ts
+./scripts/publish-pages-assets.sh --version v0.1.9 --only go --update-site-data
+
+# 已有 dist / APK 时跳过编译
+./scripts/publish-pages-assets.sh --version v0.1.9 --skip-build
+```
+
+然后提交并推送，Pages workflow 会构建并部署（`public/` 会进入 `out/`）：
+
+```bash
+git add public/releases app/site-data.ts public/install.sh
+git commit -m "release: publish v0.1.9 assets"
+git push origin main
+```
+
+上线后地址示例：
+
+| 路径 | 说明 |
+|------|------|
+| `https://tcptun.com/releases/0.1.9/tcptun-linux-amd64` | 固定版本 |
+| `https://tcptun.com/releases/latest/tcptun-linux-amd64` | 最新副本 |
+| `https://tcptun.com/install.sh` | 一键安装（从 `/releases/...` 拉二进制） |
+
+```bash
+curl -fsSL https://tcptun.com/install.sh | sh
+TCPTUN_VERSION=0.1.9 sh -c "$(curl -fsSL https://tcptun.com/install.sh)"
+```
+
+Android 需在 `tcptun-kotlin` 配置 `signing.properties` 或 `TCPTUN_RELEASE_*` 环境变量。
+
+## 网站内容
+
+推送到 `main` 会触发 `.github/workflows/pages.yml` 部署静态站。  
+发新版本后请用上面的脚本更新 `public/releases/`，并视需要改 `app/site-data.ts` 文案与版本号。

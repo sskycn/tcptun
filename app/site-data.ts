@@ -5,6 +5,9 @@ export const npmLinks = {
   tarball: `https://registry.npmjs.org/tcptun/-/tcptun-${releaseVersion}.tgz`,
 };
 
+/** Static assets hosted on GitHub Pages under /releases/<version>/ */
+export const releaseBasePath = `/releases/${releaseVersion}`;
+
 export const installCommand = "curl -fsSL https://tcptun.com/install.sh | sh";
 
 export const pinnedInstallCommand = `curl -fsSL https://tcptun.com/install.sh | TCPTUN_VERSION=${releaseVersion} sh`;
@@ -20,7 +23,8 @@ export const faqItems = [
   },
   {
     question: "一键安装装到哪里？如何固定版本？",
-    answer: "默认安装到 /usr/local/bin。用 TCPTUN_INSTALL_DIR 改目录，用 TCPTUN_VERSION 固定版本。",
+    answer:
+      "默认安装到 /usr/local/bin。用 TCPTUN_INSTALL_DIR 改目录，用 TCPTUN_VERSION 固定版本（从 tcptun.com/releases 下载）。",
   },
   {
     question: "支持哪些平台？",
@@ -699,6 +703,6 @@ function binary(
     arch,
     archLabel,
     size,
-    url: `https://unpkg.com/tcptun@${releaseVersion}/dist/${filename}`,
+    url: `${releaseBasePath}/${filename}`,
   };
 }

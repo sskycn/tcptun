@@ -96,10 +96,10 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
         <div>
           <p className="eyebrow">下载</p>
           <h2>多平台二进制，开箱即用。</h2>
-          <p>来自 npm 包 tcptun@{releaseVersion}，经 CDN 直链分发。</p>
+          <p>由本站 GitHub Pages 托管（/releases/{releaseVersion}/）。</p>
         </div>
-        <a className="button secondary" href={npmLinks.tarball}>
-          下载 .tgz
+        <a className="button secondary" href={`/releases/${releaseVersion}/SHA256SUMS`}>
+          SHA256SUMS
         </a>
       </div>
 
@@ -145,7 +145,7 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
                   {isRecommended ? <span className="recommend-pill">推荐</span> : null}
                 </div>
                 <code>{item.filename}</code>
-                <p>{formatBytes(item.size)} · npm CDN</p>
+                <p>{formatBytes(item.size)} · Pages</p>
               </div>
               <a className="download-link" href={item.url} download={item.filename}>
                 下载

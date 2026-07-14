@@ -5,6 +5,7 @@ set -eu
 package="tcptun"
 version="${TCPTUN_VERSION:-latest}"
 install_dir="${TCPTUN_INSTALL_DIR:-/usr/local/bin}"
+base_url="${TCPTUN_BASE_URL:-https://tcptun.com/releases}"
 
 fail() {
   printf 'tcptun installer: %s\n' "$*" >&2
@@ -52,7 +53,7 @@ if [ "$arch" = "armv7" ] && [ "$platform" != "linux" ]; then
 fi
 
 filename="tcptun-${platform}-${arch}${suffix}"
-url="https://unpkg.com/${package}@${version}/dist/${filename}"
+url="${base_url}/${version}/${filename}"
 
 tmp_dir=$(mktemp -d 2>/dev/null || mktemp -d -t tcptun) || fail "cannot create temporary directory"
 tmp_binary="$tmp_dir/$filename"
@@ -64,7 +65,8 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
-printf 'Downloading %s (%s/%s) from npm...\n' "$package@$version" "$platform" "$arch"
+printf 'Downloading %s (%s/%s)...\n' "$package@$version" "$platform" "$arch"
+printf '  %s\n' "$url"
 attempt=1
 downloaded=0
 if command -v curl >/dev/null 2>&1; then
@@ -109,6 +111,7 @@ fi
 
 installed_version=$($destination version 2>/dev/null) || fail "installed binary did not run successfully"
 case "$version" in
+  latest) ;;
   [0-9]*)
     [ "$installed_version" = "v$version" ] || fail "expected v$version, installed $installed_version"
     ;;
