@@ -1,5 +1,8 @@
 import Image from "next/image";
+import ConfigSection from "./config-section";
 import CopyButton from "./copy-button";
+import FaqSection from "./faq-section";
+import InstallCommand from "./install-command";
 import ProtocolIcon from "./protocol-icon";
 import { DownloadSection, PlatformDownloadButton } from "./platform-download";
 import SiteNav from "./site-nav";
@@ -146,13 +149,7 @@ export default function Home() {
             <a className="button ghost" href="#architecture">查看配置模型</a>
           </div>
 
-          <div className="install-strip">
-            <div className="install-strip-copy">
-              <span className="install-strip-label">一键安装</span>
-              <code>{installCommand}</code>
-            </div>
-            <CopyButton value={installCommand} label="复制命令" className="copy-button-solid" />
-          </div>
+          <InstallCommand variant="hero" />
 
           <div className="release-facts" aria-label="能力概览">
             <div className="fact">
@@ -259,6 +256,8 @@ export default function Home() {
         </div>
       </section>
 
+      <ConfigSection />
+
       <section className="section protocol-section" id="protocols">
         <div className="section-heading row-heading">
           <div>
@@ -305,6 +304,11 @@ export default function Home() {
                 <pre className="protocol-command"><code>{protocol.command}</code></pre>
                 <CopyButton value={protocol.command} label="复制" className="copy-button-on-dark" />
               </div>
+              {protocol.name === "native" ? (
+                <a className="protocol-doc-link" href="#config">
+                  查看 native 配置说明 →
+                </a>
+              ) : null}
             </article>
           ))}
         </div>
@@ -347,14 +351,47 @@ export default function Home() {
         </div>
       </section>
 
+      <FaqSection />
+
       <footer className="footer">
-        <div className="footer-brand">
-          <Image src="/tcptun-logo.png" alt="" width={32} height={32} />
-          <span>tcptun-go {displayVersion}</span>
+        <div className="footer-main">
+          <div className="footer-brand-block">
+            <div className="footer-brand">
+              <Image src="/tcptun-logo.png" alt="" width={36} height={36} />
+              <div>
+                <strong>tcptun-go {displayVersion}</strong>
+                <p>配置驱动的多入口、多出口代理运行时</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-columns">
+            <div className="footer-column">
+              <h3>产品</h3>
+              <a href="#architecture">架构模型</a>
+              <a href="#config">配置说明</a>
+              <a href="#protocols">隧道协议</a>
+              <a href="#start">CLI 工作流</a>
+              <a href="#faq">常见问题</a>
+            </div>
+            <div className="footer-column">
+              <h3>获取</h3>
+              <a href="#download">平台二进制</a>
+              <a href={npmLinks.package} target="_blank" rel="noreferrer">npm package</a>
+              <a href={npmLinks.tarball}>release tarball</a>
+              <a href="/install.sh">install.sh</a>
+            </div>
+            <div className="footer-column">
+              <h3>协议</h3>
+              {tunnelProtocols.map((protocol) => (
+                <a href="#protocols" key={protocol.name}>{protocol.name}</a>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="footer-links">
-          <a href={npmLinks.package} target="_blank" rel="noreferrer">npm package</a>
-          <a href={npmLinks.tarball}>release tarball</a>
+
+        <div className="footer-bottom">
+          <span>内容依据 tcptun-go {displayVersion} 手写整理 · npm 仅作分发入口</span>
           <a href="#top">返回顶部 ↑</a>
         </div>
       </footer>

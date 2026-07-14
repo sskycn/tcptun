@@ -10,8 +10,8 @@ import {
   formatBytes,
   platformInitial,
 } from "./detect-platform";
-import { binaryDownloads, installCommand, npmLinks } from "./site-data";
-import CopyButton from "./copy-button";
+import { binaryDownloads, npmLinks } from "./site-data";
+import InstallCommand from "./install-command";
 
 type PlatformDownloadButtonProps = {
   className?: string;
@@ -157,23 +157,7 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
         })}
       </div>
 
-      <div className="download-note">
-        <div className="download-note-copy">
-          <strong>一条命令自动选择平台并安装</strong>
-          <div className="download-note-command">
-            <code>{installCommand}</code>
-            <CopyButton value={installCommand} label="复制" className="copy-button-solid" />
-          </div>
-          <span>
-            默认安装 npm 最新版到 `/usr/local/bin`；可用 `TCPTUN_VERSION` 与 `TCPTUN_INSTALL_DIR`
-            覆盖。
-          </span>
-        </div>
-        <a className="download-note-link" href="/install.sh">
-          查看脚本
-          <span aria-hidden="true">↗</span>
-        </a>
-      </div>
+      <InstallCommand variant="panel" />
     </>
   );
 }
