@@ -1,7 +1,10 @@
 import Image from "next/image";
+import CopyButton from "./copy-button";
+import ProtocolIcon from "./protocol-icon";
+import { DownloadSection, PlatformDownloadButton } from "./platform-download";
+import SiteNav from "./site-nav";
 import ThemeToggle from "./theme-toggle";
 import {
-  binaryDownloads,
   inboundTypes,
   installCommand,
   npmLinks,
@@ -9,10 +12,10 @@ import {
   releaseVersion,
   topologyExample,
   tunnelProtocols,
+  binaryDownloads,
 } from "./site-data";
 
 const displayVersion = `v${releaseVersion}`;
-const linuxX64 = binaryDownloads.find((item) => item.platform === "linux" && item.arch === "amd64");
 
 const capabilities = [
   {
@@ -77,6 +80,22 @@ const workflows = [
 const pipeline = ["Load", "Validate", "Compile", "Start"] as const;
 const transports = ["raw", "ws", "h2", "h3"] as const;
 
+const terminalSnippet = `$ ${installCommand}
+
+# 或通过 npm 包装命令安装
+$ npm install -g tcptun
+
+# 加载统一拓扑配置
+$ tcptun --config config.json
+
+# 不监听端口，先完成全部校验
+$ tcptun config check --config config.json
+
+# 生成 Xray-compatible VLESS + REALITY 配置对
+$ tcptun config vless \\
+    --server proxy.example.com \\
+    --port 9443`;
+
 export default function Home() {
   return (
     <main>
@@ -93,12 +112,7 @@ export default function Home() {
           <span>tcptun-go</span>
         </a>
         <div className="topbar-actions">
-          <nav className="nav" aria-label="主要导航">
-            <a href="#architecture">架构</a>
-            <a href="#protocols">协议</a>
-            <a href="#download">下载</a>
-            <a href="#start">使用</a>
-          </nav>
+          <SiteNav />
           <ThemeToggle />
         </div>
       </header>
@@ -131,6 +145,15 @@ export default function Home() {
             </a>
             <a className="button ghost" href="#architecture">查看配置模型</a>
           </div>
+
+          <div className="install-strip">
+            <div className="install-strip-copy">
+              <span className="install-strip-label">一键安装</span>
+              <code>{installCommand}</code>
+            </div>
+            <CopyButton value={installCommand} label="复制命令" className="copy-button-solid" />
+          </div>
+
           <div className="release-facts" aria-label="能力概览">
             <div className="fact">
               <strong>{inboundTypes.length}</strong>
@@ -153,23 +176,9 @@ export default function Home() {
               <span /><span /><span />
             </div>
             <span className="terminal-title">tcptun · {displayVersion}</span>
-            <span className="terminal-status">ready</span>
+            <CopyButton value={terminalSnippet} label="复制" className="copy-button-ghost" />
           </div>
-          <pre className="terminal-body"><code>{`$ ${installCommand}
-
-# 或通过 npm 包装命令安装
-$ npm install -g tcptun
-
-# 加载统一拓扑配置
-$ tcptun --config config.json
-
-# 不监听端口，先完成全部校验
-$ tcptun config check --config config.json
-
-# 生成 Xray-compatible VLESS + REALITY 配置对
-$ tcptun config vless \\
-    --server proxy.example.com \\
-    --port 9443`}</code></pre>
+          <pre className="terminal-body"><code>{terminalSnippet}</code></pre>
         </div>
       </section>
 
@@ -240,7 +249,10 @@ $ tcptun config vless \\
                 <span /><span /><span />
               </div>
               <span>config.json</span>
-              <span className="config-badge">strict schema</span>
+              <div className="config-heading-actions">
+                <span className="config-badge">strict schema</span>
+                <CopyButton value={topologyExample} label="复制" className="copy-button-ghost" />
+              </div>
             </div>
             <pre><code>{topologyExample}</code></pre>
           </div>
@@ -265,9 +277,12 @@ $ tcptun config vless \\
           {tunnelProtocols.map((protocol, index) => (
             <article className="protocol-card" key={protocol.name}>
               <div className="protocol-card-heading">
-                <div>
-                  <span className="protocol-index">{String(index + 1).padStart(2, "0")}</span>
-                  <h3>{protocol.name}</h3>
+                <div className="protocol-title-row">
+                  <ProtocolIcon name={protocol.name} />
+                  <div>
+                    <span className="protocol-index">{String(index + 1).padStart(2, "0")}</span>
+                    <h3>{protocol.name}</h3>
+                  </div>
                 </div>
                 <span className="security-badge">{protocol.credential}</span>
               </div>
@@ -286,52 +301,17 @@ $ tcptun config vless \\
                   <dd>{protocol.mux}</dd>
                 </div>
               </dl>
-              <pre className="protocol-command"><code>{protocol.command}</code></pre>
+              <div className="protocol-command-row">
+                <pre className="protocol-command"><code>{protocol.command}</code></pre>
+                <CopyButton value={protocol.command} label="复制" className="copy-button-on-dark" />
+              </div>
             </article>
           ))}
         </div>
       </section>
 
       <section className="section download-section" id="download">
-        <div className="section-heading row-heading">
-          <div>
-            <p className="eyebrow">npm 二进制</p>
-            <h2>无需安装 Go，下载后直接运行。</h2>
-            <p>下面是 npm `tcptun@{releaseVersion}` 发布包内的原始二进制，通过 npm CDN 直接下载。</p>
-          </div>
-          <a className="button secondary" href={npmLinks.tarball}>下载完整 npm .tgz</a>
-        </div>
-        <div className="download-grid">
-          {binaryDownloads.map((item) => (
-            <article className="download-card" key={item.filename}>
-              <div className={`platform-mark ${item.platform}`} aria-hidden="true">
-                {platformInitial(item.platform)}
-              </div>
-              <div className="download-copy">
-                <div className="download-title">
-                  <h3>{item.platformLabel}</h3>
-                  <span>{item.archLabel}</span>
-                </div>
-                <code>{item.filename}</code>
-                <p>{formatBytes(item.size)} · npm CDN</p>
-              </div>
-              <a className="download-link" href={item.url} download={item.filename}>
-                下载
-              </a>
-            </article>
-          ))}
-        </div>
-        <div className="download-note">
-          <div className="download-note-copy">
-            <strong>一条命令自动选择平台并安装</strong>
-            <code>{installCommand}</code>
-            <span>默认安装 npm 最新版到 `/usr/local/bin`；可用 `TCPTUN_VERSION` 与 `TCPTUN_INSTALL_DIR` 覆盖。</span>
-          </div>
-          <a className="download-note-link" href="/install.sh">
-            查看脚本
-            <span aria-hidden="true">↗</span>
-          </a>
-        </div>
+        <DownloadSection releaseVersion={releaseVersion} />
       </section>
 
       <section className="section quickstart-section" id="start">
@@ -349,7 +329,10 @@ $ tcptun config vless \\
               </div>
               <h3>{item.title}</h3>
               <p>{item.body}</p>
-              <pre><code>{item.command}</code></pre>
+              <div className="mode-command-row">
+                <pre><code>{item.command}</code></pre>
+                <CopyButton value={item.command} label="复制" className="copy-button-on-dark" />
+              </div>
             </article>
           ))}
         </div>
@@ -360,9 +343,7 @@ $ tcptun config vless \\
             <p className="eyebrow">tcptun-go {displayVersion}</p>
             <h2>从一份严格 JSON 开始。</h2>
           </div>
-          <a className="button primary" href={linuxX64?.url || npmLinks.package}>
-            下载 Linux x64
-          </a>
+          <PlatformDownloadButton />
         </div>
       </section>
 
@@ -379,14 +360,4 @@ $ tcptun config vless \\
       </footer>
     </main>
   );
-}
-
-function formatBytes(bytes: number) {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function platformInitial(platform: string) {
-  if (platform === "darwin") return "M";
-  if (platform === "windows") return "W";
-  return "L";
 }
