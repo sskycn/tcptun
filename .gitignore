@@ -42,3 +42,4 @@ next-env.d.ts
 
 # local release packaging output
 /.release-staging/
+*.apk
