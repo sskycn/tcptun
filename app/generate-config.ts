@@ -1,4 +1,6 @@
-export type TunnelProtocol = "native" | "vless" | "vmess" | "trojan";
+import { buildOutboundUri, type TcptunOutbound, type TunnelProtocol } from "./uri-convert";
+
+export type { TunnelProtocol } from "./uri-convert";
 
 export type GenerateConfigInput = {
   protocol: TunnelProtocol;
@@ -135,7 +137,7 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     route: { default_outbound: "proxy", rules: [] as unknown[] },
   };
 
-  const clientUri = buildClientUri(protocol, clientOutbound as ClientOutbound);
+  const clientUri = buildOutboundUri(clientOutbound as TcptunOutbound, "tcptun");
 
   const destFlag =
     input.dest.trim() && input.dest.trim() !== `${serverName}:443`
@@ -173,27 +175,6 @@ export function downloadText(filename: string, content: string, mime = "applicat
   URL.revokeObjectURL(url);
 }
 
-type ClientOutbound = {
-  type: TunnelProtocol;
-  server: string;
-  port: number;
-  token?: string;
-  uuid?: string;
-  password?: string;
-  flow?: string;
-  network?: string[];
-  transport: { type: string };
-  security: {
-    type: string;
-    server_name: string;
-    fingerprint: string;
-    public_key: string;
-    short_id: string;
-    spider_x: string;
-  };
-  mux: { enabled: boolean };
-};
-
 function serverUser(protocol: TunnelProtocol, credential: string) {
   if (protocol === "vless") {
     return { id: credential, flow: "xtls-rprx-vision" };
@@ -218,68 +199,6 @@ function clientCredentialFields(protocol: TunnelProtocol, credential: string) {
     return { password: credential };
   }
   return { token: credential };
-}
-
-function buildClientUri(protocol: TunnelProtocol, outbound: ClientOutbound): string {
-  if (protocol === "vmess") {
-    const payload = {
-      v: "2",
-      ps: "tcptun",
-      add: outbound.server,
-      port: String(outbound.port),
-      id: outbound.uuid,
-      aid: "0",
-      scy: "auto",
-      net: "raw",
-      type: "none",
-      tls: "reality",
-      sni: outbound.security.server_name,
-      fp: outbound.security.fingerprint,
-      pbk: outbound.security.public_key,
-      sid: outbound.security.short_id,
-      spx: outbound.security.spider_x,
-      mux: outbound.mux.enabled,
-    };
-    return `vmess://${utf8ToBase64RawStd(JSON.stringify(payload))}`;
-  }
-
-  const credential =
-    protocol === "vless"
-      ? outbound.uuid
-      : protocol === "trojan"
-        ? outbound.password
-        : outbound.token;
-
-  const params = new URLSearchParams();
-  if (protocol === "native") {
-    params.set("v", "1");
-  } else if (protocol === "vless") {
-    params.set("encryption", "none");
-  }
-  params.set("type", "raw");
-  if (outbound.network?.length) {
-    params.set("network", outbound.network.join(","));
-  }
-  params.set("security", "reality");
-  params.set("sni", outbound.security.server_name);
-  params.set("fp", outbound.security.fingerprint);
-  params.set("pbk", outbound.security.public_key);
-  params.set("sid", outbound.security.short_id);
-  if (outbound.security.spider_x) {
-    params.set("spx", outbound.security.spider_x);
-  }
-  if (outbound.flow) {
-    params.set("flow", outbound.flow);
-  }
-  if (protocol === "native" || outbound.mux.enabled) {
-    params.set("mux", String(outbound.mux.enabled));
-  }
-
-  const host = outbound.server.includes(":")
-    ? `[${outbound.server}]:${outbound.port}`
-    : `${outbound.server}:${outbound.port}`;
-
-  return `${protocol}://${encodeURIComponent(credential || "")}@${host}?${params.toString()}#tcptun`;
 }
 
 async function generateX25519Pair(): Promise<{ privateKey: string; publicKey: string }> {
@@ -336,13 +255,6 @@ function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function utf8ToBase64RawStd(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=+$/g, "");
 }
 
 function shellQuote(value: string): string {

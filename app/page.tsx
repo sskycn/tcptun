@@ -8,6 +8,7 @@ import ProtocolIcon from "./protocol-icon";
 import { DownloadSection, PlatformDownloadButton } from "./platform-download";
 import SiteNav from "./site-nav";
 import ThemeToggle from "./theme-toggle";
+import UriConverter from "./uri-converter";
 import XrayConverter from "./xray-converter";
 import {
   inboundTypes,
@@ -256,6 +257,8 @@ export default function Home() {
       <ConfigSection />
 
       <ConfigGenerator />
+
+      <UriConverter />
 
       <XrayConverter />
 
