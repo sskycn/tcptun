@@ -58,7 +58,7 @@ export default function ConfigGenerator() {
           <p className="eyebrow">生成</p>
           <h2>在浏览器生成配对配置。</h2>
           <p>
-            与 <code>tcptun config</code> 相同：raw + REALITY、匹配密钥与凭据。密钥仅在本机生成，不会上传。
+            server/client 逻辑对齐 <code>tcptun config</code>：raw + REALITY、匹配密钥与凭据；并额外生成可导入的 URI。密钥仅在本机生成，不会上传。
           </p>
         </div>
         <div className="chip-row">
@@ -280,8 +280,8 @@ export default function ConfigGenerator() {
               <p className="eyebrow">输出</p>
               <h3>填写参数后点击生成</h3>
               <p>
-                将创建 server.json、client.json 与 client.uri，逻辑对齐{" "}
-                <code>tcptun config {form.protocol}</code>。
+                将创建 server.json、client.json 与 client.uri；JSON 对齐{" "}
+                <code>tcptun config {form.protocol}</code>，URI 对齐 <code>tcptun uri export</code>。
               </p>
               <ul>
                 <li>自动生成 X25519 密钥对与 short id</li>

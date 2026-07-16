@@ -36,22 +36,22 @@ const capabilities = [
   {
     label: "Route",
     title: "规则路由",
-    body: "支持 direct、隧道出口与 blackhole，可按域名、IP 与应用身份分流。",
+    body: "支持 direct、direct-first、balance、隧道与 blackhole，可按域名、IP 和应用身份分流。",
   },
   {
     label: "Network",
-    title: "TCP / UDP / mux",
-    body: "隧道同时支持 TCP 与 UDP；mux 复用物理连接，降低短连接开销。",
+    title: "TCP / UDP / mux / QUIC",
+    body: "Native QUIC 同时承载 stream 与 DATAGRAM，并提供分片恢复、自适应 FEC 和多连接池。",
   },
   {
-    label: "Discovery",
-    title: "局域网发现",
-    body: "无配置时可扫描局域网 SOCKS5，并通过 mDNS 发现其他 tcptun 节点。",
+    label: "Outbound",
+    title: "负载与热切换",
+    body: "balance 按负载、延迟与失败选择成员；运行时可启停、探测并切换出口。",
   },
   {
     label: "Library",
     title: "可嵌入库",
-    body: "以 Go 库形式集成 flow、route、transport 与 engine，而不仅是 CLI。",
+    body: "以 Go 库组合 flow、endpoint、route、transport 与 engine，并适配标准 net 接口。",
   },
 ];
 
@@ -71,7 +71,7 @@ const workflows = [
   {
     name: "generate",
     title: "生成配置对",
-    body: "一次生成 server / client 配置与 URI，含协议凭据与 REALITY 密钥。",
+    body: "生成 server / client 配置，含协议凭据与匹配的 REALITY 密钥。",
     command: "tcptun config vless --server proxy.example.com --port 9443",
   },
   {
@@ -133,7 +133,7 @@ export default function Home() {
             <span className="title-accent">编排全部代理流量。</span>
           </h1>
           <p className="lede">
-            tcptun 是配置驱动的多入口、多出口代理运行时。用 JSON 描述入口、出口、路由与发现，统一启动 TCP/UDP 服务。
+            tcptun 是配置驱动的多入口、多出口代理运行时。用严格 JSON 描述入口、出口与路由，统一启动 TCP/UDP 服务。
           </p>
           <div className="hero-actions">
             <a className="button primary" href="#download">
@@ -180,7 +180,7 @@ export default function Home() {
         <div className="section-heading">
           <p className="eyebrow">能力</p>
           <h2>配置定义拓扑，运行时负责校验与执行。</h2>
-          <p>从入口到出口，同一套模型覆盖本地代理、隧道、路由与发现。</p>
+          <p>从入口到出口，同一套模型覆盖本地代理、隧道、规则路由、负载均衡与出口链。</p>
         </div>
         <div className="capability-grid">
           {capabilities.map((item, index) => (

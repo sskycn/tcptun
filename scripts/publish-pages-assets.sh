@@ -3,11 +3,11 @@
 # public/releases/ for GitHub Pages deployment.
 #
 # Usage:
-#   ./scripts/publish-pages-assets.sh --version v0.1.9
-#   ./scripts/publish-pages-assets.sh --version 0.1.9 --only go
-#   ./scripts/publish-pages-assets.sh --version v0.1.9 --only android
-#   ./scripts/publish-pages-assets.sh --version v0.1.9 --skip-build
-#   ./scripts/publish-pages-assets.sh --version v0.1.9 --update-site-data
+#   ./scripts/publish-pages-assets.sh --version v0.2.0
+#   ./scripts/publish-pages-assets.sh --version 0.2.0 --only go
+#   ./scripts/publish-pages-assets.sh --version v0.2.0 --only android
+#   ./scripts/publish-pages-assets.sh --version v0.2.0 --skip-build
+#   ./scripts/publish-pages-assets.sh --version v0.2.0 --update-site-data
 #
 # After this script:
 #   git add public/releases app/site-data.ts
@@ -42,7 +42,7 @@ need_cmd() {
 
 normalize_version() {
   local v="$1"
-  [[ -n "$v" ]] || die "--version is required (e.g. v0.1.9)"
+  [[ -n "$v" ]] || die "--version is required (e.g. v0.2.0)"
   case "$v" in
     v*) printf '%s\n' "${v#v}" ;;
     *) printf '%s\n' "$v" ;;

@@ -1,4 +1,4 @@
-export const releaseVersion = "0.1.9";
+export const releaseVersion = "0.2.0";
 
 export const npmLinks = {
   package: "https://www.npmjs.com/package/tcptun",
@@ -36,7 +36,8 @@ export const faqItems = [
   },
   {
     question: "何时开启 mux 或 QUIC？",
-    answer: "短连接多、两端同版本时建议开 mux。QUIC 需要 raw + TLS，与 REALITY 互斥。",
+    answer:
+      "短连接多、两端同版本时建议开 mux。原生 QUIC 仅支持 native + raw + TLS；UDP 可选可靠 stream 或 DATAGRAM，支持分片、选择性恢复与自适应 FEC。",
   },
   {
     question: "REALITY 能和 TLS 一起用吗？",
@@ -54,24 +55,35 @@ export const faqItems = [
   {
     question: "如何把 Xray 配置转成 tcptun？",
     answer:
-      "在「转换」中粘贴 Xray JSON 或 vless/vmess/trojan 链接。支持 REALITY/TLS 与 raw/ws/h2；gRPC 等不支持的传输会提示警告。",
+      "在「转换」中粘贴 Xray JSON 或 vless/vmess/trojan 链接。支持 REALITY/TLS 与 raw/ws/h2/h3；gRPC 等不支持的传输会提示警告。",
+  },
+  {
+    question: "无配置文件时会怎样启动？",
+    answer:
+      "tcptun 会先预留 127.0.0.1:1080，再扫描私有 IPv4 局域网中可用的 SOCKS5:1080；首次握手成功后启动 mixed 代理。--retry 可在保留监听的同时持续重试。",
+  },
+  {
+    question: "如何在多个出口间负载与切换？",
+    answer:
+      "使用 balance outbound 组合成员并设置权重与 affinity_ttl。嵌入式 Runtime 和 Android bridge 还支持启停、探测及原子切换已声明的 outbound。",
   },
 ] as const;
 
 export const binaryDownloads = [
-  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 14740288),
-  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 13653986),
-  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 14352546),
+  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 14740336),
+  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 13654034),
+  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 14356642),
   binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 13172898),
   binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 13631650),
-  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 14777344),
-  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 13407744),
+  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 14779392),
+  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 13408768),
 ] as const;
 
 export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;
 export const outboundTypes = [
   "direct",
   "direct-first",
+  "balance",
   "blackhole",
   "socks5",
   "mixed",
@@ -89,7 +101,7 @@ export const tunnelProtocols = [
     generatedSecurity: "raw + REALITY",
     mux: "推荐同版本开启",
     command: "tcptun config native --server proxy.example.com --port 9443",
-    description: "私有低开销协议。吞吐优先用 raw + mux；升级时保持两端版本一致。",
+    description: "私有低开销协议。吞吐优先用 raw + mux；需要 UDP/QUIC 连接池时显式选择 quic mode。",
   },
   {
     name: "vless",
@@ -144,8 +156,7 @@ export const topologyExample = `{
     }
   ],
   "route": { "default_outbound": "proxy", "rules": [] },
-  "dns": {},
-  "discovery": {}
+  "dns": {}
 }`;
 
 /** Minimal native server: tunnel inbound + direct exit. */
@@ -168,8 +179,7 @@ export const nativeServerExample = `{
     { "tag": "direct", "type": "direct" }
   ],
   "route": { "default_outbound": "direct", "rules": [] },
-  "dns": {},
-  "discovery": {}
+  "dns": {}
 }`;
 
 /** Minimal native client: local mixed proxy → native outbound. */
@@ -198,8 +208,7 @@ export const nativeClientExample = `{
     { "tag": "direct", "type": "direct" }
   ],
   "route": { "default_outbound": "proxy", "rules": [] },
-  "dns": {},
-  "discovery": {}
+  "dns": {}
 }`;
 
 /** Native + QUIC mux mode (TLS 1.3 required on both ends). */
@@ -240,8 +249,7 @@ export const nativeQuicClientExample = `{
     { "tag": "direct", "type": "direct" }
   ],
   "route": { "default_outbound": "proxy", "rules": [] },
-  "dns": {},
-  "discovery": {}
+  "dns": {}
 }`;
 
 export const nativeQuicServerExample = `{
@@ -272,8 +280,7 @@ export const nativeQuicServerExample = `{
     { "tag": "direct", "type": "direct" }
   ],
   "route": { "default_outbound": "direct", "rules": [] },
-  "dns": {},
-  "discovery": {}
+  "dns": {}
 }`;
 
 export const nativeConfigHighlights = [
@@ -291,7 +298,7 @@ export const nativeConfigHighlights = [
   },
   {
     title: "生成",
-    body: "tcptun config native 一次生成配对的 server / client 配置与 URI。",
+    body: "tcptun config native 生成配对的 server / client 配置；URI 由 tcptun uri export 单独导出。",
   },
 ] as const;
 
@@ -326,6 +333,7 @@ export const nativeFieldGroups = [
       { key: "mux.max_streams_per_session", side: "client", detail: "单连接 stream 上限，1–4096。" },
       { key: "mux.warm_spares", side: "client", detail: "预热空闲连接数，须小于 max_sessions。" },
       { key: "mux.udp_mode", side: "client", detail: "quic 专用：reliable / auto / datagram。" },
+      { key: "mux.*_receive_window", side: "两端", detail: "QUIC 接收窗口；stream 最大 16 MiB，connection 最大 64 MiB。" },
     ],
   },
 ] as const;
@@ -341,11 +349,11 @@ export const nativeMuxNotes = [
   },
   {
     title: "QUIC",
-    body: 'mux.mode: "quic" 使用 UDP/QUIC 连接池，要求 raw + TLS 1.3。',
+    body: 'mux.mode: "quic" 使用带健康评分与路径探测的 UDP/QUIC 连接池，要求 native + raw + TLS 1.3。',
   },
   {
     title: "UDP",
-    body: "reliable 走可靠 stream；auto 优先 DATAGRAM；datagram 强制 DATAGRAM。",
+    body: "reliable 走 stream；auto 优先 DATAGRAM 并可回退；datagram 不降级。DATAGRAM 支持分片、恢复与自适应 FEC。",
   },
 ] as const;
 
@@ -354,7 +362,7 @@ export const nativeWorkflowCommands = [
     name: "generate",
     title: "生成配置对",
     command: "tcptun config native --server proxy.example.com --port 9443",
-    body: "输出 server.json、client.json、client.uri。",
+    body: "输出 server.json 与 client.json。",
   },
   {
     name: "check",
@@ -370,20 +378,20 @@ export const nativeWorkflowCommands = [
   },
   {
     name: "uri",
-    title: "导入 URI",
-    command: "tcptun uri import --input client.uri --client --output client.json",
-    body: "从 native:// URI 生成客户端配置。",
+    title: "导出 URI",
+    command: "tcptun uri export --config client.json --output client.uri",
+    body: "从 tunnel outbound 单独导出 native:// URI。",
   },
 ] as const;
 
 export const configModelNotes = [
   {
     title: "结构",
-    body: "log、inbounds、outbounds、route、dns、discovery。未知字段会被拒绝。",
+    body: "顶层仅含 log、inbounds、outbounds、route、dns。未知字段会被拒绝。",
   },
   {
     title: "引用",
-    body: "组件通过 tag 互相关联；入口与路由规则指向出口。",
+    body: "组件通过 tag 关联；via、direct-first 与 balance 的依赖会检查缺失和循环。",
   },
   {
     title: "启动",
@@ -423,8 +431,7 @@ export const vlessRealityServerExample = `{
     { "tag": "direct", "type": "direct" }
   ],
   "route": { "default_outbound": "direct", "rules": [] },
-  "dns": {},
-  "discovery": {}
+  "dns": {}
 }`;
 
 export const vlessRealityClientExample = `{
@@ -459,8 +466,7 @@ export const vlessRealityClientExample = `{
     }
   ],
   "route": { "default_outbound": "proxy", "rules": [] },
-  "dns": {},
-  "discovery": {}
+  "dns": {}
 }`;
 
 /** Native + REALITY pair shape produced by config generator (mux off by default). */
@@ -575,7 +581,7 @@ export const realityCommands = [
     title: "生成 REALITY 配置对",
     command:
       "tcptun config vless --server proxy.example.com --port 443 --server-name example.com --dest example.com:443",
-    body: "输出配对的 server / client 配置与 URI。",
+    body: "输出配对的 server.json 与 client.json；需要 URI 时再执行 tcptun uri export。",
   },
   {
     title: "native + REALITY",
