@@ -59,13 +59,13 @@ export const faqItems = [
 ] as const;
 
 export const binaryDownloads = [
-  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 14_562_096),
-  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 13_569_602),
-  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 14_213_304),
-  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 13_172_920),
-  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 13_566_136),
-  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 14_581_760),
-  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 13_304_320),
+  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 14740288),
+  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 13653986),
+  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 14352546),
+  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 13172898),
+  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 13631650),
+  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 14777344),
+  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 13407744),
 ] as const;
 
 export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;
