@@ -363,6 +363,7 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
       public_key: query.get("pbk") || "",
       short_id: query.get("sid") || "",
       spider_x: query.get("spx") || "",
+      ...(insecure ? { insecure: true } : {}),
     };
   } else if (securityType !== "none" && securityType !== "") {
     outbound.security = { type: securityType };
@@ -382,7 +383,8 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
 function parseVmessUri(text: string, tag: string): TcptunOutbound {
   let source: JsonObject;
   try {
-    const decoded = decodeBase64Flexible(text.slice("vmess://".length).trim());
+    const payload = text.slice("vmess://".length).trim().split("#", 1)[0];
+    const decoded = decodeBase64Flexible(payload);
     const parsed = JSON.parse(decoded);
     if (!isObject(parsed)) throw new Error();
     source = parsed;
@@ -409,13 +411,15 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
   setSourceInteger(muxConfig, "max_sessions", source.tcptun_mux_max_sessions);
   setSourceInteger(muxConfig, "max_streams_per_session", source.tcptun_mux_max_streams_per_session);
   setSourceInteger(muxConfig, "warm_spares", source.tcptun_mux_warm_spares);
-  if (source.tcptun_mux || Object.keys(muxConfig).length > 0) {
+  const muxEnabled = optionalSourceBoolean(source.tcptun_mux, "tcptun_mux");
+  if (muxEnabled === true || (muxEnabled === undefined && Object.keys(muxConfig).length > 0)) {
     outbound.mux = muxConfig;
   }
   if (source.tcptun_network) outbound.network = parseNetworkList(String(source.tcptun_network));
   if (source.tcptun_flow) outbound.flow = String(source.tcptun_flow);
 
   const security = String(source.tls || "").toLowerCase();
+  const insecure = optionalSourceBoolean(source.allowInsecure, "allowInsecure");
   if (security === "reality") {
     outbound.security = {
       type: "reality",
@@ -424,13 +428,16 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
       public_key: String(source.pbk || ""),
       short_id: String(source.sid || ""),
       spider_x: String(source.spx || ""),
+      ...(insecure ? { insecure: true } : {}),
     };
   } else if (security && security !== "none") {
     outbound.security = {
       type: "tls",
       ...(source.sni ? { server_name: String(source.sni) } : {}),
-      ...(source.allowInsecure ? { insecure: true } : {}),
+      ...(insecure ? { insecure: true } : {}),
     };
+  } else if (insecure) {
+    outbound.security = { insecure: true };
   }
   return outbound;
 }
@@ -761,6 +768,16 @@ function optionalBoolean(value: string | null, label: string): boolean | undefin
   if (["1", "t", "true"].includes(normalized)) return true;
   if (["0", "f", "false"].includes(normalized)) return false;
   throw new Error(`URI ${label} 必须是布尔值`);
+}
+
+function optionalSourceBoolean(value: unknown, label: string): boolean | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  return optionalBoolean(String(value), label);
 }
 
 function setOptionalText<T extends object, K extends keyof T>(target: T, key: K, value: string | null) {

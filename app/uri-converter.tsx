@@ -1,8 +1,16 @@
 "use client";
 
 import Image from "next/image";
+import jsQR from "jsqr";
 import QRCode from "qrcode";
-import { useMemo, useState, type FormEvent } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type FormEvent,
+} from "react";
 import CopyButton from "./copy-button";
 import { downloadText } from "./generate-config";
 import {
@@ -58,6 +66,7 @@ export default function UriConverter() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [qrIndex, setQrIndex] = useState(0);
+  const qrFileInput = useRef<HTMLInputElement>(null);
 
   const qrUris = useMemo(
     () => (mode !== "import" && result ? result.content.split(/\r?\n/).filter(Boolean) : []),
@@ -70,6 +79,45 @@ export default function UriConverter() {
     setResult(null);
     setError(null);
     setQrIndex(0);
+    if (qrFileInput.current) qrFileInput.current.value = "";
+  }
+
+  async function handleQrFiles(files: File[]) {
+    if (files.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const decoded = await Promise.all(files.map(decodeQrFile));
+      const uriText = decoded
+        .flatMap((value) => value.split(/\r?\n/))
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .join("\n");
+      const converted = urisToConfig(uriText, { client: false });
+      setInput(uriText);
+      setResult({
+        content: uriText,
+        filename: "client.uri",
+        summary: `已从 ${files.length} 张二维码识别 ${converted.count} 条 URI`,
+        qrCodes: [],
+      });
+      setQrIndex(0);
+    } catch (err) {
+      setResult(null);
+      setError(err instanceof Error ? err.message : "二维码识别失败");
+    } finally {
+      setBusy(false);
+      if (qrFileInput.current) qrFileInput.current.value = "";
+    }
+  }
+
+  function handleQrFileChange(event: ChangeEvent<HTMLInputElement>) {
+    void handleQrFiles(Array.from(event.target.files || []));
+  }
+
+  function handleQrDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (!busy) void handleQrFiles(Array.from(event.dataTransfer.files));
   }
 
   async function handleConvert(event: FormEvent) {
@@ -159,7 +207,7 @@ export default function UriConverter() {
           className={mode === "qrcode" ? "is-active" : undefined}
           onClick={() => switchMode("qrcode")}
         >
-          URI → 二维码
+          URI ↔ 二维码
         </button>
       </div>
 
@@ -179,6 +227,25 @@ export default function UriConverter() {
               required
             />
           </label>
+
+          {mode === "qrcode" ? (
+            <label
+              className={`uri-qr-upload${busy ? " is-disabled" : ""}`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={handleQrDrop}
+            >
+              <input
+                ref={qrFileInput}
+                type="file"
+                accept="image/*"
+                multiple
+                disabled={busy}
+                onChange={handleQrFileChange}
+              />
+              <strong>{busy ? "正在识别二维码…" : "上传二维码图片"}</strong>
+              <span>点击选择或拖放 PNG / JPEG，可一次识别多张</span>
+            </label>
+          ) : null}
 
           {mode === "export" ? (
             <div className="converter-options">
@@ -253,6 +320,7 @@ export default function UriConverter() {
                 setInput("");
                 setResult(null);
                 setError(null);
+                if (qrFileInput.current) qrFileInput.current.value = "";
               }}
             >
               清空
@@ -263,9 +331,10 @@ export default function UriConverter() {
 
           {mode === "qrcode" ? (
             <ul className="converter-notes">
-              <li>支持一行一条 URI 批量生成二维码</li>
+              <li>支持 URI 生成二维码，也支持上传二维码图片反向识别</li>
+              <li>一行一条 URI 或一张一条二维码，可批量处理</li>
               <li>每条 URI 生成独立的 512 × 512 PNG</li>
-              <li>生成过程完全在浏览器本地完成</li>
+              <li>识别与生成过程完全在浏览器本地完成</li>
             </ul>
           ) : (
             <ul className="converter-notes">
@@ -365,7 +434,7 @@ export default function UriConverter() {
                   ? "输出 URI 文本与二维码 PNG；可从客户端 outbound 或服务端 inbound 导出。"
                   : mode === "import"
                     ? "可生成单个 outbound，或带 mixed 本地入口、路由的完整 client.json。"
-                    : "直接把一条或多条分享 URI 生成为可预览、下载的二维码 PNG。"}
+                    : "粘贴 URI 生成二维码，或上传二维码图片识别并导出分享 URI。"}
               </p>
               <ul>
                 <li>支持 Native / VLESS / VMess / Trojan</li>
@@ -398,4 +467,40 @@ function generateQrCodes(uris: string[]): Promise<string[]> {
       }),
     ),
   );
+}
+
+async function decodeQrFile(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error(`${file.name} 不是图片文件`);
+  }
+
+  const imageUrl = URL.createObjectURL(file);
+  try {
+    const image = await loadImage(imageUrl, file.name);
+    const maxDimension = 2048;
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("当前浏览器无法读取二维码图片");
+    context.drawImage(image, 0, 0, width, height);
+    const pixels = context.getImageData(0, 0, width, height);
+    const decoded = jsQR(pixels.data, width, height, { inversionAttempts: "attemptBoth" });
+    if (!decoded?.data.trim()) throw new Error(`${file.name} 中未识别到二维码`);
+    return decoded.data.trim();
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
+function loadImage(src: string, filename: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = document.createElement("img");
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`无法读取图片 ${filename}`));
+    image.src = src;
+  });
 }

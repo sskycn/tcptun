@@ -2757,6 +2757,49 @@ html[data-theme="dark"] .platform-mark.windows {
   letter-spacing: 0.04em;
 }
 
+.uri-qr-upload {
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 34%, var(--line));
+  border-radius: 14px;
+  padding: 18px;
+  background: color-mix(in srgb, var(--cyan-soft) 35%, var(--surface));
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+}
+
+.uri-qr-upload:hover {
+  border-color: color-mix(in srgb, var(--primary) 65%, var(--line));
+  background: color-mix(in srgb, var(--cyan-soft) 60%, var(--surface));
+}
+
+.uri-qr-upload.is-disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.uri-qr-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.uri-qr-upload strong {
+  font-size: 13px;
+}
+
+.uri-qr-upload span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .uri-result-code {
   max-height: 260px;
 }
