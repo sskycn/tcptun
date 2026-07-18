@@ -2802,6 +2802,12 @@ html[data-theme="dark"] .platform-mark.windows {
 
 .uri-result-code {
   max-height: 260px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.uri-result-code.is-config {
+  max-height: 480px;
 }
 
 .uri-qr-panel {

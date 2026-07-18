@@ -170,10 +170,13 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
           type: "mixed",
           address: [joinHostPort(localListen, localPort)],
           network: networks,
+          transport: {},
+          security: {},
         },
       ],
       outbounds,
-      route: { default_outbound: defaultOutbound, rules: [] as unknown[] },
+      route: { default_outbound: defaultOutbound },
+      dns: {},
     };
   }
 

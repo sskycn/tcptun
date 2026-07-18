@@ -371,7 +371,11 @@ export default function UriConverter() {
                 </div>
               </div>
 
-              <pre className="generator-result-code uri-result-code">
+              <pre
+                className={`generator-result-code uri-result-code${mode === "import" ? " is-config" : ""}`}
+                aria-label={`${result.filename} 内容`}
+                tabIndex={0}
+              >
                 <code>{result.content}</code>
               </pre>
 
