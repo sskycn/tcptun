@@ -1,4 +1,4 @@
-export const releaseVersion = "0.2.0";
+export const releaseVersion = "0.2.1";
 
 export const npmLinks = {
   package: "https://www.npmjs.com/package/tcptun",
@@ -37,11 +37,21 @@ export const faqItems = [
   {
     question: "何时开启 mux 或 QUIC？",
     answer:
-      "短连接多、两端同版本时建议开 mux。原生 QUIC 仅支持 native + raw + TLS；UDP 可选可靠 stream 或 DATAGRAM，支持分片、选择性恢复与自适应 FEC。",
+      "短连接多、两端同版本时建议配置 mux: {}。原生 QUIC 仅支持 native + raw + security.type=tls；UDP 可选可靠 stream 或 DATAGRAM，支持分片、选择性恢复与自适应 FEC。",
   },
   {
     question: "REALITY 能和 TLS 一起用吗？",
-    answer: "不能。REALITY 仅配合 raw，且不能开启 transport.tls。",
+    answer: "不能。REALITY 仅配合 raw，且不能与 security.type=tls 并用。",
+  },
+  {
+    question: "address 字段怎么写？",
+    answer:
+      "inbound / outbound 的 address 都是 host:port 字符串数组。多地址表示同一逻辑服务的候选入口，首次连接会错峰竞争握手，不是 balance 负载均衡。",
+  },
+  {
+    question: "什么是反向发布？",
+    answer:
+      "native + raw + mux（group 或 QUIC）支持把 NAT 后的 TCP/UDP 服务发布到服务端：服务端配置 publish，客户端配置 expose，两端 service 名一致。",
   },
   {
     question: "四种隧道协议怎么选？",
@@ -65,18 +75,18 @@ export const faqItems = [
   {
     question: "如何在多个出口间负载与切换？",
     answer:
-      "使用 balance outbound 组合成员并设置权重与 affinity_ttl。嵌入式 Runtime 和 Android bridge 还支持启停、探测及原子切换已声明的 outbound。",
+      "使用 balance outbound 组合成员并设置权重与 affinity_ttl。同一 outbound 的多 address 只是候选入口竞速，不是负载均衡。嵌入式 Runtime 和 Android bridge 还支持启停、探测及原子切换已声明的 outbound。",
   },
 ] as const;
 
 export const binaryDownloads = [
-  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 14740336),
-  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 13654034),
-  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 14356642),
-  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 13172898),
-  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 13631650),
-  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 14779392),
-  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 13408768),
+  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 15061776),
+  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 13940850),
+  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 14672034),
+  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 13500578),
+  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 13893794),
+  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 15101952),
+  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 13692416),
 ] as const;
 
 export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;
@@ -101,7 +111,7 @@ export const tunnelProtocols = [
     generatedSecurity: "raw + REALITY",
     mux: "推荐同版本开启",
     command: "tcptun config native --server proxy.example.com --port 9443",
-    description: "私有低开销协议。吞吐优先用 raw + mux；需要 UDP/QUIC 连接池时显式选择 quic mode。",
+    description: "私有低开销协议。吞吐优先用 raw + mux；需要 UDP/QUIC 连接池时显式选择 quic mode。支持反向 publish/expose。",
   },
   {
     name: "vless",
@@ -138,21 +148,18 @@ export const topologyExample = `{
     {
       "tag": "local",
       "type": "mixed",
-      "listen": "127.0.0.1",
-      "port": 1080,
-      "network": ["tcp", "udp"],
-      "outbound": "proxy"
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
     }
   ],
   "outbounds": [
     {
       "tag": "proxy",
       "type": "native",
-      "server": "proxy.example.com",
-      "port": 9443,
+      "address": ["proxy.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "mux": { "enabled": true }
+      "mux": {}
     }
   ],
   "route": { "default_outbound": "proxy", "rules": [] },
@@ -166,13 +173,11 @@ export const nativeServerExample = `{
     {
       "tag": "server",
       "type": "native",
-      "listen": "0.0.0.0",
-      "port": 9443,
+      "address": ["0.0.0.0:9443"],
       "network": ["tcp", "udp"],
       "users": [{ "id": "change-me" }],
       "transport": { "type": "raw" },
-      "mux": { "enabled": true },
-      "outbound": "direct"
+      "mux": {}
     }
   ],
   "outbounds": [
@@ -189,21 +194,18 @@ export const nativeClientExample = `{
     {
       "tag": "local",
       "type": "mixed",
-      "listen": "127.0.0.1",
-      "port": 1080,
-      "network": ["tcp", "udp"],
-      "outbound": "proxy"
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
     }
   ],
   "outbounds": [
     {
       "tag": "proxy",
       "type": "native",
-      "server": "proxy.example.com",
-      "port": 9443,
+      "address": ["proxy.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "mux": { "enabled": true }
+      "mux": {}
     },
     { "tag": "direct", "type": "direct" }
   ],
@@ -218,27 +220,23 @@ export const nativeQuicClientExample = `{
     {
       "tag": "local",
       "type": "mixed",
-      "listen": "127.0.0.1",
-      "port": 1080,
-      "network": ["tcp", "udp"],
-      "outbound": "proxy"
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
     }
   ],
   "outbounds": [
     {
       "tag": "proxy",
       "type": "native",
-      "server": "proxy.example.com",
-      "port": 9443,
+      "address": ["proxy.example.com:9443"],
       "token": "change-me",
       "network": ["tcp", "udp"],
-      "transport": {
-        "type": "raw",
-        "tls": true,
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "tls",
         "server_name": "proxy.example.com"
       },
       "mux": {
-        "enabled": true,
         "mode": "quic",
         "udp_mode": "auto",
         "max_sessions": 4,
@@ -258,22 +256,19 @@ export const nativeQuicServerExample = `{
     {
       "tag": "server",
       "type": "native",
-      "listen": "0.0.0.0",
-      "port": 9443,
+      "address": ["0.0.0.0:9443"],
       "network": ["tcp", "udp"],
       "users": [{ "id": "change-me" }],
-      "transport": {
-        "type": "raw",
-        "tls": true,
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "tls",
         "cert": "server.crt",
         "key": "server.key"
       },
       "mux": {
-        "enabled": true,
         "mode": "quic",
         "max_streams_per_session": 128
-      },
-      "outbound": "direct"
+      }
     }
   ],
   "outbounds": [
@@ -283,18 +278,77 @@ export const nativeQuicServerExample = `{
   "dns": {}
 }`;
 
+export const nativeReverseServerExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "edge",
+      "type": "native",
+      "address": ["0.0.0.0:9443"],
+      "network": ["tcp"],
+      "users": [{ "id": "replace-with-a-long-random-token" }],
+      "transport": { "type": "raw" },
+      "mux": {},
+      "publish": [
+        { "service": "web", "address": ["0.0.0.0:8080"] }
+      ]
+    }
+  ],
+  "outbounds": [
+    { "tag": "direct", "type": "direct", "network": ["tcp"] }
+  ],
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": {}
+}`;
+
+export const nativeReverseClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "edge",
+      "type": "native",
+      "address": ["server.example.com:9443"],
+      "token": "replace-with-a-long-random-token",
+      "transport": { "type": "raw" },
+      "mux": {},
+      "expose": [
+        { "service": "web", "target": "127.0.0.1:3000" }
+      ]
+    },
+    { "tag": "direct", "type": "direct" }
+  ],
+  "route": { "default_outbound": "edge", "rules": [] },
+  "dns": {}
+}`;
+
 export const nativeConfigHighlights = [
   {
     title: "认证",
     body: "服务端 users[].id 与客户端 token 必须一致。",
   },
   {
+    title: "地址",
+    body: "address 为 host:port 数组。多地址是同一服务的候选入口竞速，不是 balance。",
+  },
+  {
     title: "吞吐",
     body: "优先 native + raw + mux。TLS / REALITY / ws / h2 / h3 更灵活，但开销更高。",
   },
   {
+    title: "反向发布",
+    body: "服务端 publish + 客户端 expose，可把 NAT 后的 TCP/UDP 服务挂到边缘监听端口。",
+  },
+  {
     title: "版本",
-    body: "mux 为私有协议，两端需同版本；滚动升级时可先关闭 mux。",
+    body: "mux 为私有协议，两端需同版本；滚动升级时可先去掉 mux 字段。",
   },
   {
     title: "生成",
@@ -308,27 +362,29 @@ export const nativeFieldGroups = [
     fields: [
       { key: "tag", side: "两端", detail: "唯一标识，供路由引用。" },
       { key: "type", side: "两端", detail: '"native"。' },
+      { key: "address", side: "两端", detail: "host:port 字符串数组；outbound 可配置多候选入口。" },
       { key: "network", side: "两端", detail: "tcp / udp，可组合。" },
-      { key: "transport", side: "两端", detail: "raw / ws / h2 / h3，及 TLS 相关字段。" },
-      { key: "security", side: "两端", detail: "可选 REALITY；仅 raw，且不能叠 TLS。" },
-      { key: "mux", side: "两端", detail: "多路复用；连接池参数主要在客户端。" },
+      { key: "transport", side: "两端", detail: "仅 type / path（raw / ws / h2 / h3）。" },
+      { key: "security", side: "两端", detail: "tls 或 reality；证书、SNI、insecure 都写在这里。" },
+      { key: "mux", side: "两端", detail: "出现即开启；{} 表示默认参数。连接池参数主要在客户端。" },
     ],
   },
   {
     name: "服务端",
     fields: [
-      { key: "listen / port", side: "server", detail: "监听地址与端口。" },
+      { key: "address", side: "server", detail: "监听地址列表，如 [\"0.0.0.0:9443\"]。" },
       { key: "users[].id", side: "server", detail: "认证凭据，对应客户端 token。" },
-      { key: "outbound", side: "server", detail: "默认出口 tag。" },
-      { key: "transport.cert/key", side: "server", detail: "TLS 或 QUIC 模式时必填。" },
+      { key: "publish", side: "server", detail: "反向发布：service + address，可选 network=tcp|udp。" },
+      { key: "security.cert/key", side: "server", detail: "TLS 或 QUIC 模式时必填。" },
     ],
   },
   {
     name: "客户端",
     fields: [
-      { key: "server / port", side: "client", detail: "远端地址与端口。" },
+      { key: "address", side: "client", detail: "远端入口，可写多个候选 host:port。" },
       { key: "token", side: "client", detail: "必填，对应服务端 users[].id。" },
-      { key: "transport.server_name", side: "client", detail: "TLS/QUIC 的 SNI。" },
+      { key: "security.server_name", side: "client", detail: "TLS/QUIC 的 SNI。" },
+      { key: "expose", side: "client", detail: "反向发布：service + target，可选 network=tcp|udp。" },
       { key: "mux.max_sessions", side: "client", detail: "连接池上限，1–32，默认 4。" },
       { key: "mux.max_streams_per_session", side: "client", detail: "单连接 stream 上限，1–4096。" },
       { key: "mux.warm_spares", side: "client", detail: "预热空闲连接数，须小于 max_sessions。" },
@@ -340,6 +396,10 @@ export const nativeFieldGroups = [
 
 export const nativeMuxNotes = [
   {
+    title: "开启方式",
+    body: "配置 mux 对象即开启（常用 \"mux\": {}）。不要再写 enabled；省略 mux 字段即关闭。",
+  },
+  {
     title: "TCP mux",
     body: "开启后复用物理连接。目标不可达时不会提前向本地代理返回成功。",
   },
@@ -349,11 +409,30 @@ export const nativeMuxNotes = [
   },
   {
     title: "QUIC",
-    body: 'mux.mode: "quic" 使用带健康评分与路径探测的 UDP/QUIC 连接池，要求 native + raw + TLS 1.3。',
+    body: 'mux.mode: "quic" 使用带健康评分与路径探测的 UDP/QUIC 连接池，要求 native + raw + security.type=tls。',
   },
   {
     title: "UDP",
     body: "reliable 走 stream；auto 优先 DATAGRAM 并可回退；datagram 不降级。DATAGRAM 支持分片、恢复与自适应 FEC。",
+  },
+] as const;
+
+export const reversePublishNotes = [
+  {
+    title: "协议范围",
+    body: "仅 native + raw，且必须开启 group mux 或 QUIC mux。VLESS / VMess / Trojan 会在校验阶段被拒绝。",
+  },
+  {
+    title: "配对规则",
+    body: "服务端 publish 与客户端 expose 的 service 名必须一致，network 也必须匹配（默认 tcp）。",
+  },
+  {
+    title: "安全边界",
+    body: "客户端本地 target 不下发到服务端；服务端只能打通白名单内的 service。",
+  },
+  {
+    title: "QUIC 要求",
+    body: "QUIC 反向发布两端都要 security.type=tls；服务端还需 cert/key。",
   },
 ] as const;
 
@@ -380,7 +459,7 @@ export const nativeWorkflowCommands = [
     name: "uri",
     title: "导出 URI",
     command: "tcptun uri export --config client.json --output client.uri",
-    body: "从 tunnel outbound 单独导出 native:// URI。",
+    body: "从 tunnel outbound 导出 URI；多 address 会导出多条。",
   },
 ] as const;
 
@@ -388,6 +467,10 @@ export const configModelNotes = [
   {
     title: "结构",
     body: "顶层仅含 log、inbounds、outbounds、route、dns。未知字段会被拒绝。",
+  },
+  {
+    title: "地址",
+    body: "inbound.address 与 outbound.address 均为 host:port 数组。多地址是候选入口竞速，独立节点请用 balance。",
   },
   {
     title: "引用",
@@ -406,8 +489,7 @@ export const vlessRealityServerExample = `{
     {
       "tag": "server",
       "type": "vless",
-      "listen": "0.0.0.0",
-      "port": 443,
+      "address": ["0.0.0.0:443"],
       "network": ["tcp", "udp"],
       "users": [
         {
@@ -423,8 +505,7 @@ export const vlessRealityServerExample = `{
         "short_ids": ["00"],
         "dest": "example.com:443",
         "max_time_diff": "30s"
-      },
-      "outbound": "direct"
+      }
     }
   ],
   "outbounds": [
@@ -440,18 +521,15 @@ export const vlessRealityClientExample = `{
     {
       "tag": "local",
       "type": "mixed",
-      "listen": "127.0.0.1",
-      "port": 1080,
-      "network": ["tcp", "udp"],
-      "outbound": "proxy"
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
     }
   ],
   "outbounds": [
     {
       "tag": "proxy",
       "type": "vless",
-      "server": "proxy.example.com",
-      "port": 443,
+      "address": ["proxy.example.com:443"],
       "uuid": "00000000-0000-4000-8000-000000000000",
       "flow": "xtls-rprx-vision",
       "transport": { "type": "raw" },
@@ -476,8 +554,7 @@ export const nativeRealityServerExample = `{
     {
       "tag": "server",
       "type": "native",
-      "listen": "0.0.0.0",
-      "port": 9443,
+      "address": ["0.0.0.0:9443"],
       "network": ["tcp", "udp"],
       "users": [{ "id": "change-me" }],
       "transport": { "type": "raw" },
@@ -488,8 +565,7 @@ export const nativeRealityServerExample = `{
         "short_ids": ["abcd1234"],
         "dest": "example.com:443",
         "max_time_diff": "30s"
-      },
-      "outbound": "direct"
+      }
     }
   ],
   "outbounds": [
@@ -504,18 +580,15 @@ export const nativeRealityClientExample = `{
     {
       "tag": "local",
       "type": "mixed",
-      "listen": "127.0.0.1",
-      "port": 1080,
-      "network": ["tcp", "udp"],
-      "outbound": "proxy"
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
     }
   ],
   "outbounds": [
     {
       "tag": "proxy",
       "type": "native",
-      "server": "proxy.example.com",
-      "port": 9443,
+      "address": ["proxy.example.com:9443"],
       "token": "change-me",
       "network": ["tcp", "udp"],
       "transport": { "type": "raw" },
@@ -539,7 +612,7 @@ export const realityRules = [
   },
   {
     title: "不叠 TLS",
-    body: "不能开启 transport.tls。需要证书 TLS 或 QUIC 时，不要使用 REALITY。",
+    body: "不能设置 security.type=tls。需要证书 TLS 或 QUIC 时，不要使用 REALITY。",
   },
   {
     title: "适用端点",
@@ -604,7 +677,7 @@ export const protocolComparison = [
     securityDefault: "raw + REALITY",
     vision: "—",
     muxNote: "私有 mux，推荐开启",
-    bestFor: "吞吐优先",
+    bestFor: "吞吐 / 反向发布",
     generator: "tcptun config native --server … --port …",
   },
   {
@@ -643,17 +716,15 @@ export const protocolOutboundSnippets = {
   native: `{
   "tag": "proxy",
   "type": "native",
-  "server": "proxy.example.com",
-  "port": 9443,
+  "address": ["proxy.example.com:9443"],
   "token": "change-me",
   "transport": { "type": "raw" },
-  "mux": { "enabled": true }
+  "mux": {}
 }`,
   vless: `{
   "tag": "proxy",
   "type": "vless",
-  "server": "proxy.example.com",
-  "port": 443,
+  "address": ["proxy.example.com:443"],
   "uuid": "00000000-0000-4000-8000-000000000000",
   "flow": "xtls-rprx-vision",
   "transport": { "type": "raw" },
@@ -668,29 +739,29 @@ export const protocolOutboundSnippets = {
   vmess: `{
   "tag": "proxy",
   "type": "vmess",
-  "server": "proxy.example.com",
-  "port": 443,
+  "address": ["proxy.example.com:443"],
   "uuid": "00000000-0000-4000-8000-000000000000",
   "transport": {
     "type": "ws",
-    "path": "/vmess",
-    "tls": true,
+    "path": "/vmess"
+  },
+  "security": {
+    "type": "tls",
     "server_name": "proxy.example.com"
   },
-  "mux": { "enabled": true }
+  "mux": {}
 }`,
   trojan: `{
   "tag": "proxy",
   "type": "trojan",
-  "server": "proxy.example.com",
-  "port": 443,
+  "address": ["proxy.example.com:443"],
   "password": "change-me",
-  "transport": {
-    "type": "raw",
-    "tls": true,
+  "transport": { "type": "raw" },
+  "security": {
+    "type": "tls",
     "server_name": "proxy.example.com"
   },
-  "mux": { "enabled": true }
+  "mux": {}
 }`,
 } as const;
 

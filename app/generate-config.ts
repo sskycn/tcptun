@@ -75,39 +75,36 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
   const shortId = randomHex(8);
   const credential = await generateCredential(protocol);
 
+  const serverInbound: Record<string, unknown> = {
+    tag: "server",
+    type: protocol,
+    address: [joinHostPort(listen, input.port)],
+    network: ["tcp", "udp"],
+    users: [serverUser(protocol, credential)],
+    transport: { type: "raw" },
+    security: {
+      type: "reality",
+      private_key: privateKey,
+      server_names: [serverName],
+      short_ids: [shortId],
+      dest,
+      max_time_diff: "30s",
+    },
+  };
+  if (enableMux) serverInbound.mux = {};
+
   const serverConfig = {
     log: { level: "info" },
-    inbounds: [
-      {
-        tag: "server",
-        type: protocol,
-        listen,
-        port: input.port,
-        network: ["tcp", "udp"],
-        users: [serverUser(protocol, credential)],
-        transport: { type: "raw" },
-        security: {
-          type: "reality",
-          private_key: privateKey,
-          server_names: [serverName],
-          short_ids: [shortId],
-          dest,
-          max_time_diff: "30s",
-        },
-        mux: { enabled: enableMux },
-        outbound: "direct",
-      },
-    ],
+    inbounds: [serverInbound],
     outbounds: [{ tag: "direct", type: "direct", network: ["tcp", "udp"] }],
     route: { default_outbound: "direct", rules: [] as unknown[] },
   };
 
-  const clientOutbound = {
+  const clientOutbound: Record<string, unknown> = {
     tag: "proxy",
     type: protocol,
-    server,
-    port: input.port,
-    network: ["tcp", "udp"] as string[],
+    address: [joinHostPort(server, input.port)],
+    network: ["tcp", "udp"],
     transport: { type: "raw" },
     security: {
       type: "reality",
@@ -117,9 +114,9 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
       short_id: shortId,
       spider_x: "/",
     },
-    mux: { enabled: enableMux },
     ...clientCredentialFields(protocol, credential),
   };
+  if (enableMux) clientOutbound.mux = {};
 
   const clientConfig = {
     log: { level: "info" },
@@ -127,10 +124,8 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
       {
         tag: "local",
         type: "mixed",
-        listen: localListen,
-        port: input.localPort,
+        address: [joinHostPort(localListen, input.localPort)],
         network: ["tcp", "udp"],
-        outbound: "proxy",
       },
     ],
     outbounds: [clientOutbound],
@@ -173,6 +168,14 @@ export function downloadText(filename: string, content: string, mime = "applicat
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function joinHostPort(host: string, port: number): string {
+  const normalized = host.trim().replace(/^\[|\]$/g, "");
+  if (normalized.includes(":") && !normalized.startsWith("[")) {
+    return `[${normalized}]:${port}`;
+  }
+  return `${normalized}:${port}`;
 }
 
 function serverUser(protocol: TunnelProtocol, credential: string) {

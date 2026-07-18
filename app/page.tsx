@@ -32,7 +32,7 @@ const capabilities = [
   {
     label: "Config",
     title: "严格 JSON",
-    body: "拒绝未知字段；启动前校验 tag、引用、协议认证、TLS、REALITY 与 mux。",
+    body: "address 使用 host:port 数组；拒绝未知字段；启动前校验 tag、引用、协议认证、TLS、REALITY 与 mux。",
   },
   {
     label: "Route",
@@ -45,9 +45,14 @@ const capabilities = [
     body: "Native QUIC 同时承载 stream 与 DATAGRAM，并提供分片恢复、自适应 FEC 和多连接池。",
   },
   {
+    label: "Reverse",
+    title: "反向发布",
+    body: "native mux / QUIC 支持 publish 与 expose，把 NAT 后的 TCP/UDP 服务挂到边缘端口。",
+  },
+  {
     label: "Outbound",
     title: "负载与热切换",
-    body: "balance 按负载、延迟与失败选择成员；运行时可启停、探测并切换出口。",
+    body: "balance 按负载、延迟与失败选择成员；同一 outbound 的多 address 是候选入口竞速。",
   },
   {
     label: "Library",

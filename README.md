@@ -23,23 +23,23 @@ pnpm build
 
 ```bash
 # 编译 Go（+ Android）并写入 public/releases/<version>/ 与 latest/
-./scripts/publish-pages-assets.sh --version v0.2.0
+./scripts/publish-pages-assets.sh --version v0.2.1
 
 # 只编译 Go
-./scripts/publish-pages-assets.sh --version v0.2.0 --only go
+./scripts/publish-pages-assets.sh --version v0.2.1 --only go
 
 # 同步版本号与文件大小到 app/site-data.ts
-./scripts/publish-pages-assets.sh --version v0.2.0 --only go --update-site-data
+./scripts/publish-pages-assets.sh --version v0.2.1 --only go --update-site-data
 
 # 已有 dist / APK 时跳过编译
-./scripts/publish-pages-assets.sh --version v0.2.0 --skip-build
+./scripts/publish-pages-assets.sh --version v0.2.1 --skip-build
 ```
 
 然后提交并推送，Pages workflow 会构建并部署（`public/` 会进入 `out/`）：
 
 ```bash
 git add public/releases app/site-data.ts public/install.sh
-git commit -m "release: publish v0.2.0 assets"
+git commit -m "release: publish v0.2.1 assets"
 git push origin main
 ```
 
@@ -47,13 +47,13 @@ git push origin main
 
 | 路径 | 说明 |
 |------|------|
-| `https://tcptun.com/releases/0.2.0/tcptun-linux-amd64` | 固定版本 |
+| `https://tcptun.com/releases/0.2.1/tcptun-linux-amd64` | 固定版本 |
 | `https://tcptun.com/releases/latest/tcptun-linux-amd64` | 最新副本 |
 | `https://tcptun.com/install.sh` | 一键安装（从 `/releases/...` 拉二进制） |
 
 ```bash
 curl -fsSL https://tcptun.com/install.sh | sh
-TCPTUN_VERSION=0.2.0 sh -c "$(curl -fsSL https://tcptun.com/install.sh)"
+TCPTUN_VERSION=0.2.1 sh -c "$(curl -fsSL https://tcptun.com/install.sh)"
 ```
 
 Android 需在 `tcptun-kotlin` 配置 `signing.properties` 或 `TCPTUN_RELEASE_*` 环境变量。

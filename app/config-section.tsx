@@ -12,6 +12,8 @@ import {
   nativeQuicServerExample,
   nativeRealityClientExample,
   nativeRealityServerExample,
+  nativeReverseClientExample,
+  nativeReverseServerExample,
   nativeServerExample,
   nativeWorkflowCommands,
   protocolComparison,
@@ -19,6 +21,7 @@ import {
   realityCommands,
   realityFieldGroups,
   realityRules,
+  reversePublishNotes,
   vlessRealityClientExample,
   vlessRealityServerExample,
 } from "./site-data";
@@ -47,6 +50,18 @@ const nativeExampleTabs = [
     label: "客户端 QUIC",
     hint: "client-native-quic.json",
     code: nativeQuicClientExample,
+  },
+  {
+    id: "reverse-server",
+    label: "反向发布服务端",
+    hint: "server-reverse.json",
+    code: nativeReverseServerExample,
+  },
+  {
+    id: "reverse-client",
+    label: "反向发布客户端",
+    hint: "client-reverse.json",
+    code: nativeReverseClientExample,
   },
 ] as const;
 
@@ -103,6 +118,9 @@ export default function ConfigSection() {
         <div className="chip-row">
           <a className="chip-link" href="#config-native">
             native
+          </a>
+          <a className="chip-link" href="#reverse">
+            反向发布
           </a>
           <a className="chip-link" href="#reality">
             REALITY
@@ -233,7 +251,6 @@ export default function ConfigSection() {
             <span>mux 片段</span>
             <CopyButton
               value={`"mux": {
-  "enabled": true,
   "max_sessions": 4,
   "max_streams_per_session": 16,
   "warm_spares": 1
@@ -244,12 +261,29 @@ export default function ConfigSection() {
           </div>
           <pre>
             <code>{`"mux": {
-  "enabled": true,
   "max_sessions": 4,
   "max_streams_per_session": 16,
   "warm_spares": 1
 }`}</code>
           </pre>
+        </div>
+      </div>
+
+      <div className="mux-panel" id="reverse">
+        <div className="section-subheading">
+          <h3>反向发布</h3>
+          <p>
+            把 NAT 后的 TCP/UDP 服务挂到隧道服务端监听端口。服务端配置{" "}
+            <code>publish</code>，客户端配置 <code>expose</code>。
+          </p>
+        </div>
+        <div className="mux-grid">
+          {reversePublishNotes.map((item) => (
+            <article key={item.title}>
+              <h4>{item.title}</h4>
+              <p>{item.body}</p>
+            </article>
+          ))}
         </div>
       </div>
 
@@ -349,8 +383,8 @@ export default function ConfigSection() {
         <div className="reality-warn">
           <strong>注意</strong>
           <p>
-            REALITY 与 <code>transport.tls</code> / QUIC mux 互斥。需要伪装用 REALITY；需要 QUIC
-            用证书 TLS。
+            REALITY 与 <code>security.type=tls</code> / QUIC mux 互斥。需要伪装用 REALITY；需要 QUIC
+            用证书 TLS（写在 <code>security</code> 中，不再使用 <code>transport.tls</code>）。
           </p>
         </div>
       </div>

@@ -19,8 +19,7 @@ type JsonObject = Record<string, unknown>;
 type TcptunOutbound = {
   tag: string;
   type: string;
-  server?: string;
-  port?: number;
+  address?: string[];
   uuid?: string;
   password?: string;
   token?: string;
@@ -29,11 +28,6 @@ type TcptunOutbound = {
   transport?: {
     type?: string;
     path?: string;
-    tls?: boolean;
-    server_name?: string;
-    insecure?: boolean;
-    cert?: string;
-    key?: string;
   };
   security?: {
     type?: string;
@@ -47,21 +41,22 @@ type TcptunOutbound = {
     dest?: string;
     spider_x?: string;
     max_time_diff?: string;
+    cert?: string;
+    key?: string;
+    insecure?: boolean;
   };
-  mux?: { enabled?: boolean };
+  mux?: Record<string, unknown>;
 };
 
 type TcptunInbound = {
   tag: string;
   type: string;
-  listen?: string;
-  port?: number;
+  address?: string[];
   network?: string[];
   users?: Array<{ id?: string; password?: string; flow?: string }>;
   transport?: TcptunOutbound["transport"];
   security?: TcptunOutbound["security"];
-  mux?: { enabled?: boolean };
-  outbound?: string;
+  mux?: Record<string, unknown>;
 };
 
 const SAMPLE_XRAY = `{
@@ -325,12 +320,11 @@ function convertXrayOutbound(source: JsonObject, tag: string, warnings: string[]
   const outbound: TcptunOutbound = {
     tag,
     type: protocol,
-    server,
-    port,
+    address: [joinHostPort(server, port)],
     network: ["tcp", "udp"],
-    transport: finalizeTransport(stream, mapStreamTransport(stream, warnings, `outbound ${tag}`)),
-    mux: { enabled: muxEnabled },
+    transport: mapStreamTransport(stream, warnings, `outbound ${tag}`),
   };
+  if (muxEnabled) outbound.mux = {};
 
   if (protocol === "trojan") {
     if (!password) throw new Error("trojan password 缺失");
@@ -343,13 +337,6 @@ function convertXrayOutbound(source: JsonObject, tag: string, warnings: string[]
 
   const security = mapStreamSecurity(stream, "client", warnings, `outbound ${tag}`);
   if (security) outbound.security = security;
-
-  // REALITY cannot combine with transport.tls
-  if (security?.type === "reality" && outbound.transport) {
-    delete outbound.transport.tls;
-    delete outbound.transport.server_name;
-    delete outbound.transport.insecure;
-  }
 
   return outbound;
 }
@@ -394,27 +381,19 @@ function convertXrayInbound(source: JsonObject, tag: string, warnings: string[])
   const inbound: TcptunInbound = {
     tag,
     type: protocol,
-    listen,
-    port,
+    address: [joinHostPort(listen, port)],
     network: ["tcp", "udp"],
     users,
-    transport: finalizeTransport(stream, mapStreamTransport(stream, warnings, `inbound ${tag}`)),
-    mux: { enabled: false },
-    outbound: "direct",
+    transport: mapStreamTransport(stream, warnings, `inbound ${tag}`),
   };
 
   const security = mapStreamSecurity(stream, "server", warnings, `inbound ${tag}`);
   if (security) {
     inbound.security = security;
-    if (inbound.transport) {
-      delete inbound.transport.tls;
-      delete inbound.transport.server_name;
-      delete inbound.transport.insecure;
-    }
   }
 
-  // TLS certs on server
-  if (inbound.transport?.tls) {
+  // TLS certs on server when using certificate TLS
+  if (security?.type === "tls") {
     const tls = isObject(stream.tlsSettings) ? stream.tlsSettings : {};
     const certs = Array.isArray(tls.certificates) ? tls.certificates : [];
     const cert = isObject(certs[0]) ? certs[0] : null;
@@ -422,16 +401,16 @@ function convertXrayInbound(source: JsonObject, tag: string, warnings: string[])
       const certFile = String(cert.certificateFile || cert.certificate || "");
       const keyFile = String(cert.keyFile || cert.key || "");
       if (certFile && keyFile && !certFile.includes("\n") && !keyFile.includes("\n")) {
-        inbound.transport = {
-          ...inbound.transport,
+        inbound.security = {
+          ...inbound.security,
           cert: certFile,
           key: keyFile,
         };
       } else if (certFile || keyFile) {
-        warnings.push(`inbound ${tag} 的证书是内联内容或路径不完整，请手动填写 transport.cert/key`);
+        warnings.push(`inbound ${tag} 的证书是内联内容或路径不完整，请手动填写 security.cert/key`);
       }
     } else {
-      warnings.push(`inbound ${tag} 启用了 TLS，请手动补充 transport.cert/key`);
+      warnings.push(`inbound ${tag} 启用了 TLS，请手动补充 security.cert/key`);
     }
   }
 
@@ -510,10 +489,21 @@ function mapStreamSecurity(
   const security = String(stream.security || "none").toLowerCase();
   const transportHint = String(stream.network || "tcp").toLowerCase();
 
-  if (security !== "reality") {
+  if (security === "tls" || security === "xtls") {
     if (security === "xtls") {
       warnings.push(`${label} 使用 xtls，已按 TLS 处理`);
     }
+    const tls = isObject(stream.tlsSettings) ? stream.tlsSettings : {};
+    const serverName = String(tls.serverName || tls.server_name || "");
+    const insecure = Boolean(tls.allowInsecure || tls.insecure);
+    return {
+      type: "tls",
+      ...(serverName ? { server_name: serverName } : {}),
+      ...(insecure && side === "client" ? { insecure: true } : {}),
+    };
+  }
+
+  if (security !== "reality") {
     return undefined;
   }
 
@@ -564,23 +554,6 @@ function mapStreamSecurity(
   };
 }
 
-function finalizeTransport(
-  stream: JsonObject,
-  transport: NonNullable<TcptunOutbound["transport"]>,
-): NonNullable<TcptunOutbound["transport"]> {
-  const security = String(stream.security || "none").toLowerCase();
-  if (security !== "tls" && security !== "xtls") return transport;
-  const tls = isObject(stream.tlsSettings) ? stream.tlsSettings : {};
-  const serverName = String(tls.serverName || tls.server_name || "");
-  const insecure = Boolean(tls.allowInsecure || tls.insecure);
-  return {
-    ...transport,
-    tls: true,
-    ...(serverName ? { server_name: serverName } : {}),
-    ...(insecure ? { insecure: true } : {}),
-  };
-}
-
 function buildClientConfig(
   outbounds: TcptunOutbound[],
   localListen: string,
@@ -607,10 +580,8 @@ function buildClientConfig(
       {
         tag: "local",
         type: "mixed",
-        listen: localListen,
-        port: localPort,
+        address: [joinHostPort(localListen, localPort)],
         network: ["tcp", "udp"],
-        outbound: defaultOutbound,
       },
     ],
     outbounds: finalOutbounds,
@@ -678,15 +649,13 @@ function parseVmessLink(text: string, tag: string): TcptunOutbound {
   const outbound: TcptunOutbound = {
     tag,
     type: "vmess",
-    server: address,
-    port,
+    address: [joinHostPort(address, port)],
     uuid,
     network: ["tcp", "udp"],
     transport: {
       type: transportType,
       ...(path ? { path } : {}),
     },
-    mux: { enabled: false },
   };
 
   if (tls === "reality") {
@@ -699,9 +668,8 @@ function parseVmessLink(text: string, tag: string): TcptunOutbound {
       spider_x: String(source.spx || source.spiderX || "/"),
     };
   } else if (tls === "tls") {
-    outbound.transport = {
-      ...outbound.transport,
-      tls: true,
+    outbound.security = {
+      type: "tls",
       server_name: String(source.sni || source.serverName || ""),
     };
   }
@@ -733,14 +701,12 @@ function parseVlessOrTrojanLink(text: string, tag: string, protocol: "vless" | "
   const outbound: TcptunOutbound = {
     tag,
     type: protocol,
-    server,
-    port,
+    address: [joinHostPort(server, port)],
     network: ["tcp", "udp"],
     transport: {
       type,
       ...(path ? { path } : {}),
     },
-    mux: { enabled: false },
   };
 
   if (protocol === "vless") {
@@ -763,9 +729,8 @@ function parseVlessOrTrojanLink(text: string, tag: string, protocol: "vless" | "
       spider_x: query.get("spx") || "/",
     };
   } else if (security === "tls") {
-    outbound.transport = {
-      ...outbound.transport,
-      tls: true,
+    outbound.security = {
+      type: "tls",
       ...(sni ? { server_name: sni } : {}),
       ...(query.get("allowInsecure") === "1" || query.get("insecure") === "1"
         ? { insecure: true }
@@ -774,6 +739,14 @@ function parseVlessOrTrojanLink(text: string, tag: string, protocol: "vless" | "
   }
 
   return outbound;
+}
+
+function joinHostPort(host: string, port: number): string {
+  const normalized = host.trim().replace(/^\[|\]$/g, "");
+  if (normalized.includes(":") && !normalized.startsWith("[")) {
+    return `[${normalized}]:${port}`;
+  }
+  return `${normalized}:${port}`;
 }
 
 function mapShareNetwork(network: string): string {

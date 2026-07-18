@@ -23,11 +23,6 @@ export type UriImportResult = {
 export type TcptunTransport = {
   type?: string;
   path?: string;
-  tls?: boolean;
-  cert?: string;
-  key?: string;
-  server_name?: string;
-  insecure?: boolean;
 };
 
 export type TcptunSecurity = {
@@ -42,10 +37,12 @@ export type TcptunSecurity = {
   dest?: string;
   spider_x?: string;
   max_time_diff?: string | number;
+  cert?: string;
+  key?: string;
+  insecure?: boolean;
 };
 
 export type TcptunMux = {
-  enabled?: boolean;
   mode?: string;
   udp_mode?: string;
   max_sessions?: number;
@@ -56,9 +53,7 @@ export type TcptunMux = {
 export type TcptunOutbound = {
   tag: string;
   type: string;
-  server?: string;
-  port?: number;
-  address?: string;
+  address?: string[];
   via?: string;
   username?: string;
   password?: string;
@@ -68,7 +63,7 @@ export type TcptunOutbound = {
   network?: string[];
   transport?: TcptunTransport;
   security?: TcptunSecurity;
-  mux?: TcptunMux;
+  mux?: TcptunMux | null;
   discover?: boolean;
   primary?: string;
   fallback?: string;
@@ -83,15 +78,12 @@ type TcptunUser = { id?: string; password?: string; flow?: string };
 type TcptunInbound = {
   tag: string;
   type: string;
-  listen?: string;
-  listen_addresses?: string[];
-  port?: number;
-  address?: string;
+  address?: string[];
   network?: string[];
   users?: TcptunUser[];
   transport?: TcptunTransport;
   security?: TcptunSecurity;
-  mux?: TcptunMux;
+  mux?: TcptunMux | null;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -149,7 +141,7 @@ export async function configToUris(
   return {
     uriText: uris.join("\n"),
     count: uris.length,
-    summary: `已从 ${uris.length} 个 ${scope === "inbounds" ? "inbound" : "outbound"} 生成 URI`,
+    summary: `已从 ${uris.length} 个 ${scope === "inbounds" ? "inbound 地址" : "outbound 地址"} 生成 URI`,
   };
 }
 
@@ -176,10 +168,8 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
         {
           tag: "local",
           type: "mixed",
-          listen: localListen,
-          port: localPort,
+          address: [joinHostPort(localListen, localPort)],
           network: networks,
-          outbound: defaultOutbound,
         },
       ],
       outbounds,
@@ -201,6 +191,7 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   const transport = outbound.transport || {};
   const security = outbound.security || {};
   const mux = outbound.mux || {};
+  const muxEnabled = outbound.mux != null;
 
   if (protocol === "vmess") {
     const payload = {
@@ -215,7 +206,12 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
       type: "none",
       host: "",
       path: transport.path || "",
-      tls: security.type === "reality" ? "reality" : transport.tls ? "tls" : "",
+      tls:
+        security.type === "reality"
+          ? "reality"
+          : security.type === "tls"
+            ? "tls"
+            : "",
       ...(security.type === "reality"
         ? {
             sni: security.server_name || "",
@@ -224,11 +220,11 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
             sid: security.short_id || "",
             spx: security.spider_x || "",
           }
-        : transport.server_name
-          ? { sni: transport.server_name }
+        : security.type === "tls" && security.server_name
+          ? { sni: security.server_name }
           : {}),
-      ...(transport.insecure ? { allowInsecure: true } : {}),
-      ...(mux.enabled ? { tcptun_mux: true } : {}),
+      ...(security.insecure ? { allowInsecure: true } : {}),
+      ...(muxEnabled ? { tcptun_mux: true } : {}),
       ...(mux.mode ? { tcptun_mux_mode: mux.mode } : {}),
       ...(mux.udp_mode ? { tcptun_mux_udp_mode: mux.udp_mode } : {}),
       ...(positiveInteger(mux.max_sessions)
@@ -257,15 +253,10 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   if (outbound.network?.length) query.set("network", outbound.network.join(","));
   if (transport.path) query.set("path", transport.path);
 
-  if (transport.tls) {
+  if (security.type === "tls") {
     query.set("security", "tls");
-    if (transport.server_name) query.set("sni", transport.server_name);
-  } else if (security.type !== "reality" && transport.server_name) {
-    query.set("sni", transport.server_name);
-  }
-  if (transport.insecure) query.set("insecure", "true");
-
-  if (security.type === "reality") {
+    if (security.server_name) query.set("sni", security.server_name);
+  } else if (security.type === "reality") {
     query.set("security", "reality");
     query.set("sni", security.server_name || "");
     query.set("fp", security.fingerprint || "");
@@ -273,8 +264,9 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
     query.set("sid", security.short_id || "");
     if (security.spider_x) query.set("spx", security.spider_x);
   }
+  if (security.insecure) query.set("insecure", "true");
   if (outbound.flow) query.set("flow", outbound.flow);
-  if (protocol === "native" || mux.enabled) query.set("mux", String(Boolean(mux.enabled)));
+  if (protocol === "native" || muxEnabled) query.set("mux", String(muxEnabled));
   if (mux.mode) query.set("mux_mode", mux.mode);
   if (mux.udp_mode) query.set("mux_udp_mode", mux.udp_mode);
   if (positiveInteger(mux.max_sessions)) query.set("mux_max_sessions", String(mux.max_sessions));
@@ -326,16 +318,12 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   };
   const path = query.get("path");
   if (path) transport.path = path;
-  const insecure = optionalBoolean(query.get("insecure"), "insecure");
-  if (insecure) transport.insecure = true;
 
   const outbound: TcptunOutbound = {
     tag,
     type: protocol,
-    server,
-    port,
+    address: [joinHostPort(server, port)],
     transport,
-    mux: {},
   };
   const networkText = query.get("network")?.trim();
   if (networkText) outbound.network = parseNetworkList(networkText);
@@ -343,22 +331,30 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   if (flow) outbound.flow = flow;
 
   const mux = optionalBoolean(query.get("mux"), "mux");
-  if (mux !== undefined) outbound.mux!.enabled = mux;
-  setOptionalText(outbound.mux!, "mode", query.get("mux_mode"));
-  setOptionalText(outbound.mux!, "udp_mode", query.get("mux_udp_mode"));
-  setOptionalInteger(outbound.mux!, "max_sessions", query.get("mux_max_sessions"));
-  setOptionalInteger(
-    outbound.mux!,
-    "max_streams_per_session",
-    query.get("mux_max_streams_per_session"),
-  );
-  setOptionalInteger(outbound.mux!, "warm_spares", query.get("mux_warm_spares"));
+  const muxConfig: TcptunMux = {};
+  setOptionalText(muxConfig, "mode", query.get("mux_mode"));
+  setOptionalText(muxConfig, "udp_mode", query.get("mux_udp_mode"));
+  setOptionalInteger(muxConfig, "max_sessions", query.get("mux_max_sessions"));
+  setOptionalInteger(muxConfig, "max_streams_per_session", query.get("mux_max_streams_per_session"));
+  setOptionalInteger(muxConfig, "warm_spares", query.get("mux_warm_spares"));
+  const hasMuxFields = Object.keys(muxConfig).length > 0;
+  if (mux === true || (mux === undefined && hasMuxFields)) {
+    outbound.mux = muxConfig;
+  } else if (mux === false) {
+    // omit mux
+  } else if (hasMuxFields) {
+    outbound.mux = muxConfig;
+  }
 
+  const insecure = optionalBoolean(query.get("insecure"), "insecure");
   const securityType = (query.get("security") || "none").trim().toLowerCase();
   const sni = query.get("sni") || query.get("serverName") || "";
   if (securityType === "tls") {
-    transport.tls = true;
-    if (sni) transport.server_name = sni;
+    outbound.security = {
+      type: "tls",
+      ...(sni ? { server_name: sni } : {}),
+      ...(insecure ? { insecure: true } : {}),
+    };
   } else if (securityType === "reality") {
     outbound.security = {
       type: "reality",
@@ -368,10 +364,10 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
       short_id: query.get("sid") || "",
       spider_x: query.get("spx") || "",
     };
-  } else if (securityType === "none" || securityType === "") {
-    if (sni) transport.server_name = sni;
-  } else {
+  } else if (securityType !== "none" && securityType !== "") {
     outbound.security = { type: securityType };
+  } else if (insecure) {
+    outbound.security = { insecure: true };
   }
 
   const username = decodeUserInfo(uri.username);
@@ -400,27 +396,22 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
   const outbound: TcptunOutbound = {
     tag,
     type: "vmess",
-    server,
-    port,
+    address: [joinHostPort(server, port)],
     uuid: requiredCredential(String(source.id || ""), "VMess uuid"),
     transport: {
       type: String(source.net || "raw"),
       ...(source.path ? { path: String(source.path) } : {}),
-      ...(source.allowInsecure ? { insecure: true } : {}),
-    },
-    mux: {
-      ...(source.tcptun_mux ? { enabled: true } : {}),
-      ...(source.tcptun_mux_mode ? { mode: String(source.tcptun_mux_mode) } : {}),
-      ...(source.tcptun_mux_udp_mode ? { udp_mode: String(source.tcptun_mux_udp_mode) } : {}),
     },
   };
-  setSourceInteger(outbound.mux!, "max_sessions", source.tcptun_mux_max_sessions);
-  setSourceInteger(
-    outbound.mux!,
-    "max_streams_per_session",
-    source.tcptun_mux_max_streams_per_session,
-  );
-  setSourceInteger(outbound.mux!, "warm_spares", source.tcptun_mux_warm_spares);
+  const muxConfig: TcptunMux = {};
+  if (source.tcptun_mux_mode) muxConfig.mode = String(source.tcptun_mux_mode);
+  if (source.tcptun_mux_udp_mode) muxConfig.udp_mode = String(source.tcptun_mux_udp_mode);
+  setSourceInteger(muxConfig, "max_sessions", source.tcptun_mux_max_sessions);
+  setSourceInteger(muxConfig, "max_streams_per_session", source.tcptun_mux_max_streams_per_session);
+  setSourceInteger(muxConfig, "warm_spares", source.tcptun_mux_warm_spares);
+  if (source.tcptun_mux || Object.keys(muxConfig).length > 0) {
+    outbound.mux = muxConfig;
+  }
   if (source.tcptun_network) outbound.network = parseNetworkList(String(source.tcptun_network));
   if (source.tcptun_flow) outbound.flow = String(source.tcptun_flow);
 
@@ -435,8 +426,11 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
       spider_x: String(source.spx || ""),
     };
   } else if (security && security !== "none") {
-    outbound.transport!.tls = true;
-    if (source.sni) outbound.transport!.server_name = String(source.sni);
+    outbound.security = {
+      type: "tls",
+      ...(source.sni ? { server_name: String(source.sni) } : {}),
+      ...(source.allowInsecure ? { insecure: true } : {}),
+    };
   }
   return outbound;
 }
@@ -449,10 +443,22 @@ function outboundsFromConfigOutbounds(value: unknown): TcptunOutbound[] {
       : isObject(value) && typeof value.type === "string"
         ? [value]
         : [];
-  return candidates
+  const result: TcptunOutbound[] = [];
+  candidates
     .filter(isObject)
     .filter((item) => isUriProtocol(String(item.type || "")))
-    .map((item, index) => asOutbound(item, index));
+    .forEach((item, index) => {
+      const outbound = asOutbound(item, index);
+      const addresses = normalizeAddressList(outbound.address, outbound.tag, "outbound");
+      addresses.forEach((address, addressIndex) => {
+        const tag =
+          addresses.length === 1
+            ? outbound.tag
+            : `${outbound.tag}-${addressIndex + 1}`;
+        result.push({ ...outbound, tag, address: [address] });
+      });
+    });
+  return result;
 }
 
 async function outboundsFromConfigInbounds(value: unknown): Promise<TcptunOutbound[]> {
@@ -468,14 +474,18 @@ async function outboundsFromConfigInbounds(value: unknown): Promise<TcptunOutbou
   const outbounds: TcptunOutbound[] = [];
   for (const inbound of inbounds) {
     const addresses = inboundAddresses(inbound);
-    for (const address of addresses) outbounds.push(await outboundFromInbound(inbound, address));
+    for (const [index, address] of addresses.entries()) {
+      const outbound = await outboundFromInbound(inbound, address);
+      if (addresses.length > 1) outbound.tag = `${inbound.tag}-${index + 1}`;
+      outbounds.push(outbound);
+    }
   }
   return outbounds;
 }
 
 async function outboundFromInbound(
   inbound: TcptunInbound,
-  address: { server: string; port: number },
+  address: string,
 ): Promise<TcptunOutbound> {
   if (inbound.users?.length !== 1) {
     throw new Error(`inbound ${inbound.tag} 导出 URI 时必须且只能包含一个用户`);
@@ -485,17 +495,13 @@ async function outboundFromInbound(
   const outbound: TcptunOutbound = {
     tag: inbound.tag,
     type: protocol,
-    server: address.server,
-    port: address.port,
+    address: [address],
     ...(inbound.network?.length ? { network: [...inbound.network] } : {}),
     transport: {
       type: inbound.transport?.type,
       path: inbound.transport?.path,
-      tls: inbound.transport?.tls,
-      server_name: inbound.transport?.server_name,
-      insecure: inbound.transport?.insecure,
     },
-    mux: { ...(inbound.mux || {}) },
+    ...(inbound.mux != null ? { mux: { ...(inbound.mux || {}) } } : {}),
   };
   if (user.flow) outbound.flow = user.flow;
   if (protocol === "vless" || protocol === "vmess") outbound.uuid = user.id;
@@ -503,7 +509,8 @@ async function outboundFromInbound(
   else outbound.token = user.id;
 
   const security = inbound.security || {};
-  if ((security.type || "").toLowerCase() === "reality") {
+  const securityType = (security.type || "").toLowerCase();
+  if (securityType === "reality") {
     if (!security.private_key) throw new Error(`inbound ${inbound.tag} 缺少 REALITY private_key`);
     if (!security.server_names?.length) throw new Error(`inbound ${inbound.tag} 缺少 REALITY server_names`);
     outbound.security = {
@@ -514,19 +521,41 @@ async function outboundFromInbound(
       short_id: security.short_ids?.[0] || "",
       spider_x: "/",
     };
+  } else if (securityType === "tls") {
+    outbound.security = {
+      type: "tls",
+      ...(security.server_name ? { server_name: security.server_name } : {}),
+    };
   } else if (security.type) {
     outbound.security = { type: security.type };
   }
   return outbound;
 }
 
-function inboundAddresses(inbound: TcptunInbound): Array<{ server: string; port: number }> {
-  if (inbound.address?.trim()) return [splitAddress(inbound.address)];
-  assertPort(Number(inbound.port), `inbound ${inbound.tag} 端口`);
-  const hosts = [...(inbound.listen_addresses || [])];
-  if (inbound.listen?.trim()) hosts.push(inbound.listen.trim());
-  if (hosts.length === 0) throw new Error(`inbound ${inbound.tag} 缺少监听地址`);
-  return [...new Set(hosts)].map((server) => ({ server: server.replace(/^\[|\]$/g, ""), port: Number(inbound.port) }));
+function inboundAddresses(inbound: TcptunInbound): string[] {
+  return normalizeAddressList(inbound.address, inbound.tag, "inbound");
+}
+
+function normalizeAddressList(
+  address: string[] | undefined,
+  tag: string,
+  kind: string,
+): string[] {
+  if (!Array.isArray(address) || address.length === 0) {
+    throw new Error(`${kind} ${tag} 缺少 address 数组`);
+  }
+  const seen = new Set<string>();
+  const result: string[] = [];
+  address.forEach((value, index) => {
+    const text = String(value || "").trim();
+    if (!text) throw new Error(`${kind} ${tag} address[${index}] 不能为空`);
+    // validate host:port
+    splitAddress(text);
+    if (seen.has(text)) return;
+    seen.add(text);
+    result.push(text);
+  });
+  return result;
 }
 
 function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtocol) {
@@ -543,11 +572,11 @@ function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtoco
   ) {
     throw new Error(`outbound ${outbound.tag} 的发现或策略字段无法写入 URI`);
   }
-  if (outbound.transport?.cert || outbound.transport?.key) {
+  const security = outbound.security || {};
+  if (security.cert || security.key) {
     throw new Error(`outbound ${outbound.tag} 的证书或密钥文件无法写入 URI`);
   }
-  const security = outbound.security || {};
-  if (security.type && security.type !== "none" && security.type !== "reality") {
+  if (security.type && !["none", "tls", "reality", ""].includes(security.type)) {
     throw new Error(`outbound ${outbound.tag} 的 security.type=${security.type} 无法写入 URI`);
   }
   if (
@@ -557,7 +586,7 @@ function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtoco
     security.dest ||
     security.max_time_diff
   ) {
-    throw new Error(`outbound ${outbound.tag} 含服务端 REALITY 字段，无法写入客户端 URI`);
+    throw new Error(`outbound ${outbound.tag} 含服务端 security 字段，无法写入客户端 URI`);
   }
   if (protocol === "native" && (outbound.password || outbound.uuid)) {
     throw new Error(`outbound ${outbound.tag} 包含非 Native 凭据`);
@@ -587,11 +616,83 @@ function parseJson(raw: string): unknown {
 }
 
 function asOutbound(value: JsonObject, index: number): TcptunOutbound {
-  return { ...(value as TcptunOutbound), tag: String(value.tag || `proxy${index + 1}`) };
+  const outbound = { ...(value as TcptunOutbound), tag: String(value.tag || `proxy${index + 1}`) };
+  // normalize legacy server/port if still present in pasted JSON
+  if ((!outbound.address || outbound.address.length === 0) && value.server != null && value.port != null) {
+    outbound.address = [joinHostPort(String(value.server), Number(value.port))];
+  }
+  // normalize address if it was a single string
+  if (typeof value.address === "string") {
+    outbound.address = [value.address];
+  }
+  // normalize legacy transport.tls into security.tls
+  const transport = (value.transport || {}) as JsonObject;
+  if (transport.tls && !outbound.security?.type) {
+    outbound.security = {
+      type: "tls",
+      ...(transport.server_name ? { server_name: String(transport.server_name) } : {}),
+      ...(transport.insecure ? { insecure: true } : {}),
+      ...(transport.cert ? { cert: String(transport.cert) } : {}),
+      ...(transport.key ? { key: String(transport.key) } : {}),
+    };
+  }
+  if (outbound.transport) {
+    outbound.transport = {
+      type: outbound.transport.type,
+      path: outbound.transport.path,
+    };
+  }
+  // legacy mux.enabled: true → mux object; enabled:false → omit
+  if (isObject(value.mux) && "enabled" in value.mux) {
+    const enabled = Boolean(value.mux.enabled);
+    if (!enabled) {
+      outbound.mux = undefined;
+    } else {
+      const { enabled: _enabled, ...rest } = value.mux as JsonObject;
+      void _enabled;
+      outbound.mux = rest as TcptunMux;
+    }
+  }
+  return outbound;
 }
 
 function asInbound(value: JsonObject, index: number): TcptunInbound {
-  return { ...(value as TcptunInbound), tag: String(value.tag || `server${index + 1}`) };
+  const inbound = { ...(value as TcptunInbound), tag: String(value.tag || `server${index + 1}`) };
+  if ((!inbound.address || inbound.address.length === 0) && (value.listen != null || value.port != null)) {
+    const host = String(value.listen || "0.0.0.0");
+    const port = Number(value.port);
+    if (Number.isInteger(port)) inbound.address = [joinHostPort(host, port)];
+  }
+  if (typeof value.address === "string") {
+    inbound.address = [value.address];
+  }
+  const transport = (value.transport || {}) as JsonObject;
+  if (transport.tls && !inbound.security?.type) {
+    inbound.security = {
+      ...(inbound.security || {}),
+      type: "tls",
+      ...(transport.server_name ? { server_name: String(transport.server_name) } : {}),
+      ...(transport.cert ? { cert: String(transport.cert) } : {}),
+      ...(transport.key ? { key: String(transport.key) } : {}),
+    };
+  }
+  if (inbound.transport) {
+    inbound.transport = {
+      type: inbound.transport.type,
+      path: inbound.transport.path,
+    };
+  }
+  if (isObject(value.mux) && "enabled" in value.mux) {
+    const enabled = Boolean(value.mux.enabled);
+    if (!enabled) {
+      inbound.mux = undefined;
+    } else {
+      const { enabled: _enabled, ...rest } = value.mux as JsonObject;
+      void _enabled;
+      inbound.mux = rest as TcptunMux;
+    }
+  }
+  return inbound;
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -609,14 +710,11 @@ function isUriProtocol(value: string): value is TunnelProtocol {
 }
 
 function outboundEndpoint(outbound: TcptunOutbound): { server: string; port: number } {
-  if (outbound.address?.trim()) {
-    if (outbound.server || outbound.port) throw new Error(`outbound ${outbound.tag} 的 address 不能和 server/port 并用`);
-    return splitAddress(outbound.address);
+  const addresses = outbound.address;
+  if (!addresses || addresses.length !== 1) {
+    throw new Error(`outbound ${outbound.tag} 导出 URI 时 address 必须恰好包含 1 项`);
   }
-  const server = outbound.server?.trim() || "";
-  if (!server) throw new Error(`outbound ${outbound.tag} 缺少 server`);
-  assertPort(Number(outbound.port), `outbound ${outbound.tag} 端口`);
-  return { server: server.replace(/^\[|\]$/g, ""), port: Number(outbound.port) };
+  return splitAddress(addresses[0]);
 }
 
 function splitAddress(address: string): { server: string; port: number } {
@@ -628,6 +726,14 @@ function splitAddress(address: string): { server: string; port: number } {
   const port = Number(match[2]);
   assertPort(port, "地址端口");
   return { server: match[1].replace(/^\[|\]$/g, ""), port };
+}
+
+function joinHostPort(host: string, port: number): string {
+  const normalized = host.trim().replace(/^\[|\]$/g, "");
+  if (normalized.includes(":") && !normalized.startsWith("[")) {
+    return `[${normalized}]:${port}`;
+  }
+  return `${normalized}:${port}`;
 }
 
 function assertPort(value: number, label: string) {

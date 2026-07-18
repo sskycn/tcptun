@@ -26,22 +26,18 @@ const SAMPLE_CONFIG = `{
     {
       "tag": "local",
       "type": "mixed",
-      "listen": "127.0.0.1",
-      "port": 1080,
-      "network": ["tcp", "udp"],
-      "outbound": "proxy"
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
     }
   ],
   "outbounds": [
     {
       "tag": "proxy",
       "type": "native",
-      "server": "proxy.example.com",
-      "port": 9443,
+      "address": ["proxy.example.com:9443"],
       "token": "replace-with-token",
       "network": ["tcp", "udp"],
-      "transport": { "type": "raw" },
-      "mux": { "enabled": false }
+      "transport": { "type": "raw" }
     }
   ],
   "route": { "default_outbound": "proxy", "rules": [] }

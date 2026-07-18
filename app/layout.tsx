@@ -34,7 +34,7 @@ const themeInitScript = `
 
 export const metadata: Metadata = {
   title: `tcptun v${releaseVersion} · 配置驱动的代理运行时`,
-  description: `tcptun 是多入口、多出口代理运行时。支持 native、VLESS、VMess、Trojan、REALITY、mux、原生 QUIC、balance 与规则路由。`,
+  description: `tcptun 是多入口、多出口代理运行时。支持 native、VLESS、VMess、Trojan、REALITY、mux、原生 QUIC、反向发布、balance 与规则路由。`,
   icons: {
     icon: "/tcptun-logo.png",
     apple: "/tcptun-logo.png",
