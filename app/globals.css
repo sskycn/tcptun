@@ -2029,6 +2029,162 @@ html[data-theme="dark"] .platform-mark.android {
   background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
 
+.native-reality-quic {
+  margin: 0 0 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line));
+  border-radius: var(--radius);
+  padding: 24px;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--primary) 14%, transparent), transparent 38%),
+    linear-gradient(145deg, color-mix(in srgb, var(--cyan-soft) 28%, var(--surface)), var(--surface));
+  box-shadow: 0 1px 2px rgb(var(--shadow) / 0.04);
+  scroll-margin-top: 88px;
+}
+
+.native-reality-quic-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.6fr);
+  gap: 28px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.native-reality-quic-heading .eyebrow {
+  margin-bottom: 8px;
+}
+
+.native-reality-quic-heading h3 {
+  margin: 0 0 10px;
+  font-size: clamp(22px, 2.5vw, 30px);
+  letter-spacing: -0.035em;
+}
+
+.native-reality-quic-heading h3 code {
+  color: var(--text);
+  font: inherit;
+}
+
+.native-reality-quic-heading p,
+.native-reality-quic-layer p,
+.native-reality-quic-footer p,
+.native-reality-quic-fit p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.native-reality-quic-heading p code,
+.native-reality-quic-footer p code {
+  border-radius: 6px;
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
+  color: var(--text);
+  font: 600 12px var(--font-jetbrains), monospace;
+}
+
+.native-reality-quic-fit {
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line));
+  border-radius: var(--radius-small);
+  padding: 16px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.native-reality-quic-fit span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--primary);
+  font: 700 10px var(--font-jetbrains), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.native-reality-quic-fit strong,
+.native-reality-quic-footer strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.native-reality-quic-stack {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.native-reality-quic-layer-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.native-reality-quic-layer {
+  height: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  padding: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.native-reality-quic-layer > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font: 700 10px var(--font-jetbrains), monospace;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.native-reality-quic-layer > code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-bottom: 10px;
+  color: var(--cyan-text);
+  font: 700 13px var(--font-jetbrains), monospace;
+}
+
+.native-reality-quic-plus {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: -14px;
+  display: grid;
+  width: 10px;
+  place-items: center;
+  color: var(--primary);
+  font: 800 15px var(--font-jetbrains), monospace;
+  transform: translateY(-50%);
+}
+
+.native-reality-quic-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(340px, 1.1fr);
+  gap: 18px;
+  align-items: center;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.native-reality-quic-command {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: var(--radius-small);
+  background: var(--terminal);
+}
+
+.native-reality-quic-command pre {
+  padding: 14px 54px 14px 16px;
+  color: var(--terminal-text);
+  white-space: pre-wrap;
+}
+
+.native-reality-quic-command .copy-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
 .config-example-panel {
   overflow: hidden;
   margin-bottom: 14px;
@@ -3328,6 +3484,8 @@ button:focus-visible {
 
   .architecture-grid,
   .native-focus-heading,
+  .native-reality-quic-heading,
+  .native-reality-quic-footer,
   .native-pair-note,
   .generator-grid,
   .converter-grid {
@@ -3336,6 +3494,14 @@ button:focus-visible {
 
   .native-pair-flow {
     justify-content: flex-start;
+  }
+
+  .native-reality-quic-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .native-reality-quic-layer-wrap:nth-child(2) .native-reality-quic-plus {
+    display: none;
   }
 
   .row-heading {
@@ -3463,6 +3629,25 @@ button:focus-visible {
 
   .config-workflow-grid article {
     min-height: auto;
+  }
+
+  .native-reality-quic {
+    padding: 20px;
+  }
+
+  .native-reality-quic-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .native-reality-quic-plus {
+    position: static;
+    width: auto;
+    margin: 6px 0 -12px;
+    transform: none;
+  }
+
+  .native-reality-quic-layer-wrap:nth-child(2) .native-reality-quic-plus {
+    display: grid;
   }
 
   .config-example-toolbar {

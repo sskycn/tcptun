@@ -13,8 +13,10 @@ import {
 } from "react";
 import CopyButton from "./copy-button";
 import { downloadText } from "./generate-config";
+import { decodeProfilePayload, encodeT3 } from "./profile-t3";
 import {
   configToUris,
+  parseOutboundUri,
   urisToConfig,
   type UriExportScope,
 } from "./uri-convert";
@@ -26,6 +28,7 @@ type ConvertResult = {
   filename: string;
   summary: string;
   qrCodes: string[];
+  qrPayloads: string[];
 };
 
 const SAMPLE_CONFIG = `{
@@ -68,10 +71,7 @@ export default function UriConverter() {
   const [qrIndex, setQrIndex] = useState(0);
   const qrFileInput = useRef<HTMLInputElement>(null);
 
-  const qrUris = useMemo(
-    () => (mode !== "import" && result ? result.content.split(/\r?\n/).filter(Boolean) : []),
-    [mode, result],
-  );
+  const qrPayloads = useMemo(() => result?.qrPayloads || [], [result]);
 
   function switchMode(next: ConvertMode) {
     setMode(next);
@@ -97,9 +97,10 @@ export default function UriConverter() {
       setInput(uriText);
       setResult({
         content: uriText,
-        filename: "client.uri",
-        summary: `已从 ${files.length} 张二维码识别 ${converted.count} 条 URI`,
+        filename: uriText.startsWith("T3:") || uriText.startsWith("T2:") ? "client.profile" : "client.uri",
+        summary: `已从 ${files.length} 张二维码识别 ${converted.count} 个分享端点`,
         qrCodes: [],
+        qrPayloads: [],
       });
       setQrIndex(0);
     } catch (err) {
@@ -127,13 +128,14 @@ export default function UriConverter() {
     try {
       if (mode === "export") {
         const converted = await configToUris(input, { scope, name });
-        const uris = converted.uriText.split(/\r?\n/).filter(Boolean);
-        const qrCodes = await generateQrCodes(uris);
+        const profiles = converted.profileText.split(/\r?\n/).filter(Boolean);
+        const qrCodes = await generateQrCodes(profiles);
         setResult({
           content: converted.uriText,
           filename: "client.uri",
           summary: `${converted.summary}，并生成 ${qrCodes.length} 张二维码`,
           qrCodes,
+          qrPayloads: profiles,
         });
         setQrIndex(0);
       } else if (mode === "import") {
@@ -143,16 +145,19 @@ export default function UriConverter() {
           filename: client ? "client.json" : converted.count === 1 ? "outbound.json" : "outbounds.json",
           summary: converted.summary,
           qrCodes: [],
+          qrPayloads: [],
         });
       } else {
-        const uris = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-        urisToConfig(uris.join("\n"), { client: false });
-        const qrCodes = await generateQrCodes(uris);
+        const shares = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        urisToConfig(shares.join("\n"), { client: false });
+        const profiles = shares.map((share, index) => profilePayloadFromShare(share, index));
+        const qrCodes = await generateQrCodes(profiles);
         setResult({
-          content: uris.join("\n"),
-          filename: "client.uri",
-          summary: `已从 ${uris.length} 条 URI 生成 ${qrCodes.length} 张二维码`,
+          content: profiles.join("\n"),
+          filename: "client.profile",
+          summary: `已从 ${shares.length} 个分享端点生成 ${qrCodes.length} 张 T3 二维码`,
           qrCodes,
+          qrPayloads: profiles,
         });
         setQrIndex(0);
       }
@@ -171,7 +176,7 @@ export default function UriConverter() {
           <p className="eyebrow">URI</p>
           <h2>配置、分享 URI 与二维码互转。</h2>
           <p>
-            对齐 <code>tcptun uri export/import</code>，支持 Native、VLESS、VMess 与 Trojan；导出 URI 时同步生成可下载二维码，所有内容仅在浏览器本地处理。
+            对齐 <code>tcptun uri export/import</code>：文本保留普通 URI，二维码默认使用更紧凑的 <code>T3:</code> Base45 profile；导入兼容 T3、旧 T2 和 URI。
           </p>
         </div>
         <div className="chip-row">
@@ -207,21 +212,21 @@ export default function UriConverter() {
           className={mode === "qrcode" ? "is-active" : undefined}
           onClick={() => switchMode("qrcode")}
         >
-          URI ↔ 二维码
+          分享端点 ↔ 二维码
         </button>
       </div>
 
       <div className="converter-grid">
         <form className="converter-form" onSubmit={handleConvert}>
           <label className="converter-input-label">
-            <span>{mode === "export" ? "tcptun 配置 JSON" : "分享 URI（一行一条）"}</span>
+            <span>{mode === "export" ? "tcptun 配置 JSON" : "分享 URI / T3 / T2（一行一条）"}</span>
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
               placeholder={
                 mode === "export"
                   ? "粘贴完整 config.json、outbound 对象或 outbound 数组"
-                  : "粘贴 native:// / vless:// / vmess:// / trojan://"
+                  : "粘贴 T3: / T2: / native:// / vless:// / vmess:// / trojan://"
               }
               spellCheck={false}
               required
@@ -331,15 +336,15 @@ export default function UriConverter() {
 
           {mode === "qrcode" ? (
             <ul className="converter-notes">
-              <li>支持 URI 生成二维码，也支持上传二维码图片反向识别</li>
-              <li>一行一条 URI 或一张一条二维码，可批量处理</li>
+              <li>新生成的二维码使用 T3 Base45 profile，码密度更低</li>
+              <li>上传识别兼容 T3、旧 T2 和普通 URI</li>
               <li>每条 URI 生成独立的 512 × 512 PNG</li>
               <li>识别与生成过程完全在浏览器本地完成</li>
             </ul>
           ) : (
             <ul className="converter-notes">
               <li>完整配置会自动筛选支持 URI 的 tunnel inbound / outbound</li>
-              <li>多端点导出为一行一条 URI，并分别生成二维码</li>
+              <li>多端点导出为一行一条 URI，并分别生成 T3 二维码</li>
               <li>URI 无法承载出口链、路由规则、服务端私钥等配置字段</li>
             </ul>
           )}
@@ -383,7 +388,7 @@ export default function UriConverter() {
                 <div className="uri-qr-panel">
                   <div className="uri-qr-heading">
                     <div>
-                      <span>URI 二维码</span>
+                      <span>T3 Profile 二维码</span>
                       <small>{result.qrCodes.length > 1 ? `${qrIndex + 1} / ${result.qrCodes.length}` : "PNG · 512 × 512"}</small>
                     </div>
                     <button
@@ -395,10 +400,10 @@ export default function UriConverter() {
                     </button>
                   </div>
                   {result.qrCodes.length > 1 ? (
-                    <div className="uri-qr-tabs" role="tablist" aria-label="选择 URI 二维码">
+                    <div className="uri-qr-tabs" role="tablist" aria-label="选择 T3 Profile 二维码">
                       {result.qrCodes.map((_, index) => (
                         <button
-                          key={qrUris[index] || index}
+                          key={qrPayloads[index] || index}
                           type="button"
                           role="tab"
                           aria-selected={qrIndex === index}
@@ -413,13 +418,13 @@ export default function UriConverter() {
                   <div className="uri-qr-image">
                     <Image
                       src={result.qrCodes[qrIndex]}
-                      alt={`第 ${qrIndex + 1} 条 URI 的二维码`}
+                      alt={`第 ${qrIndex + 1} 个 T3 profile 的二维码`}
                       width={256}
                       height={256}
                       unoptimized
                     />
                   </div>
-                  <p className="uri-qr-caption">{qrUris[qrIndex]}</p>
+                  <p className="uri-qr-caption">{qrPayloads[qrIndex]}</p>
                 </div>
               ) : null}
             </>
@@ -431,14 +436,14 @@ export default function UriConverter() {
                   ? "粘贴配置后生成分享入口"
                   : mode === "import"
                     ? "粘贴 URI 后还原配置"
-                    : "粘贴 URI 后生成二维码"}
+                    : "粘贴分享端点后生成 T3 二维码"}
               </h3>
               <p>
                 {mode === "export"
                   ? "输出 URI 文本与二维码 PNG；可从客户端 outbound 或服务端 inbound 导出。"
                   : mode === "import"
                     ? "可生成单个 outbound，或带 mixed 本地入口、路由的完整 client.json。"
-                    : "粘贴 URI 生成二维码，或上传二维码图片识别并导出分享 URI。"}
+                    : "粘贴 URI / profile 生成 T3 二维码，或上传图片识别分享端点。"}
               </p>
               <ul>
                 <li>支持 Native / VLESS / VMess / Trojan</li>
@@ -471,6 +476,24 @@ function generateQrCodes(uris: string[]): Promise<string[]> {
       }),
     ),
   );
+}
+
+function profilePayloadFromShare(share: string, index: number): string {
+  if (share.startsWith("T3:") || share.startsWith("T2:")) {
+    const decoded = decodeProfilePayload(share, `proxy-${index + 1}`);
+    return encodeT3(decoded.outbound, decoded.name);
+  }
+  const outbound = parseOutboundUri(share, `proxy-${index + 1}`);
+  let displayName = "tcptun";
+  if (!share.toLowerCase().startsWith("vmess://")) {
+    try {
+      const fragment = new URL(share).hash.slice(1);
+      if (fragment) displayName = decodeURIComponent(fragment);
+    } catch {
+      // parseOutboundUri above owns validation and already produced the useful error.
+    }
+  }
+  return encodeT3(outbound, displayName);
 }
 
 async function decodeQrFile(file: File): Promise<string> {

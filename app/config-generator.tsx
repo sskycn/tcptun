@@ -58,7 +58,7 @@ export default function ConfigGenerator() {
           <p className="eyebrow">生成</p>
           <h2>在浏览器生成配对配置。</h2>
           <p>
-            server/client 逻辑对齐 <code>tcptun config</code>：raw + REALITY、匹配密钥与凭据；并额外生成可导入的 URI。密钥仅在本机生成，不会上传。
+            server/client 逻辑对齐 <code>tcptun config</code>：普通模式使用 raw + REALITY，Native QUIC 模式使用 reality-quic + QUIC mux。密钥仅在本机生成，不会上传。
           </p>
         </div>
         <div className="chip-row">
@@ -83,7 +83,13 @@ export default function ConfigGenerator() {
                     name="protocol"
                     value={item.id}
                     checked={form.protocol === item.id}
-                    onChange={() => update("protocol", item.id as TunnelProtocol)}
+                    onChange={() =>
+                      setForm((previous) => ({
+                        ...previous,
+                        protocol: item.id as TunnelProtocol,
+                        quic: item.id === "native" ? previous.quic : false,
+                      }))
+                    }
                   />
                   <span className="generator-protocol-name">{item.label}</span>
                   <span className="generator-protocol-hint">{item.hint}</span>
@@ -166,14 +172,16 @@ export default function ConfigGenerator() {
             </label>
           </div>
 
-          <label className="generator-check">
-            <input
-              type="checkbox"
-              checked={Boolean(form.enableMux)}
-              onChange={(event) => update("enableMux", event.target.checked)}
-            />
-            <span>启用 mux（CLI 生成器默认关闭）</span>
-          </label>
+          {form.protocol === "native" ? (
+            <label className="generator-check">
+              <input
+                type="checkbox"
+                checked={Boolean(form.quic)}
+                onChange={(event) => update("quic", event.target.checked)}
+              />
+              <span>生成 Native QUIC 配置（等价于 <code>--quic</code>）</span>
+            </label>
+          ) : null}
 
           <div className="generator-actions">
             <button type="submit" className="button primary" disabled={busy}>
@@ -287,6 +295,7 @@ export default function ConfigGenerator() {
                 <li>自动生成 X25519 密钥对与 short id</li>
                 <li>按协议生成 token / UUID / password</li>
                 <li>vless 默认启用 Vision flow</li>
+                <li>Native 可选 reality-quic + QUIC mux 配置</li>
               </ul>
             </div>
           )}

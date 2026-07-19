@@ -11,7 +11,7 @@ export type GenerateConfigInput = {
   localPort: number;
   serverName: string;
   dest: string;
-  enableMux?: boolean;
+  quic?: boolean;
 };
 
 export type GeneratedConfigs = {
@@ -38,7 +38,7 @@ export function defaultGenerateInput(): GenerateConfigInput {
     localPort: 1080,
     serverName: "example.com",
     dest: "",
-    enableMux: false,
+    quic: false,
   };
 }
 
@@ -56,6 +56,7 @@ export function validateGenerateInput(input: GenerateConfigInput): string | null
     return "本地端口需为 1–65535";
   }
   if (!input.serverName.trim()) return "请填写 REALITY server name";
+  if (input.quic && input.protocol !== "native") return "QUIC 配置生成仅支持 native 协议";
   return null;
 }
 
@@ -68,8 +69,9 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
   const listen = input.listen.trim();
   const localListen = input.localListen.trim();
   const serverName = input.serverName.trim();
-  const dest = input.dest.trim() || `${serverName}:443`;
-  const enableMux = Boolean(input.enableMux);
+  const defaultDest = joinHostPort(serverName, 443);
+  const dest = input.dest.trim() || defaultDest;
+  const quic = Boolean(input.quic);
 
   const { privateKey, publicKey } = await generateX25519Pair();
   const shortId = randomHex(8);
@@ -83,7 +85,7 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     users: [serverUser(protocol, credential)],
     transport: { type: "raw" },
     security: {
-      type: "reality",
+      type: quic ? "reality-quic" : "reality",
       private_key: privateKey,
       server_names: [serverName],
       short_ids: [shortId],
@@ -91,7 +93,9 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
       max_time_diff: "30s",
     },
   };
-  if (enableMux) serverInbound.mux = {};
+  if (quic) {
+    serverInbound.mux = { mode: "quic", max_streams_per_session: 128 };
+  }
 
   const serverConfig = {
     log: { level: "info" },
@@ -107,16 +111,24 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     network: ["tcp", "udp"],
     transport: { type: "raw" },
     security: {
-      type: "reality",
+      type: quic ? "reality-quic" : "reality",
       server_name: serverName,
       fingerprint: "chrome",
       public_key: publicKey,
       short_id: shortId,
-      spider_x: "/",
+      ...(quic ? {} : { spider_x: "/" }),
     },
     ...clientCredentialFields(protocol, credential),
   };
-  if (enableMux) clientOutbound.mux = {};
+  if (quic) {
+    clientOutbound.mux = {
+      mode: "quic",
+      udp_mode: "auto",
+      max_sessions: 4,
+      max_streams_per_session: 128,
+      warm_spares: 1,
+    };
+  }
 
   const clientConfig = {
     log: { level: "info" },
@@ -135,8 +147,8 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
   const clientUri = buildOutboundUri(clientOutbound as TcptunOutbound, "tcptun");
 
   const destFlag =
-    input.dest.trim() && input.dest.trim() !== `${serverName}:443`
-      ? ` --dest ${shellQuote(dest)}`
+    input.dest.trim() && input.dest.trim() !== defaultDest
+      ? `--dest ${shellQuote(dest)}`
       : "";
 
   const cliCommand = [
@@ -147,6 +159,7 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     `--local-listen ${shellQuote(localListen)}`,
     `--local-port ${input.localPort}`,
     `--server-name ${shellQuote(serverName)}`,
+    quic ? "--quic" : "",
     destFlag,
   ]
     .filter(Boolean)

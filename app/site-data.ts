@@ -37,7 +37,7 @@ export const faqItems = [
   {
     question: "何时开启 mux 或 QUIC？",
     answer:
-      "短连接多、两端同版本时建议配置 mux: {}。原生 QUIC 仅支持 native + raw + security.type=tls；UDP 可选可靠 stream 或 DATAGRAM，支持分片、选择性恢复与自适应 FEC。",
+      "短连接多、两端同版本时建议配置 mux: {}。原生 QUIC 要求 native + raw + mux.mode=quic，安全层可用 TLS 或 reality-quic；CLI 可用 tcptun config native --quic 生成后者。",
   },
   {
     question: "REALITY 能和 TLS 一起用吗？",
@@ -95,7 +95,6 @@ export const binaryDownloads = [
 export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;
 export const outboundTypes = [
   "direct",
-  "direct-first",
   "balance",
   "blackhole",
   "socks5",
@@ -111,10 +110,10 @@ export const tunnelProtocols = [
     name: "native",
     credential: "Token",
     interoperability: "tcptun ↔ tcptun",
-    generatedSecurity: "raw + REALITY",
+    generatedSecurity: "raw + REALITY；QUIC 用 reality-quic",
     mux: "推荐同版本开启",
     command: "tcptun config native --server proxy.example.com --port 9443",
-    description: "私有低开销协议。吞吐优先用 raw + mux；需要 UDP/QUIC 连接池时显式选择 quic mode。支持反向 publish/expose。",
+    description: "私有低开销协议。吞吐优先用 raw + mux；--quic 使用 raw + reality-quic + mux.mode=quic。支持反向 publish/expose。",
   },
   {
     name: "vless",
@@ -216,7 +215,7 @@ export const nativeClientExample = `{
   "dns": {}
 }`;
 
-/** Native + QUIC mux mode (TLS 1.3 required on both ends). */
+/** Native + REALITY QUIC pair produced by `tcptun config native --quic`. */
 export const nativeQuicClientExample = `{
   "log": { "level": "info" },
   "inbounds": [
@@ -236,8 +235,11 @@ export const nativeQuicClientExample = `{
       "network": ["tcp", "udp"],
       "transport": { "type": "raw" },
       "security": {
-        "type": "tls",
-        "server_name": "proxy.example.com"
+        "type": "reality-quic",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "abcd1234"
       },
       "mux": {
         "mode": "quic",
@@ -264,9 +266,12 @@ export const nativeQuicServerExample = `{
       "users": [{ "id": "change-me" }],
       "transport": { "type": "raw" },
       "security": {
-        "type": "tls",
-        "cert": "server.crt",
-        "key": "server.key"
+        "type": "reality-quic",
+        "private_key": "REPLACE_WITH_SERVER_PRIVATE_KEY",
+        "server_names": ["example.com"],
+        "short_ids": ["abcd1234"],
+        "dest": "example.com:443",
+        "max_time_diff": "30s"
       },
       "mux": {
         "mode": "quic",
@@ -368,7 +373,7 @@ export const nativeFieldGroups = [
       { key: "address", side: "两端", detail: "host:port 字符串数组；outbound 可配置多候选入口。" },
       { key: "network", side: "两端", detail: "tcp / udp，可组合。" },
       { key: "transport", side: "两端", detail: "仅 type / path（raw / ws / h2 / h3）。" },
-      { key: "security", side: "两端", detail: "tls 或 reality；证书、SNI、insecure 都写在这里。" },
+      { key: "security", side: "两端", detail: "tls、reality 或 reality-quic；安全参数都写在这里。" },
       { key: "mux", side: "两端", detail: "出现即开启；{} 表示默认参数。连接池参数主要在客户端。" },
     ],
   },
@@ -378,7 +383,7 @@ export const nativeFieldGroups = [
       { key: "address", side: "server", detail: "监听地址列表，如 [\"0.0.0.0:9443\"]。" },
       { key: "users[].id", side: "server", detail: "认证凭据，对应客户端 token。" },
       { key: "publish", side: "server", detail: "反向发布：service + address，可选 network=tcp|udp。" },
-      { key: "security.cert/key", side: "server", detail: "TLS 或 QUIC 模式时必填。" },
+      { key: "security.cert/key", side: "server", detail: "TLS 入站必填；reality-quic 则使用 REALITY 密钥字段。" },
     ],
   },
   {
@@ -412,7 +417,7 @@ export const nativeMuxNotes = [
   },
   {
     title: "QUIC",
-    body: 'mux.mode: "quic" 使用带健康评分与路径探测的 UDP/QUIC 连接池，要求 native + raw + security.type=tls。',
+    body: 'mux.mode: "quic" 使用 UDP/QUIC 连接池，要求 native + raw，security.type 可为 tls 或 reality-quic。',
   },
   {
     title: "UDP",
@@ -435,7 +440,7 @@ export const reversePublishNotes = [
   },
   {
     title: "QUIC 要求",
-    body: "QUIC 反向发布两端都要 security.type=tls；服务端还需 cert/key。",
+    body: "QUIC 反向发布两端要使用匹配的 TLS 或 reality-quic 安全层；TLS 服务端需 cert/key。",
   },
 ] as const;
 
@@ -451,6 +456,12 @@ export const nativeWorkflowCommands = [
     title: "校验",
     command: "tcptun config check --config server.json",
     body: "不监听端口，适合改配置后自检。",
+  },
+  {
+    name: "quic",
+    title: "生成 QUIC 配置对",
+    command: "tcptun config native --quic --server proxy.example.com --port 9443",
+    body: "输出 reality-quic + QUIC mux 的匹配配置。",
   },
   {
     name: "run",
@@ -477,7 +488,7 @@ export const configModelNotes = [
   },
   {
     title: "引用",
-    body: "组件通过 tag 关联；via、direct-first 与 balance 的依赖会检查缺失和循环。",
+    body: "组件通过 tag 关联；via 出口链和 balance 成员会检查缺失与循环。",
   },
   {
     title: "启动",
@@ -615,7 +626,7 @@ export const realityRules = [
   },
   {
     title: "不叠 TLS",
-    body: "不能设置 security.type=tls。需要证书 TLS 或 QUIC 时，不要使用 REALITY。",
+    body: "普通 reality 不能与 security.type=tls 叠加；安全层 type 始终只选一种。",
   },
   {
     title: "适用端点",
@@ -624,6 +635,10 @@ export const realityRules = [
   {
     title: "密钥成对",
     body: "服务端 private_key 与客户端 public_key 对应；short_id 两端一致。",
+  },
+  {
+    title: "QUIC 变体",
+    body: "reality-quic 仅用于 native + raw + QUIC mux，复用 REALITY 密钥字段，且不使用 spider_x。",
   },
 ] as const;
 

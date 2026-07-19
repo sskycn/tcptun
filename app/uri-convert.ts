@@ -1,9 +1,12 @@
+import { decodeProfilePayload, encodeT3 } from "./profile-t3";
+
 export type TunnelProtocol = "native" | "vless" | "vmess" | "trojan";
 
 export type UriExportScope = "outbounds" | "inbounds";
 
 export type UriExportResult = {
   uriText: string;
+  profileText: string;
   count: number;
   summary: string;
 };
@@ -48,6 +51,10 @@ export type TcptunMux = {
   max_sessions?: number;
   max_streams_per_session?: number;
   warm_spares?: number;
+  initial_stream_receive_window?: number;
+  max_stream_receive_window?: number;
+  initial_connection_receive_window?: number;
+  max_connection_receive_window?: number;
 };
 
 export type TcptunOutbound = {
@@ -65,6 +72,9 @@ export type TcptunOutbound = {
   security?: TcptunSecurity;
   mux?: TcptunMux | null;
   discover?: boolean;
+  members?: Array<{ outbound: string; weight?: number }>;
+  affinity_ttl?: string | number;
+  expose?: Array<{ service: string; network?: string; target: string }>;
   primary?: string;
   fallback?: string;
   probe_timeout?: string | number;
@@ -137,9 +147,14 @@ export async function configToUris(
     const displayName = endpoints.length === 1 ? name : `${name}-${outbound.tag}`;
     return buildOutboundUri(outbound, displayName);
   });
+  const profiles = endpoints.map((outbound) => {
+    const displayName = endpoints.length === 1 ? name : `${name}-${outbound.tag}`;
+    return encodeT3(outbound, displayName);
+  });
 
   return {
     uriText: uris.join("\n"),
+    profileText: profiles.join("\n"),
     count: uris.length,
     summary: `已从 ${uris.length} 个 ${scope === "inbounds" ? "inbound 地址" : "outbound 地址"} 生成 URI`,
   };
@@ -183,7 +198,7 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
   return {
     configJson: JSON.stringify(output, null, 2),
     count: outbounds.length,
-    summary: `已从 ${outbounds.length} 条 URI 生成${client ? "客户端配置" : " outbound 配置"}`,
+    summary: `已从 ${outbounds.length} 个分享端点生成${client ? "客户端配置" : " outbound 配置"}`,
   };
 }
 
@@ -259,8 +274,8 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   if (security.type === "tls") {
     query.set("security", "tls");
     if (security.server_name) query.set("sni", security.server_name);
-  } else if (security.type === "reality") {
-    query.set("security", "reality");
+  } else if (security.type === "reality" || security.type === "reality-quic") {
+    query.set("security", security.type);
     query.set("sni", security.server_name || "");
     query.set("fp", security.fingerprint || "");
     query.set("pbk", security.public_key || "");
@@ -286,6 +301,9 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
 export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   const value = text.trim();
   if (!value) throw new Error("URI 不能为空");
+  if (value.startsWith("T3:") || value.startsWith("T2:")) {
+    return decodeProfilePayload(value, tag).outbound;
+  }
   if (value.toLowerCase().startsWith("vmess://")) return parseVmessUri(value, tag);
 
   let uri: URL;
@@ -358,14 +376,14 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
       ...(sni ? { server_name: sni } : {}),
       ...(insecure ? { insecure: true } : {}),
     };
-  } else if (securityType === "reality") {
+  } else if (securityType === "reality" || securityType === "reality-quic") {
     outbound.security = {
-      type: "reality",
+      type: securityType,
       server_name: sni,
       fingerprint: query.get("fp") || "",
       public_key: query.get("pbk") || "",
       short_id: query.get("sid") || "",
-      spider_x: query.get("spx") || "",
+      ...(securityType === "reality" ? { spider_x: query.get("spx") || "" } : {}),
       ...(insecure ? { insecure: true } : {}),
     };
   } else if (securityType !== "none" && securityType !== "") {
@@ -423,14 +441,14 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
 
   const security = String(source.tls || "").toLowerCase();
   const insecure = optionalSourceBoolean(source.allowInsecure, "allowInsecure");
-  if (security === "reality") {
+  if (security === "reality" || security === "reality-quic") {
     outbound.security = {
-      type: "reality",
+      type: security,
       server_name: String(source.sni || ""),
       fingerprint: String(source.fp || ""),
       public_key: String(source.pbk || ""),
       short_id: String(source.sid || ""),
-      spider_x: String(source.spx || ""),
+      ...(security === "reality" ? { spider_x: String(source.spx || "") } : {}),
       ...(insecure ? { insecure: true } : {}),
     };
   } else if (security && security !== "none") {
@@ -520,16 +538,16 @@ async function outboundFromInbound(
 
   const security = inbound.security || {};
   const securityType = (security.type || "").toLowerCase();
-  if (securityType === "reality") {
+  if (securityType === "reality" || securityType === "reality-quic") {
     if (!security.private_key) throw new Error(`inbound ${inbound.tag} 缺少 REALITY private_key`);
     if (!security.server_names?.length) throw new Error(`inbound ${inbound.tag} 缺少 REALITY server_names`);
     outbound.security = {
-      type: "reality",
+      type: securityType,
       server_name: security.server_names[0],
       fingerprint: "chrome",
       public_key: x25519PublicKey(security.private_key),
       short_id: security.short_ids?.[0] || "",
-      spider_x: "/",
+      ...(securityType === "reality" ? { spider_x: "/" } : {}),
     };
   } else if (securityType === "tls") {
     outbound.security = {
@@ -586,7 +604,7 @@ function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtoco
   if (security.cert || security.key) {
     throw new Error(`outbound ${outbound.tag} 的证书或密钥文件无法写入 URI`);
   }
-  if (security.type && !["none", "tls", "reality", ""].includes(security.type)) {
+  if (security.type && !["none", "tls", "reality", "reality-quic", ""].includes(security.type)) {
     throw new Error(`outbound ${outbound.tag} 的 security.type=${security.type} 无法写入 URI`);
   }
   if (
