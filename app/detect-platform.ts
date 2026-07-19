@@ -77,6 +77,7 @@ export function formatBytes(bytes: number) {
 }
 
 export function platformInitial(platform: string) {
+  if (platform === "android") return "A";
   if (platform === "darwin") return "M";
   if (platform === "windows") return "W";
   return "L";
@@ -85,13 +86,16 @@ export function platformInitial(platform: string) {
 function detectOs(ua: string, platformHint: string, uaPlatform: string): BinaryDownload["platform"] {
   const haystack = `${ua} ${platformHint} ${uaPlatform}`;
 
+  if (/android/.test(haystack)) {
+    return "android";
+  }
   if (/iphone|ipad|ipod|macintosh|mac os|macos|macintel|macarm/.test(haystack)) {
     return "darwin";
   }
   if (/windows|win32|win64|wow64/.test(haystack)) {
     return "windows";
   }
-  if (/android|linux|cros|chromium os/.test(haystack)) {
+  if (/linux|cros|chromium os/.test(haystack)) {
     return "linux";
   }
   return "linux";
@@ -126,6 +130,7 @@ function formatPlatformLabel(
   platform: BinaryDownload["platform"],
   arch: BinaryDownload["arch"],
 ) {
+  if (platform === "android") return "Android";
   const os =
     platform === "darwin" ? "macOS" : platform === "windows" ? "Windows" : "Linux";
   const archLabel = arch === "amd64" ? "x64" : arch === "arm64" ? "ARM64" : "ARMv7";

@@ -1623,15 +1623,30 @@ html[data-theme="dark"] .protocol-icon-trojan {
   color: #2154a3;
 }
 
+.platform-mark.android {
+  background: #e5f7ec;
+  color: #19713b;
+}
+
 html[data-theme="dark"] .platform-mark.windows {
   background: #1a3156;
   color: #b7d0ff;
+}
+
+html[data-theme="dark"] .platform-mark.android {
+  background: #173d29;
+  color: #9be7b5;
 }
 
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .platform-mark.windows {
     background: #1a3156;
     color: #b7d0ff;
+  }
+
+  html:not([data-theme="light"]) .platform-mark.android {
+    background: #173d29;
+    color: #9be7b5;
   }
 }
 
