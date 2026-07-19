@@ -37,7 +37,7 @@ const capabilities = [
   {
     label: "Route",
     title: "规则路由",
-    body: "支持 direct、direct-first、balance、隧道与 blackhole，可按域名、IP 和应用身份分流。",
+    body: "支持 direct、balance、隧道与 blackhole，可按域名、IP 和应用身份分流。",
   },
   {
     label: "Network",
@@ -315,9 +315,9 @@ export default function Home() {
               </div>
               <a
                 className="protocol-doc-link"
-                href={protocol.name === "native" ? "#config-native" : "#protocol-compare"}
+                href={protocol.name === "native" ? "#native-reality-quic" : "#protocol-compare"}
               >
-                {protocol.name === "native" ? "配置说明 →" : "协议对照 →"}
+                {protocol.name === "native" ? "Native / QUIC 说明 →" : "协议对照 →"}
               </a>
             </article>
           ))}

@@ -92,6 +92,29 @@ const realityExampleTabs = [
   },
 ] as const;
 
+const nativeRealityQuicLayers = [
+  {
+    label: "Protocol",
+    value: "native",
+    body: "负责 token 认证、TCP / UDP 隧道语义与反向发布。",
+  },
+  {
+    label: "Transport",
+    value: "raw",
+    body: "作为 QUIC 模式要求的基础传输，不再叠加 ws / h2 / h3。",
+  },
+  {
+    label: "Security",
+    value: "reality-quic",
+    body: "使用 REALITY 密钥与站点参数保护 QUIC 握手，无需部署证书。",
+  },
+  {
+    label: "Multiplexing",
+    value: "mux.mode: quic",
+    body: "用 QUIC 连接池承载 stream 与 UDP DATAGRAM。",
+  },
+] as const;
+
 type NativeTabId = (typeof nativeExampleTabs)[number]["id"];
 type RealityTabId = (typeof realityExampleTabs)[number]["id"];
 type SnippetKey = keyof typeof protocolOutboundSnippets;
@@ -118,6 +141,9 @@ export default function ConfigSection() {
         <div className="chip-row">
           <a className="chip-link" href="#config-native">
             native
+          </a>
+          <a className="chip-link" href="#native-reality-quic">
+            reality-quic
           </a>
           <a className="chip-link" href="#reverse">
             反向发布
@@ -176,6 +202,60 @@ export default function ConfigSection() {
               <p>{item.body}</p>
             </article>
           ))}
+        </div>
+      </div>
+
+      <div className="native-reality-quic" id="native-reality-quic">
+        <div className="native-reality-quic-heading">
+          <div>
+            <p className="eyebrow">Native QUIC</p>
+            <h3>
+              <code>native + raw + reality-quic</code>
+            </h3>
+            <p>
+              这不是三种可替换的模式，而是一套分层组合：<code>native</code> 是隧道协议，
+              <code>raw</code> 是传输，<code>reality-quic</code> 是 QUIC 专用安全层；同时必须设置
+              <code>mux.mode=quic</code> 才会启用原生 QUIC 连接池。
+            </p>
+          </div>
+          <div className="native-reality-quic-fit">
+            <span>适合</span>
+            <strong>两端均为 tcptun</strong>
+            <p>希望同时承载 TCP stream 与 UDP DATAGRAM，并避免维护 TLS 证书。</p>
+          </div>
+        </div>
+
+        <div className="native-reality-quic-stack" aria-label="Native Reality QUIC 分层结构">
+          {nativeRealityQuicLayers.map((layer, index) => (
+            <div className="native-reality-quic-layer-wrap" key={layer.label}>
+              <article className="native-reality-quic-layer">
+                <span>{layer.label}</span>
+                <code>{layer.value}</code>
+                <p>{layer.body}</p>
+              </article>
+              {index < nativeRealityQuicLayers.length - 1 ? (
+                <span className="native-reality-quic-plus" aria-hidden="true">+</span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+
+        <div className="native-reality-quic-footer">
+          <div>
+            <strong>两端必须配对</strong>
+            <p>
+              token、REALITY 公私钥、server name 与 short ID 要对应；普通
+              <code>security.type=reality</code> 不能代替 <code>reality-quic</code>。
+            </p>
+          </div>
+          <div className="native-reality-quic-command">
+            <pre><code>tcptun config native --quic --server proxy.example.com --port 9443</code></pre>
+            <CopyButton
+              value="tcptun config native --quic --server proxy.example.com --port 9443"
+              label="复制"
+              className="copy-button-on-dark"
+            />
+          </div>
         </div>
       </div>
 
@@ -317,7 +397,7 @@ export default function ConfigSection() {
         <div className="section-subheading row-heading section-subheading-wide">
           <div>
             <p className="eyebrow">REALITY</p>
-            <h3>端点伪装安全层</h3>
+            <h3>REALITY 与 REALITY QUIC</h3>
             <p>
               写在 <code>security</code> 中。四种隧道协议均可使用；VLESS 生成配置默认附带 Vision。
             </p>
@@ -383,8 +463,8 @@ export default function ConfigSection() {
         <div className="reality-warn">
           <strong>注意</strong>
           <p>
-            REALITY 与 <code>security.type=tls</code> / QUIC mux 互斥。需要伪装用 REALITY；需要 QUIC
-            用证书 TLS（写在 <code>security</code> 中，不再使用 <code>transport.tls</code>）。
+            普通 <code>reality</code> 不能直接用于 QUIC mux；Native QUIC 可选证书 TLS，或使用
+            <code>security.type=reality-quic</code>。<code>tcptun config native --quic</code> 会生成后者。
           </p>
         </div>
       </div>
