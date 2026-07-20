@@ -12,7 +12,6 @@ import { DownloadSection, PlatformDownloadButton } from "./platform-download";
 import SiteNav from "./site-nav";
 import ThemeToggle from "./theme-toggle";
 import UriConverter from "./uri-converter";
-import XrayConverter from "./xray-converter";
 import {
   inboundTypes,
   installCommand,
@@ -80,13 +79,13 @@ const workflows = [
   {
     name: "generate",
     title: "Generate a pair",
-    body: "Generate matching server / client configs with credentials and REALITY keys.",
-    command: "tcptun config vless --server proxy.example.com --port 9443",
+    body: "Generate matching native server / client configs with credentials and REALITY keys.",
+    command: "tcptun config native --server proxy.example.com --port 9443",
   },
   {
     name: "uri",
     title: "Import URI",
-    body: "Build a client config from native / VLESS / VMess / Trojan URIs.",
+    body: "Build a client config from a native URI.",
     command: "tcptun uri import --input client.uri --client --output client.json",
   },
 ];
@@ -102,7 +101,7 @@ $ tcptun --config config.json
 
 $ tcptun config check --config config.json
 
-$ tcptun config vless \\
+$ tcptun config native \\
     --server proxy.example.com \\
     --port 9443`;
 
@@ -142,8 +141,9 @@ export default function Home() {
             <span className="title-accent">orchestrate all proxy traffic.</span>
           </h1>
           <p className="lede">
-            tcptun is a config-driven multi-inbound, multi-outbound proxy runtime. Describe
-            inbounds, outbounds, and routes in strict JSON, then start TCP/UDP services together.
+            tcptun is a config-driven multi-inbound, multi-outbound proxy runtime built around the
+            native tunnel protocol. Describe inbounds, outbounds, and routes in strict JSON, then
+            start TCP/UDP services together.
           </p>
           <div className="hero-actions">
             <a className="button primary" href="#download">
@@ -272,14 +272,15 @@ export default function Home() {
 
       <UriConverter />
 
-      <XrayConverter />
-
       <section className="section protocol-section" id="protocols">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">Protocols</p>
-            <h2>Four tunnel protocols, one topology.</h2>
-            <p>Xray compatibility is for wire protocols, not config file format.</p>
+            <p className="eyebrow">Native</p>
+            <h2>The native tunnel protocol.</h2>
+            <p>
+              Private, low-overhead tunneling for tcptun-to-tcptun setups: mux, QUIC, REALITY, and
+              reverse publish under one topology.
+            </p>
           </div>
           <div className="chip-row">
             {transports.map((item) => (
@@ -288,7 +289,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="protocol-grid">
+        <div className="protocol-grid protocol-grid-single">
           {tunnelProtocols.map((protocol, index) => (
             <article className="protocol-card" key={protocol.name}>
               <div className="protocol-card-heading">
@@ -320,11 +321,8 @@ export default function Home() {
                 <pre className="protocol-command"><code>{protocol.command}</code></pre>
                 <CopyButton value={protocol.command} label="Copy" className="copy-button-on-dark" />
               </div>
-              <a
-                className="protocol-doc-link"
-                href={protocol.name === "native" ? "#native-reality-quic" : "#protocol-compare"}
-              >
-                {protocol.name === "native" ? "Native / QUIC notes →" : "Protocol comparison →"}
+              <a className="protocol-doc-link" href="#native-reality-quic">
+                Native / QUIC notes →
               </a>
             </article>
           ))}
@@ -390,8 +388,8 @@ export default function Home() {
               <a href="#architecture">Architecture</a>
               <a href="#config">Config</a>
               <a href="#generate">Generate</a>
-              <a href="#convert">Convert</a>
-              <a href="#protocols">Protocols</a>
+              <a href="#uri">URI</a>
+              <a href="#protocols">Native</a>
               <a href="#start">CLI</a>
               <a href="#faq">FAQ</a>
               <a href="#disclaimer">Disclaimer</a>
@@ -405,10 +403,12 @@ export default function Home() {
               <a href="/install.sh">install.sh</a>
             </div>
             <div className="footer-column">
-              <h3>Protocols</h3>
-              {tunnelProtocols.map((protocol) => (
-                <a href="#protocols" key={protocol.name}>{protocol.name}</a>
-              ))}
+              <h3>Native</h3>
+              <a href="#protocols">Overview</a>
+              <a href="#config-native">Config</a>
+              <a href="#native-reality-quic">QUIC</a>
+              <a href="#reverse">Reverse publish</a>
+              <a href="#reality">REALITY</a>
             </div>
           </div>
         </div>
