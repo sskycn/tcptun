@@ -8,10 +8,12 @@ import DisclaimerSection from "./disclaimer-section";
 import FaqSection from "./faq-section";
 import InstallCommand from "./install-command";
 import NativeGuide from "./native-guide";
+import ProtocolIcon from "./protocol-icon";
 import { DownloadSection, PlatformDownloadButton } from "./platform-download";
 import SiteNav from "./site-nav";
 import ThemeToggle from "./theme-toggle";
 import UriConverter from "./uri-converter";
+import XrayConverter from "./xray-converter";
 import {
   inboundTypes,
   installCommand,
@@ -19,6 +21,7 @@ import {
   outboundTypes,
   releaseVersion,
   topologyExample,
+  tunnelProtocols,
   binaryDownloads,
 } from "./site-data";
 
@@ -78,18 +81,19 @@ const workflows = [
   {
     name: "generate",
     title: "Generate a pair",
-    body: "Generate matching native server / client configs with credentials and REALITY keys.",
-    command: "tcptun config native --server proxy.example.com --port 9443",
+    body: "Generate matching server / client configs with credentials and REALITY keys.",
+    command: "tcptun config vless --server proxy.example.com --port 9443",
   },
   {
     name: "uri",
     title: "Import URI",
-    body: "Build a client config from a native URI.",
+    body: "Build a client config from native / VLESS / VMess / Trojan URIs.",
     command: "tcptun uri import --input client.uri --client --output client.json",
   },
 ];
 
 const pipeline = ["Load", "Validate", "Compile", "Start"] as const;
+const transports = ["raw", "ws", "h2", "h3"] as const;
 
 const terminalSnippet = `$ ${installCommand}
 
@@ -99,7 +103,7 @@ $ tcptun --config config.json
 
 $ tcptun config check --config config.json
 
-$ tcptun config native \\
+$ tcptun config vless \\
     --server proxy.example.com \\
     --port 9443`;
 
@@ -139,9 +143,8 @@ export default function Home() {
             <span className="title-accent">orchestrate all proxy traffic.</span>
           </h1>
           <p className="lede">
-            tcptun is a config-driven multi-inbound, multi-outbound proxy runtime built around the
-            native tunnel protocol. Describe inbounds, outbounds, and routes in strict JSON, then
-            start TCP/UDP services together.
+            tcptun is a config-driven multi-inbound, multi-outbound proxy runtime. Describe
+            inbounds, outbounds, and routes in strict JSON, then start TCP/UDP services together.
           </p>
           <div className="hero-actions">
             <a className="button primary" href="#download">
@@ -270,6 +273,75 @@ export default function Home() {
 
       <UriConverter />
 
+      <XrayConverter />
+
+      <section className="section protocol-section" id="protocols">
+        <div className="section-heading row-heading">
+          <div>
+            <p className="eyebrow">Protocols</p>
+            <h2>Four tunnel protocols, one topology.</h2>
+            <p>Xray compatibility is for wire protocols, not config file format.</p>
+          </div>
+          <div className="chip-row">
+            {transports.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="protocol-grid">
+          {tunnelProtocols.map((protocol, index) => (
+            <article className="protocol-card" key={protocol.name}>
+              <div className="protocol-card-heading">
+                <div className="protocol-title-row">
+                  <ProtocolIcon name={protocol.name} />
+                  <div>
+                    <span className="protocol-index">{String(index + 1).padStart(2, "0")}</span>
+                    <h3>{protocol.name}</h3>
+                  </div>
+                </div>
+                <span className="security-badge">{protocol.credential}</span>
+              </div>
+              <p className="protocol-description">{protocol.description}</p>
+              <dl>
+                <div>
+                  <dt>Interop</dt>
+                  <dd>{protocol.interoperability}</dd>
+                </div>
+                <div>
+                  <dt>Default security</dt>
+                  <dd>{protocol.generatedSecurity}</dd>
+                </div>
+                <div className="wide">
+                  <dt>Mux</dt>
+                  <dd>{protocol.mux}</dd>
+                </div>
+              </dl>
+              <div className="protocol-command-row">
+                <pre className="protocol-command"><code>{protocol.command}</code></pre>
+                <CopyButton value={protocol.command} label="Copy" className="copy-button-on-dark" />
+              </div>
+              <a
+                className="protocol-doc-link"
+                href={
+                  protocol.name === "native"
+                    ? "#native-guide"
+                    : protocol.name === "vless"
+                      ? "#protocol-examples"
+                      : "#protocol-compare"
+                }
+              >
+                {protocol.name === "native"
+                  ? "Native guide →"
+                  : protocol.name === "vless"
+                    ? "Use cases →"
+                    : "Protocol comparison →"}
+              </a>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <NativeGuide />
 
       <section className="section download-section" id="download">
@@ -332,7 +404,8 @@ export default function Home() {
               <a href="#config">Config</a>
               <a href="#generate">Generate</a>
               <a href="#uri">URI</a>
-              <a href="#protocols">Native</a>
+              <a href="#convert">Convert</a>
+              <a href="#protocols">Protocols</a>
               <a href="#start">CLI</a>
               <a href="#faq">FAQ</a>
               <a href="#disclaimer">Disclaimer</a>
@@ -346,14 +419,13 @@ export default function Home() {
               <a href="/install.sh">install.sh</a>
             </div>
             <div className="footer-column">
-              <h3>Native</h3>
-              <a href="#protocols">Overview</a>
-              <a href="#native-tutorial">Tutorial</a>
-              <a href="#native-examples">Examples</a>
-              <a href="#config-native">Config</a>
-              <a href="#native-reality-quic">QUIC</a>
-              <a href="#reverse">Reverse publish</a>
-              <a href="#reality">REALITY</a>
+              <h3>Protocols</h3>
+              {tunnelProtocols.map((protocol) => (
+                <a href="#protocols" key={protocol.name}>{protocol.name}</a>
+              ))}
+              <a href="#native-guide">Native guide</a>
+              <a href="#protocol-examples">Use cases</a>
+              <a href="#protocol-compare">Compare</a>
             </div>
           </div>
         </div>

@@ -56,14 +56,13 @@ export default function ConfigGenerator() {
       <div className="section-heading row-heading">
         <div>
           <p className="eyebrow">Generate</p>
-          <h2>Generate native server / client pairs in the browser.</h2>
+          <h2>Generate paired configs in the browser.</h2>
           <p>
-            Matches <code>tcptun config native</code>: normal mode uses raw + REALITY; QUIC mode uses
-            reality-quic + QUIC mux. Keys are generated locally and never uploaded.
+            Server/client logic matches <code>tcptun config</code>: normal mode uses raw + REALITY;
+            Native QUIC mode uses reality-quic + QUIC mux. Keys are generated locally and never uploaded.
           </p>
         </div>
         <div className="chip-row">
-          <span>native</span>
           <span>X25519</span>
           <span>server + client</span>
           <span>URI</span>
@@ -89,6 +88,7 @@ export default function ConfigGenerator() {
                       setForm((previous) => ({
                         ...previous,
                         protocol: item.id as TunnelProtocol,
+                        quic: item.id === "native" ? previous.quic : false,
                       }))
                     }
                   />
@@ -294,9 +294,9 @@ export default function ConfigGenerator() {
               </p>
               <ul>
                 <li>Generates an X25519 key pair and short id</li>
-                <li>Creates a native token shared by server and client</li>
-                <li>Default path: raw + REALITY</li>
-                <li>Optional: reality-quic + QUIC mux via the checkbox</li>
+                <li>Creates token / UUID / password by protocol</li>
+                <li>vless enables Vision flow by default</li>
+                <li>Native can optionally emit reality-quic + QUIC mux</li>
               </ul>
             </div>
           )}

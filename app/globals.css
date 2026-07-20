@@ -1448,6 +1448,11 @@ pre {
   margin-bottom: 14px;
 }
 
+.native-usecase-tabs-secondary {
+  margin-top: -4px;
+  margin-bottom: 16px;
+}
+
 .native-usecase-tabs button {
   appearance: none;
   border: 1px solid var(--line);

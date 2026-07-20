@@ -23,6 +23,9 @@ export type GeneratedConfigs = {
 
 export const protocols: Array<{ id: TunnelProtocol; label: string; hint: string }> = [
   { id: "native", label: "native", hint: "tcptun private protocol" },
+  { id: "vless", label: "vless", hint: "Xray interop + Vision" },
+  { id: "vmess", label: "vmess", hint: "Xray VMess AEAD" },
+  { id: "trojan", label: "trojan", hint: "Password auth" },
 ];
 
 export function defaultGenerateInput(): GenerateConfigInput {
@@ -40,8 +43,8 @@ export function defaultGenerateInput(): GenerateConfigInput {
 }
 
 export function validateGenerateInput(input: GenerateConfigInput): string | null {
-  if (input.protocol !== "native") {
-    return "This generator supports only the native protocol";
+  if (!["native", "vless", "vmess", "trojan"].includes(input.protocol)) {
+    return "Unsupported protocol";
   }
   if (!input.server.trim()) return "Server address is required";
   if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {

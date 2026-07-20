@@ -174,11 +174,10 @@ export default function UriConverter() {
       <div className="section-heading row-heading">
         <div>
           <p className="eyebrow">URI</p>
-          <h2>Convert native configs, share URIs, and QR codes.</h2>
+          <h2>Convert between configs, share URIs, and QR codes.</h2>
           <p>
-            Matches <code>tcptun uri export/import</code> for native endpoints: text keeps plain{" "}
-            <code>native://</code> URIs, QR codes default to the denser <code>T3:</code> Base45 profile,
-            and import accepts T3, legacy T2, and native URIs.
+            Matches <code>tcptun uri export/import</code>: text keeps plain URIs, QR codes default to the denser{" "}
+            <code>T3:</code> Base45 profile, and import accepts T3, legacy T2, and URIs.
           </p>
         </div>
         <div className="chip-row">
@@ -221,14 +220,14 @@ export default function UriConverter() {
       <div className="converter-grid">
         <form className="converter-form" onSubmit={handleConvert}>
           <label className="converter-input-label">
-            <span>{mode === "export" ? "tcptun config JSON" : "Native URI / T3 / T2 (one per line)"}</span>
+            <span>{mode === "export" ? "tcptun config JSON" : "Share URI / T3 / T2 (one per line)"}</span>
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
               placeholder={
                 mode === "export"
-                  ? "Paste a full config.json, native outbound object, or outbound array"
-                  : "Paste T3: / T2: / native:// share endpoints"
+                  ? "Paste a full config.json, outbound object, or outbound array"
+                  : "Paste T3: / T2: / native:// / vless:// / vmess:// / trojan://"
               }
               spellCheck={false}
               required
@@ -448,7 +447,7 @@ export default function UriConverter() {
                     : "Paste URIs / profiles to generate T3 QR codes, or upload images to recover share endpoints."}
               </p>
               <ul>
-                <li>Focused on native tunnel endpoints</li>
+                <li>Supports Native / VLESS / VMess / Trojan</li>
                 <li>Preserves raw / ws / h2 / h3, TLS / REALITY, and mux parameters</li>
                 <li>Supports IPv4, IPv6, and domain endpoints</li>
               </ul>
