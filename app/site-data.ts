@@ -14,12 +14,20 @@ export const pinnedInstallCommand = `curl -fsSL https://tcptun.com/install.sh | 
 
 export const faqItems = [
   {
+    question: "Can I use Xray config files directly?",
+    answer: "No. tcptun uses its own JSON topology. Xray compatibility covers wire protocols such as VLESS / VMess / Trojan, not the config format.",
+  },
+  {
     question: "What is the native protocol?",
-    answer: "native is tcptun’s private tunnel protocol for tcptun-to-tcptun setups. A typical path is local mixed → native outbound → native inbound → direct, with matching users[].id and token. See the Native section for a full tutorial and examples.",
+    answer: "native is tcptun’s private tunnel protocol for tcptun-to-tcptun setups. A typical path is local mixed → native outbound → native inbound → direct, with matching users[].id and token. See the Native guide for a full tutorial and examples.",
   },
   {
     question: "How do I run my first native tunnel?",
     answer: "Install tcptun, run tcptun config native --server <host> --port <port>, edit the generated server/client endpoints and token, validate with tcptun config check, start the server then the client, and point apps at 127.0.0.1:1080.",
+  },
+  {
+    question: "How do I choose among the four tunnel protocols?",
+    answer: "Prefer native for tcptun-to-tcptun throughput, mux, QUIC, and reverse publish. Use vless / vmess / trojan when you need wire interop with Xray-compatible clients or servers.",
   },
   {
     question: "How do I validate a config?",
@@ -60,7 +68,12 @@ export const faqItems = [
   {
     question: "Is browser-based config generation safe?",
     answer:
-      "Keys and credentials are generated locally with Web Crypto and never uploaded. You can also use the CLI: tcptun config native --server ….",
+      "Keys and credentials are generated locally with Web Crypto and never uploaded. You can also use the CLI: tcptun config <protocol> --server ….",
+  },
+  {
+    question: "How do I convert an Xray config to tcptun?",
+    answer:
+      "Paste Xray JSON or vless/vmess/trojan links in Convert. REALITY/TLS and raw/ws/h2/h3 are supported; unsupported transports such as gRPC produce warnings.",
   },
   {
     question: "What happens when no config file is provided?",
@@ -108,7 +121,7 @@ export const cookieNotice = {
   points: [
     "Theme preference may be stored in your browser (for example localStorage key tcptun-theme) so light, dark, or system mode can be restored on later visits.",
     "Hosting, CDN, or security infrastructure that serves this site may set technical cookies or logs needed to deliver pages, assets, and basic reliability.",
-    "Browser tools on this site (config generation and URI conversion) process data locally in your browser; those tools are not used by us to set advertising cookies.",
+    "Browser tools on this site (config generation, URI conversion, and Xray conversion) process data locally in your browser; those tools are not used by us to set advertising cookies.",
     "We do not use first-party advertising or marketing tracking cookies on this site. Third-party services outside our control may still process requests according to their own policies.",
     "You can clear cookies and site data in your browser settings at any time. Disabling storage may reset preferences such as theme.",
   ],
@@ -129,7 +142,7 @@ export const binaryDownloads = [
   binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 16049152),
 ] as const;
 
-export const inboundTypes = ["mixed", "socks5", "native"] as const;
+export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;
 export const outboundTypes = [
   "direct",
   "balance",
@@ -137,6 +150,9 @@ export const outboundTypes = [
   "socks5",
   "mixed",
   "native",
+  "vless",
+  "vmess",
+  "trojan",
 ] as const;
 
 export const tunnelProtocols = [
@@ -148,6 +164,33 @@ export const tunnelProtocols = [
     mux: "Recommended when both ends match",
     command: "tcptun config native --server proxy.example.com --port 9443",
     description: "Private low-overhead protocol. Prefer raw + mux for throughput; --quic uses raw + reality-quic + mux.mode=quic. Supports reverse publish/expose.",
+  },
+  {
+    name: "vless",
+    credential: "UUID",
+    interoperability: "Xray VLESS",
+    generatedSecurity: "raw + REALITY + Vision",
+    mux: "Optional",
+    command: "tcptun config vless --server proxy.example.com --port 9443",
+    description: "Supports TCP/UDP. Generated configs default to Vision + REALITY and can interoperate with Xray.",
+  },
+  {
+    name: "vmess",
+    credential: "UUID",
+    interoperability: "Xray VMess AEAD",
+    generatedSecurity: "raw + REALITY",
+    mux: "Optional",
+    command: "tcptun config vmess --server proxy.example.com --port 9443",
+    description: "VMess AEAD with TCP/UDP support and Xray interop.",
+  },
+  {
+    name: "trojan",
+    credential: "Password",
+    interoperability: "Xray Trojan",
+    generatedSecurity: "raw + REALITY",
+    mux: "Optional",
+    command: "tcptun config trojan --server proxy.example.com --port 9443",
+    description: "Password-authenticated Trojan tunnel with TCP/UDP support.",
   },
 ] as const;
 
@@ -541,7 +584,7 @@ export const nativeMuxNotes = [
 export const reversePublishNotes = [
   {
     title: "Protocol scope",
-    body: "Only native + raw, and group mux or QUIC mux must be enabled. Other tunnel types are rejected during validation.",
+    body: "Only native + raw, and group mux or QUIC mux must be enabled. VLESS / VMess / Trojan are rejected during validation.",
   },
   {
     title: "Pairing rules",
@@ -834,7 +877,7 @@ export const realityRules = [
   },
   {
     title: "Supported endpoints",
-    body: "Used with the native tunnel. mixed and socks5 are unsupported.",
+    body: "Works with native / vless / vmess / trojan. mixed and socks5 are unsupported.",
   },
   {
     title: "Key pairing",
@@ -873,6 +916,12 @@ export const realityFieldGroups = [
 
 export const realityCommands = [
   {
+    title: "Generate a REALITY pair",
+    command:
+      "tcptun config vless --server proxy.example.com --port 443 --server-name example.com --dest example.com:443",
+    body: "Writes paired server.json and client.json; run tcptun uri export if you need URIs.",
+  },
+  {
     title: "native + REALITY",
     command:
       "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
@@ -902,6 +951,36 @@ export const protocolComparison = [
     bestFor: "Throughput / reverse publish",
     generator: "tcptun config native --server … --port …",
   },
+  {
+    name: "vless",
+    credential: "uuid ↔ users[].id",
+    interop: "Xray VLESS",
+    securityDefault: "raw + REALITY + Vision",
+    vision: "xtls-rprx-vision",
+    muxNote: "Optional",
+    bestFor: "Xray interop / camouflage",
+    generator: "tcptun config vless --server … --port …",
+  },
+  {
+    name: "vmess",
+    credential: "uuid ↔ users[].id",
+    interop: "Xray VMess",
+    securityDefault: "raw + REALITY",
+    vision: "—",
+    muxNote: "Optional",
+    bestFor: "VMess ecosystem",
+    generator: "tcptun config vmess --server … --port …",
+  },
+  {
+    name: "trojan",
+    credential: "password ↔ users[].password",
+    interop: "Xray Trojan",
+    securityDefault: "raw + REALITY",
+    vision: "—",
+    muxNote: "Optional",
+    bestFor: "Password auth",
+    generator: "tcptun config trojan --server … --port …",
+  },
 ] as const;
 
 export const protocolOutboundSnippets = {
@@ -913,7 +992,304 @@ export const protocolOutboundSnippets = {
   "transport": { "type": "raw" },
   "mux": {}
 }`,
+  vless: `{
+  "tag": "proxy",
+  "type": "vless",
+  "address": ["proxy.example.com:443"],
+  "uuid": "00000000-0000-4000-8000-000000000000",
+  "flow": "xtls-rprx-vision",
+  "transport": { "type": "raw" },
+  "security": {
+    "type": "reality",
+    "server_name": "example.com",
+    "fingerprint": "chrome",
+    "public_key": "…",
+    "short_id": "00"
+  }
+}`,
+  vmess: `{
+  "tag": "proxy",
+  "type": "vmess",
+  "address": ["proxy.example.com:443"],
+  "uuid": "00000000-0000-4000-8000-000000000000",
+  "transport": {
+    "type": "ws",
+    "path": "/vmess"
+  },
+  "security": {
+    "type": "tls",
+    "server_name": "proxy.example.com"
+  },
+  "mux": {}
+}`,
+  trojan: `{
+  "tag": "proxy",
+  "type": "trojan",
+  "address": ["proxy.example.com:443"],
+  "password": "change-me",
+  "transport": { "type": "raw" },
+  "security": {
+    "type": "tls",
+    "server_name": "proxy.example.com"
+  },
+  "mux": {}
+}`,
 } as const;
+
+
+export const vmessTlsServerExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "server",
+      "type": "vmess",
+      "address": ["0.0.0.0:443"],
+      "network": ["tcp", "udp"],
+      "users": [{ "id": "00000000-0000-4000-8000-000000000000" }],
+      "transport": { "type": "ws", "path": "/vmess" },
+      "security": {
+        "type": "tls",
+        "cert": "/path/to/fullchain.pem",
+        "key": "/path/to/privkey.pem"
+      }
+    }
+  ],
+  "outbounds": [{ "tag": "direct", "type": "direct" }],
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": {}
+}`;
+
+export const vmessTlsClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "vmess",
+      "address": ["proxy.example.com:443"],
+      "uuid": "00000000-0000-4000-8000-000000000000",
+      "transport": { "type": "ws", "path": "/vmess" },
+      "security": {
+        "type": "tls",
+        "server_name": "proxy.example.com"
+      },
+      "mux": {}
+    }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
+}`;
+
+export const trojanTlsServerExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "server",
+      "type": "trojan",
+      "address": ["0.0.0.0:443"],
+      "network": ["tcp", "udp"],
+      "users": [{ "password": "change-me" }],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "tls",
+        "cert": "/path/to/fullchain.pem",
+        "key": "/path/to/privkey.pem"
+      }
+    }
+  ],
+  "outbounds": [{ "tag": "direct", "type": "direct" }],
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": {}
+}`;
+
+export const trojanTlsClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "trojan",
+      "address": ["proxy.example.com:443"],
+      "password": "change-me",
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "tls",
+        "server_name": "proxy.example.com"
+      },
+      "mux": {}
+    }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
+}`;
+
+export const protocolUseCases = [
+  {
+    id: "native-basic",
+    protocol: "native",
+    title: "native · basic proxy",
+    summary: "tcptun-to-tcptun tunnel with raw + mux for throughput.",
+    when: "Both ends run tcptun and you want low overhead.",
+    steps: [
+      "Generate with tcptun config native.",
+      "Match users[].id and token.",
+      "Start server, then client; use 127.0.0.1:1080.",
+    ],
+    commands: [
+      "tcptun config native --server proxy.example.com --port 9443",
+      "tcptun config check --config server.json",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: nativeServerExample,
+    clientCode: nativeClientExample,
+    serverHint: "server-native.json",
+    clientHint: "client-native.json",
+  },
+  {
+    id: "native-reality",
+    protocol: "native",
+    title: "native · REALITY",
+    summary: "native over raw with REALITY camouflage.",
+    when: "Public TCP edge with REALITY keys instead of your own cert.",
+    steps: [
+      "Generate with --server-name and --dest.",
+      "Pair private_key / public_key and short ids.",
+      "Keep transport raw.",
+    ],
+    commands: [
+      "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: nativeRealityServerExample,
+    clientCode: nativeRealityClientExample,
+    serverHint: "server-native-reality.json",
+    clientHint: "client-native-reality.json",
+  },
+  {
+    id: "native-quic",
+    protocol: "native",
+    title: "native · QUIC",
+    summary: "native + raw + reality-quic + mux.mode=quic.",
+    when: "You want QUIC streams/DATAGRAMs without managing TLS certs.",
+    steps: [
+      "Generate with --quic.",
+      "Open UDP on the listen port.",
+      "Do not use plain reality in place of reality-quic.",
+    ],
+    commands: [
+      "tcptun config native --quic --server proxy.example.com --port 9443",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: nativeQuicServerExample,
+    clientCode: nativeQuicClientExample,
+    serverHint: "server-native-quic.json",
+    clientHint: "client-native-quic.json",
+  },
+  {
+    id: "native-reverse",
+    protocol: "native",
+    title: "native · reverse publish",
+    summary: "Expose a NAT-side service on the edge with publish/expose.",
+    when: "The real service sits behind the client; the VPS should accept public traffic.",
+    steps: [
+      "Enable mux on both ends.",
+      "Match service names on publish and expose.",
+      "Dial the server publish address externally.",
+    ],
+    commands: [
+      "tcptun --config server-reverse.json",
+      "tcptun --config client-reverse.json",
+    ],
+    serverCode: nativeReverseServerExample,
+    clientCode: nativeReverseClientExample,
+    serverHint: "server-reverse.json",
+    clientHint: "client-reverse.json",
+  },
+  {
+    id: "vless-reality",
+    protocol: "vless",
+    title: "vless · REALITY + Vision",
+    summary: "Xray-compatible VLESS with Vision flow and REALITY.",
+    when: "You need VLESS wire interop or default generated REALITY + Vision path.",
+    steps: [
+      "Generate with tcptun config vless.",
+      "Match uuid / users[].id and REALITY keys.",
+      "Keep transport raw for REALITY.",
+    ],
+    commands: [
+      "tcptun config vless --server proxy.example.com --port 443 --server-name example.com --dest example.com:443",
+      "tcptun config check --config server.json",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: vlessRealityServerExample,
+    clientCode: vlessRealityClientExample,
+    serverHint: "server-vless-reality.json",
+    clientHint: "client-vless-reality.json",
+  },
+  {
+    id: "vmess-tls-ws",
+    protocol: "vmess",
+    title: "vmess · TLS + WebSocket",
+    summary: "VMess AEAD behind TLS and a WebSocket path.",
+    when: "You need VMess interop or a path-based front behind an existing TLS site.",
+    steps: [
+      "Generate with tcptun config vmess or adapt the samples.",
+      "Deploy cert/key on the server TLS inbound.",
+      "Match uuid, path, and server_name on the client.",
+    ],
+    commands: [
+      "tcptun config vmess --server proxy.example.com --port 443",
+      "tcptun config check --config server.json",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: vmessTlsServerExample,
+    clientCode: vmessTlsClientExample,
+    serverHint: "server-vmess-tls-ws.json",
+    clientHint: "client-vmess-tls-ws.json",
+  },
+  {
+    id: "trojan-tls",
+    protocol: "trojan",
+    title: "trojan · TLS password auth",
+    summary: "Password-authenticated Trojan tunnel over TLS.",
+    when: "You want Trojan wire interop with a simple password credential.",
+    steps: [
+      "Generate with tcptun config trojan.",
+      "Match password / users[].password and TLS SNI.",
+      "Start server then client; use local mixed :1080.",
+    ],
+    commands: [
+      "tcptun config trojan --server proxy.example.com --port 443",
+      "tcptun config check --config server.json",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: trojanTlsServerExample,
+    clientCode: trojanTlsClientExample,
+    serverHint: "server-trojan-tls.json",
+    clientHint: "client-trojan-tls.json",
+  },
+] as const;
+
 
 function binary(
   filename: string,
