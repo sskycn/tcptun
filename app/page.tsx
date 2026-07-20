@@ -412,7 +412,7 @@ export default function Home() {
 
         <div className="footer-bottom">
           <span>
-            tcptun {displayVersion} · Use only in accordance with applicable law.{" "}
+            tcptun {displayVersion} · Lawful use only · Use at your own risk · No warranty.{" "}
             <a href="#disclaimer">Disclaimer</a>
           </span>
           <a href="#top">Back to top</a>
