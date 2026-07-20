@@ -79,28 +79,6 @@ export const faqItems = [
   },
 ] as const;
 
-/** Core principles shown prominently in the disclaimer section. */
-export const disclaimerHighlights = [
-  {
-    key: "lawful",
-    label: "Lawful use only",
-    statement:
-      "You must use this software only under lawful conditions and in compliance with all applicable laws, regulations, and network policies.",
-  },
-  {
-    key: "consequences",
-    label: "Consequences are yours alone",
-    statement:
-      "You assume full responsibility for your use of this software and bear all consequences arising from installation, configuration, operation, or misuse.",
-  },
-  {
-    key: "warranty",
-    label: "No warranty or promise",
-    statement:
-      "The author provides no warranty, guarantee, assurance, or promise of any kind regarding the software, this website, or any results of use.",
-  },
-] as const;
-
 export const disclaimerItems = [
   {
     title: "Lawful use only",

@@ -1,4 +1,4 @@
-import { disclaimerHighlights, disclaimerItems } from "./site-data";
+import { disclaimerItems } from "./site-data";
 
 export default function DisclaimerSection() {
   return (
@@ -7,29 +7,8 @@ export default function DisclaimerSection() {
         <p className="eyebrow">Legal</p>
         <h2>Disclaimer</h2>
         <p>
-          Please read carefully. The following three points are mandatory and apply to every use of
-          tcptun and this website.
+          Please read carefully. The following terms apply to every use of tcptun and this website.
         </p>
-      </div>
-
-      <div className="disclaimer-emphasis" role="note" aria-label="Core disclaimer terms">
-        <p className="disclaimer-emphasis-lead">
-          <strong>Emphasized terms.</strong> Lawful use is required. All consequences are yours.
-          The author provides no warranty or promise.
-        </p>
-        <ol className="disclaimer-highlights">
-          {disclaimerHighlights.map((item, index) => (
-            <li key={item.key} className="disclaimer-highlight" data-key={item.key}>
-              <span className="disclaimer-highlight-index" aria-hidden="true">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <div>
-                <h3>{item.label}</h3>
-                <p>{item.statement}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
       </div>
 
       <div className="disclaimer-grid">
