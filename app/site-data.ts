@@ -81,28 +81,16 @@ export const faqItems = [
 
 export const disclaimerItems = [
   {
-    title: "Lawful use only",
-    body: "tcptun is a networking and proxy runtime for legitimate purposes such as development, testing, research, and authorized network operations. You must comply with all applicable laws, regulations, and network policies in your jurisdiction.",
+    title: "Lawful use required",
+    body: "You may use this software only in compliance with applicable laws, regulations, and network policies. Illegal use is prohibited.",
   },
   {
-    title: "Your responsibility",
-    body: "You are solely responsible for how you install, configure, and operate tcptun, including the systems you connect to and the traffic you forward. Unauthorized access, interception, or circumvention of access controls may be illegal.",
+    title: "You bear all consequences",
+    body: "You alone are responsible for how you install, configure, and operate this software, and for any consequences that result from your use.",
   },
   {
-    title: "No warranty",
-    body: "The software, website, binaries, install scripts, and browser tools are provided “as is”, without warranties of any kind, express or implied, including merchantability, fitness for a particular purpose, and non-infringement.",
-  },
-  {
-    title: "Limitation of liability",
-    body: "To the maximum extent permitted by law, authors, contributors, and operators of this site are not liable for any direct, indirect, incidental, special, consequential, or punitive damages arising from use or inability to use tcptun or this website.",
-  },
-  {
-    title: "Local processing",
-    body: "Config generation, URI conversion, and Xray conversion on this site run in your browser. Keys and credentials are not uploaded by those tools, but you remain responsible for safeguarding secrets and the configs you create.",
-  },
-  {
-    title: "Third-party interop",
-    body: "References to Xray, VLESS, VMess, Trojan, REALITY, and other third-party protocols or products are for technical interoperability only and do not imply endorsement, affiliation, or support.",
+    title: "No warranty or promise",
+    body: "The author provides no warranty, guarantee, or promise of any kind. The software and this website are provided as is, without any express or implied assurances of fitness, reliability, or results.",
   },
 ] as const;
 

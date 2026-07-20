@@ -7,8 +7,8 @@ export default function DisclaimerSection() {
         <p className="eyebrow">Legal</p>
         <h2>Disclaimer</h2>
         <p>
-          By downloading, installing, configuring, or using tcptun or this website, you acknowledge
-          and accept the following terms.
+          Use this software only under lawful conditions. You assume all consequences of use.
+          The author provides no warranty or promise.
         </p>
       </div>
 
@@ -27,8 +27,9 @@ export default function DisclaimerSection() {
       <div className="disclaimer-footnote">
         <strong>Important</strong>
         <p>
-          If you do not agree with this disclaimer, do not use tcptun or the tools on this site.
-          Continued use constitutes acceptance of these conditions.
+          By downloading, installing, or using tcptun or this website, you agree to use the software
+          lawfully, accept full responsibility for any consequences, and acknowledge that the author
+          offers no warranty or promise. If you do not agree, do not use this software.
         </p>
       </div>
     </section>
