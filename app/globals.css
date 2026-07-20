@@ -3323,90 +3323,6 @@ html[data-theme="dark"] .platform-mark.android {
   max-width: 68ch;
 }
 
-.disclaimer-emphasis {
-  display: grid;
-  gap: 16px;
-  margin-bottom: 18px;
-  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
-  border-radius: var(--radius);
-  background:
-    linear-gradient(
-      155deg,
-      color-mix(in srgb, var(--accent-soft) 88%, var(--surface)),
-      color-mix(in srgb, var(--surface) 92%, var(--accent-soft))
-    );
-  padding: 20px 20px 18px;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent),
-    0 18px 40px rgb(var(--shadow) / 0.06);
-}
-
-.disclaimer-emphasis-lead {
-  margin: 0;
-  max-width: 78ch;
-  color: var(--text);
-  font-size: 15.5px;
-  font-weight: 650;
-  line-height: 1.55;
-  letter-spacing: -0.01em;
-}
-
-.disclaimer-emphasis-lead strong {
-  color: var(--accent-text);
-}
-
-.disclaimer-highlights {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.disclaimer-highlight {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-  min-height: 100%;
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
-  border-radius: var(--radius-small);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  padding: 16px;
-}
-
-.disclaimer-highlight-index {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 36px;
-  height: 28px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent-text);
-  font-family: var(--font-jetbrains), ui-monospace, monospace;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-
-.disclaimer-highlight h3 {
-  margin: 0 0 8px;
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-}
-
-.disclaimer-highlight p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13.5px;
-  line-height: 1.65;
-}
-
 .disclaimer-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3468,17 +3384,17 @@ html[data-theme="dark"] .platform-mark.android {
 
 .disclaimer-footnote {
   display: grid;
-  gap: 8px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 18px;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
   border-radius: var(--radius-small);
   background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
-  padding: 16px 18px;
+  padding: 18px 20px;
 }
 
 .disclaimer-footnote > strong {
   color: var(--accent-text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 750;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3487,14 +3403,16 @@ html[data-theme="dark"] .platform-mark.android {
 .disclaimer-footnote p {
   margin: 0;
   max-width: 90ch;
-  color: var(--muted);
-  font-size: 14px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 550;
   line-height: 1.7;
+  letter-spacing: -0.01em;
 }
 
 .disclaimer-footnote p strong {
   color: var(--text);
-  font-weight: 750;
+  font-weight: 800;
 }
 
 /* ---------- footer ---------- */
@@ -3666,8 +3584,7 @@ button:focus-visible {
   .mux-grid,
   .reality-fields,
   .reality-commands,
-  .disclaimer-grid,
-  .disclaimer-highlights {
+  .disclaimer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -3775,8 +3692,7 @@ button:focus-visible {
     flex-direction: column;
   }
 
-  .disclaimer-grid,
-  .disclaimer-highlights {
+  .disclaimer-grid {
     grid-template-columns: 1fr;
   }
 
