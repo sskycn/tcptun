@@ -2,6 +2,8 @@ import Image from "next/image";
 import ConfigGenerator from "./config-generator";
 import ConfigSection from "./config-section";
 import CopyButton from "./copy-button";
+import CookieBanner from "./cookie-banner";
+import CookieSettingsLink from "./cookie-settings-link";
 import DisclaimerSection from "./disclaimer-section";
 import FaqSection from "./faq-section";
 import InstallCommand from "./install-command";
@@ -393,6 +395,7 @@ export default function Home() {
               <a href="#start">CLI</a>
               <a href="#faq">FAQ</a>
               <a href="#disclaimer">Disclaimer</a>
+              <CookieSettingsLink className="footer-text-button" />
             </div>
             <div className="footer-column">
               <h3>Download</h3>
@@ -415,10 +418,14 @@ export default function Home() {
             tcptun {displayVersion} ·{" "}
             <strong>Lawful use only · You bear all consequences · No warranty or promise.</strong>{" "}
             <a href="#disclaimer">Disclaimer</a>
+            {" · "}
+            <CookieSettingsLink className="footer-text-button" />
           </span>
           <a href="#top">Back to top</a>
         </div>
       </footer>
+
+      <CookieBanner />
     </main>
   );
 }
