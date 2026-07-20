@@ -79,18 +79,52 @@ export const faqItems = [
   },
 ] as const;
 
+/** Core principles shown prominently in the disclaimer section. */
+export const disclaimerHighlights = [
+  {
+    key: "lawful",
+    label: "Lawful use only",
+    statement:
+      "You must use this software only under lawful conditions and in compliance with all applicable laws, regulations, and network policies.",
+  },
+  {
+    key: "consequences",
+    label: "Consequences are yours alone",
+    statement:
+      "You assume full responsibility for your use of this software and bear all consequences arising from installation, configuration, operation, or misuse.",
+  },
+  {
+    key: "warranty",
+    label: "No warranty or promise",
+    statement:
+      "The author provides no warranty, guarantee, assurance, or promise of any kind regarding the software, this website, or any results of use.",
+  },
+] as const;
+
 export const disclaimerItems = [
   {
-    title: "Lawful use required",
-    body: "You may use this software only in compliance with applicable laws, regulations, and network policies. Illegal use is prohibited.",
+    title: "Lawful use only",
+    body: "tcptun and this website may be used only for lawful purposes and only in compliance with applicable laws, regulations, and the policies of any network or service you connect to. Any illegal use is strictly prohibited. You must determine for yourself whether a particular use is lawful in your jurisdiction.",
   },
   {
     title: "You bear all consequences",
-    body: "You alone are responsible for how you install, configure, and operate this software, and for any consequences that result from your use.",
+    body: "You alone are responsible for how you download, install, configure, and operate this software, including the systems you access, the traffic you forward, and the configs you create. Any risk, loss, liability, dispute, claim, penalty, or other consequence arising from your use is borne solely by you.",
   },
   {
-    title: "No warranty or promise",
-    body: "The author provides no warranty, guarantee, or promise of any kind. The software and this website are provided as is, without any express or implied assurances of fitness, reliability, or results.",
+    title: "No warranty or promise from the author",
+    body: "The author makes no warranty, guarantee, representation, or promise—express or implied—about fitness for a particular purpose, merchantability, non-infringement, availability, security, correctness, or any outcome. The software, binaries, install scripts, website, and browser tools are provided strictly “as is” and “as available”.",
+  },
+  {
+    title: "No liability for your use",
+    body: "To the maximum extent permitted by law, the author, contributors, and site operators are not liable for any direct, indirect, incidental, special, consequential, or punitive damages, or for any loss of data, profits, business, or goodwill, arising from your use of or inability to use tcptun or this website.",
+  },
+  {
+    title: "Your obligation to assess risk",
+    body: "Before using this software you must evaluate legal, technical, and operational risks yourself. If you are unsure whether a use is lawful, or whether the software is suitable for your needs, do not use it.",
+  },
+  {
+    title: "Acceptance by use",
+    body: "By downloading, installing, configuring, or using tcptun or any tool on this website, you acknowledge and accept this disclaimer in full—especially lawful use, self-borne consequences, and the absence of any warranty or promise by the author. If you do not agree, do not use this software.",
   },
 ] as const;
 
