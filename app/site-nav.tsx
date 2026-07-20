@@ -3,14 +3,14 @@
 import { useEffect, useId, useState } from "react";
 
 const links = [
-  { href: "#architecture", id: "architecture", label: "架构" },
-  { href: "#config", id: "config", label: "配置" },
-  { href: "#generate", id: "generate", label: "生成" },
+  { href: "#architecture", id: "architecture", label: "Architecture" },
+  { href: "#config", id: "config", label: "Config" },
+  { href: "#generate", id: "generate", label: "Generate" },
   { href: "#uri", id: "uri", label: "URI" },
-  { href: "#convert", id: "convert", label: "转换" },
-  { href: "#protocols", id: "protocols", label: "协议" },
-  { href: "#download", id: "download", label: "下载" },
-  { href: "#start", id: "start", label: "命令" },
+  { href: "#convert", id: "convert", label: "Convert" },
+  { href: "#protocols", id: "protocols", label: "Protocols" },
+  { href: "#download", id: "download", label: "Download" },
+  { href: "#start", id: "start", label: "CLI" },
   { href: "#faq", id: "faq", label: "FAQ" },
 ] as const;
 
@@ -78,7 +78,7 @@ export default function SiteNav() {
 
   return (
     <div className="site-nav">
-      <nav className="nav nav-desktop" aria-label="主要导航">
+      <nav className="nav nav-desktop" aria-label="Primary navigation">
         {links.map((link) => (
           <a
             key={link.id}
@@ -96,7 +96,7 @@ export default function SiteNav() {
         className={`nav-toggle ${open ? "is-open" : ""}`}
         aria-expanded={open}
         aria-controls={menuId}
-        aria-label={open ? "关闭菜单" : "打开菜单"}
+        aria-label={open ? "Close menu" : "Open menu"}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="nav-toggle-bars" aria-hidden="true">
@@ -115,11 +115,11 @@ export default function SiteNav() {
       <nav
         id={menuId}
         className={`nav-mobile ${open ? "is-open" : ""}`}
-        aria-label="移动导航"
+        aria-label="Mobile navigation"
         aria-hidden={!open}
       >
         <div className="nav-mobile-panel">
-          <p className="nav-mobile-label">导航</p>
+          <p className="nav-mobile-label">Navigation</p>
           {links.map((link) => (
             <a
               key={link.id}

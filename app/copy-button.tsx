@@ -10,7 +10,7 @@ type CopyButtonProps = {
 
 export default function CopyButton({
   value,
-  label = "复制",
+  label = "Copy",
   className = "",
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
@@ -50,7 +50,7 @@ export default function CopyButton({
       type="button"
       className={`copy-button ${copied ? "is-copied" : ""} ${className}`.trim()}
       onClick={handleCopy}
-      aria-label={copied ? "已复制" : label}
+      aria-label={copied ? "Copied" : label}
     >
       <span className="copy-button-icon" aria-hidden="true">
         {copied ? (
@@ -83,7 +83,7 @@ export default function CopyButton({
           </svg>
         )}
       </span>
-      <span>{copied ? "已复制" : label}</span>
+      <span>{copied ? "Copied" : label}</span>
     </button>
   );
 }

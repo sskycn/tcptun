@@ -17,8 +17,8 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
       <div className="install-strip">
         <div className="install-strip-copy">
           <div className="install-mode-row">
-            <span className="install-strip-label">一键安装</span>
-            <div className="install-mode-toggle" role="group" aria-label="安装版本">
+            <span className="install-strip-label">One-line install</span>
+            <div className="install-mode-toggle" role="group" aria-label="Install version">
               <button
                 type="button"
                 className={mode === "latest" ? "is-active" : undefined}
@@ -39,7 +39,7 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
           </div>
           <code>{command}</code>
         </div>
-        <CopyButton value={command} label="复制命令" className="copy-button-solid" />
+        <CopyButton value={command} label="Copy command" className="copy-button-solid" />
       </div>
     );
   }
@@ -48,8 +48,8 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
     <div className="download-note">
       <div className="download-note-copy">
         <div className="install-mode-row">
-          <strong>一键安装</strong>
-          <div className="install-mode-toggle" role="group" aria-label="安装版本">
+          <strong>One-line install</strong>
+          <div className="install-mode-toggle" role="group" aria-label="Install version">
             <button
               type="button"
               className={mode === "latest" ? "is-active" : undefined}
@@ -70,16 +70,16 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
         </div>
         <div className="download-note-command">
           <code>{command}</code>
-          <CopyButton value={command} label="复制" className="copy-button-solid" />
+          <CopyButton value={command} label="Copy" className="copy-button-solid" />
         </div>
         <span>
           {mode === "latest"
-            ? "安装最新版到 /usr/local/bin，可用 TCPTUN_INSTALL_DIR 改目录。"
-            : `安装 v${releaseVersion}，可用 TCPTUN_INSTALL_DIR 改目录。`}
+            ? "Installs the latest release to /usr/local/bin. Override the directory with TCPTUN_INSTALL_DIR."
+            : `Installs v${releaseVersion}. Override the directory with TCPTUN_INSTALL_DIR.`}
         </span>
       </div>
       <a className="download-note-link" href="/install.sh">
-        查看脚本
+        View script
         <span aria-hidden="true">↗</span>
       </a>
     </div>

@@ -6,9 +6,9 @@ type ThemeChoice = "system" | "light" | "dark";
 
 const storageKey = "tcptun-theme";
 const choices: Array<{ label: string; value: ThemeChoice }> = [
-  { label: "系统", value: "system" },
-  { label: "浅色", value: "light" },
-  { label: "深色", value: "dark" },
+  { label: "System", value: "system" },
+  { label: "Light", value: "light" },
+  { label: "Dark", value: "dark" },
 ];
 
 function applyTheme(choice: ThemeChoice) {
@@ -50,7 +50,7 @@ export default function ThemeToggle() {
   }
 
   return (
-    <div className="theme-toggle" role="group" aria-label="颜色主题" suppressHydrationWarning>
+    <div className="theme-toggle" role="group" aria-label="Color theme" suppressHydrationWarning>
       {choices.map((choice) => (
         <button
           key={choice.value}

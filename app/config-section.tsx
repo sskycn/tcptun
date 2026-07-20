@@ -29,37 +29,37 @@ import {
 const nativeExampleTabs = [
   {
     id: "server",
-    label: "服务端 raw+mux",
+    label: "Server raw+mux",
     hint: "server-native.json",
     code: nativeServerExample,
   },
   {
     id: "client",
-    label: "客户端 raw+mux",
+    label: "Client raw+mux",
     hint: "client-native.json",
     code: nativeClientExample,
   },
   {
     id: "quic-server",
-    label: "服务端 QUIC",
+    label: "Server QUIC",
     hint: "server-native-quic.json",
     code: nativeQuicServerExample,
   },
   {
     id: "quic-client",
-    label: "客户端 QUIC",
+    label: "Client QUIC",
     hint: "client-native-quic.json",
     code: nativeQuicClientExample,
   },
   {
     id: "reverse-server",
-    label: "反向发布服务端",
+    label: "Reverse publish server",
     hint: "server-reverse.json",
     code: nativeReverseServerExample,
   },
   {
     id: "reverse-client",
-    label: "反向发布客户端",
+    label: "Reverse publish client",
     hint: "client-reverse.json",
     code: nativeReverseClientExample,
   },
@@ -68,25 +68,25 @@ const nativeExampleTabs = [
 const realityExampleTabs = [
   {
     id: "vless-server",
-    label: "VLESS 服务端",
+    label: "VLESS server",
     hint: "server-vless-reality.json",
     code: vlessRealityServerExample,
   },
   {
     id: "vless-client",
-    label: "VLESS 客户端",
+    label: "VLESS client",
     hint: "client-vless-reality.json",
     code: vlessRealityClientExample,
   },
   {
     id: "native-server",
-    label: "Native 服务端",
+    label: "Native server",
     hint: "native + REALITY server",
     code: nativeRealityServerExample,
   },
   {
     id: "native-client",
-    label: "Native 客户端",
+    label: "Native client",
     hint: "native + REALITY client",
     code: nativeRealityClientExample,
   },
@@ -96,22 +96,22 @@ const nativeRealityQuicLayers = [
   {
     label: "Protocol",
     value: "native",
-    body: "负责 token 认证、TCP / UDP 隧道语义与反向发布。",
+    body: "Handles token auth, TCP / UDP tunnel semantics, and reverse publish.",
   },
   {
     label: "Transport",
     value: "raw",
-    body: "作为 QUIC 模式要求的基础传输，不再叠加 ws / h2 / h3。",
+    body: "Required base transport for QUIC mode; do not stack ws / h2 / h3.",
   },
   {
     label: "Security",
     value: "reality-quic",
-    body: "使用 REALITY 密钥与站点参数保护 QUIC 握手，无需部署证书。",
+    body: "Protects the QUIC handshake with REALITY keys and site parameters; no cert deploy needed.",
   },
   {
     label: "Multiplexing",
     value: "mux.mode: quic",
-    body: "用 QUIC 连接池承载 stream 与 UDP DATAGRAM。",
+    body: "Uses a QUIC connection pool for streams and UDP DATAGRAMs.",
   },
 ] as const;
 
@@ -134,9 +134,9 @@ export default function ConfigSection() {
     <section className="section config-section" id="config">
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">配置</p>
-          <h2>JSON 拓扑、native 与 REALITY。</h2>
-          <p>用一份配置描述入口、出口与安全层。先看 native，再看 REALITY 与协议选型。</p>
+          <p className="eyebrow">Config</p>
+          <h2>JSON topology, native, and REALITY.</h2>
+          <p>Describe inbounds, outbounds, and security in one config. Start with native, then REALITY and protocol choice.</p>
         </div>
         <div className="chip-row">
           <a className="chip-link" href="#config-native">
@@ -146,16 +146,16 @@ export default function ConfigSection() {
             reality-quic
           </a>
           <a className="chip-link" href="#reverse">
-            反向发布
+            Reverse publish
           </a>
           <a className="chip-link" href="#reality">
             REALITY
           </a>
           <a className="chip-link" href="#generate">
-            生成
+            Generate
           </a>
           <a className="chip-link" href="#protocol-compare">
-            对照
+            Compare
           </a>
         </div>
       </div>
@@ -174,13 +174,13 @@ export default function ConfigSection() {
         <div className="native-focus-heading">
           <div>
             <p className="eyebrow">Native</p>
-            <h3>低开销私有隧道</h3>
+            <h3>Low-overhead private tunnel</h3>
             <p>
-              支持 TCP / UDP 与 mux，传输可选 raw / ws / h2 / h3。服务端{" "}
-              <code>users[].id</code> 与客户端 <code>token</code> 必须一致。
+              Supports TCP / UDP and mux, with transport options raw / ws / h2 / h3. Server{" "}
+              <code>users[].id</code> and client <code>token</code> must match.
             </p>
           </div>
-          <div className="native-auth-map" aria-label="Native 认证对应关系">
+          <div className="native-auth-map" aria-label="Native auth mapping">
             <div>
               <span>Server inbound</span>
               <code>users[].id</code>
@@ -213,19 +213,20 @@ export default function ConfigSection() {
               <code>native + raw + reality-quic</code>
             </h3>
             <p>
-              这不是三种可替换的模式，而是一套分层组合：<code>native</code> 是隧道协议，
-              <code>raw</code> 是传输，<code>reality-quic</code> 是 QUIC 专用安全层；同时必须设置
-              <code>mux.mode=quic</code> 才会启用原生 QUIC 连接池。
+              This is not three interchangeable modes, but one layered stack: <code>native</code> is
+              the tunnel protocol, <code>raw</code> is the transport, and <code>reality-quic</code> is
+              the QUIC-only security layer. You must also set <code>mux.mode=quic</code> to enable the
+              native QUIC connection pool.
             </p>
           </div>
           <div className="native-reality-quic-fit">
-            <span>适合</span>
-            <strong>两端均为 tcptun</strong>
-            <p>希望同时承载 TCP stream 与 UDP DATAGRAM，并避免维护 TLS 证书。</p>
+            <span>Best for</span>
+            <strong>tcptun on both ends</strong>
+            <p>Carry TCP streams and UDP DATAGRAMs together without managing TLS certificates.</p>
           </div>
         </div>
 
-        <div className="native-reality-quic-stack" aria-label="Native Reality QUIC 分层结构">
+        <div className="native-reality-quic-stack" aria-label="Native Reality QUIC stack">
           {nativeRealityQuicLayers.map((layer, index) => (
             <div className="native-reality-quic-layer-wrap" key={layer.label}>
               <article className="native-reality-quic-layer">
@@ -242,17 +243,17 @@ export default function ConfigSection() {
 
         <div className="native-reality-quic-footer">
           <div>
-            <strong>两端必须配对</strong>
+            <strong>Both ends must match</strong>
             <p>
-              token、REALITY 公私钥、server name 与 short ID 要对应；普通
-              <code>security.type=reality</code> 不能代替 <code>reality-quic</code>。
+              token, REALITY key pair, server name, and short ID must correspond. Plain{" "}
+              <code>security.type=reality</code> cannot replace <code>reality-quic</code>.
             </p>
           </div>
           <div className="native-reality-quic-command">
             <pre><code>tcptun config native --quic --server proxy.example.com --port 9443</code></pre>
             <CopyButton
               value="tcptun config native --quic --server proxy.example.com --port 9443"
-              label="复制"
+              label="Copy"
               className="copy-button-on-dark"
             />
           </div>
@@ -264,15 +265,16 @@ export default function ConfigSection() {
         activeId={nativeTab}
         onChange={(id) => setNativeTab(id as NativeTabId)}
         active={activeNative}
-        tablistLabel="Native 配置示例"
+        tablistLabel="Native config examples"
       />
 
       <div className="native-pair-note">
         <div>
-          <strong>最小拓扑</strong>
+          <strong>Minimal topology</strong>
           <p>
-            服务端暴露 <code>native</code> 入口；客户端用本地 <code>mixed</code> 入口转发到{" "}
-            <code>native</code> 出口。替换示例中的凭据与地址即可运行。
+            The server exposes a <code>native</code> inbound; the client forwards a local{" "}
+            <code>mixed</code> inbound to a <code>native</code> outbound. Replace the sample
+            credentials and addresses to run.
           </p>
         </div>
         <div className="native-pair-flow" aria-hidden="true">
@@ -288,8 +290,8 @@ export default function ConfigSection() {
 
       <div className="field-groups">
         <div className="section-subheading">
-          <h3>字段</h3>
-          <p>常用字段一览。</p>
+          <h3>Fields</h3>
+          <p>Common field overview.</p>
         </div>
         <div className="field-group-grid">
           {nativeFieldGroups.map((group) => (
@@ -315,7 +317,7 @@ export default function ConfigSection() {
         <div className="section-subheading">
           <h3>Mux / QUIC</h3>
           <p>
-            短连接场景建议开启 mux。峰值吞吐优先 <code>native + raw + mux</code>。
+            Enable mux for short-connection workloads. Prefer <code>native + raw + mux</code> for peak throughput.
           </p>
         </div>
         <div className="mux-grid">
@@ -328,14 +330,14 @@ export default function ConfigSection() {
         </div>
         <div className="mux-snippet">
           <div className="mux-snippet-heading">
-            <span>mux 片段</span>
+            <span>mux snippet</span>
             <CopyButton
               value={`"mux": {
   "max_sessions": 4,
   "max_streams_per_session": 16,
   "warm_spares": 1
 }`}
-              label="复制"
+              label="Copy"
               className="copy-button-ghost"
             />
           </div>
@@ -351,10 +353,10 @@ export default function ConfigSection() {
 
       <div className="mux-panel" id="reverse">
         <div className="section-subheading">
-          <h3>反向发布</h3>
+          <h3>Reverse publish</h3>
           <p>
-            把 NAT 后的 TCP/UDP 服务挂到隧道服务端监听端口。服务端配置{" "}
-            <code>publish</code>，客户端配置 <code>expose</code>。
+            Hang NAT-side TCP/UDP services on tunnel server listen ports. Configure{" "}
+            <code>publish</code> on the server and <code>expose</code> on the client.
           </p>
         </div>
         <div className="mux-grid">
@@ -369,8 +371,8 @@ export default function ConfigSection() {
 
       <div className="config-workflow">
         <div className="section-subheading">
-          <h3>工作流</h3>
-          <p>生成 → 校验 → 启动。</p>
+          <h3>Workflow</h3>
+          <p>Generate → validate → start.</p>
         </div>
         <div className="config-workflow-grid">
           {nativeWorkflowCommands.map((item, index) => (
@@ -385,7 +387,7 @@ export default function ConfigSection() {
                 <pre>
                   <code>{item.command}</code>
                 </pre>
-                <CopyButton value={item.command} label="复制" className="copy-button-on-dark" />
+                <CopyButton value={item.command} label="Copy" className="copy-button-on-dark" />
               </div>
             </article>
           ))}
@@ -397,9 +399,10 @@ export default function ConfigSection() {
         <div className="section-subheading row-heading section-subheading-wide">
           <div>
             <p className="eyebrow">REALITY</p>
-            <h3>REALITY 与 REALITY QUIC</h3>
+            <h3>REALITY and REALITY QUIC</h3>
             <p>
-              写在 <code>security</code> 中。四种隧道协议均可使用；VLESS 生成配置默认附带 Vision。
+              Configured under <code>security</code>. All four tunnel protocols can use it; VLESS
+              generated configs enable Vision by default.
             </p>
           </div>
           <div className="chip-row">
@@ -440,7 +443,7 @@ export default function ConfigSection() {
           activeId={realityTab}
           onChange={(id) => setRealityTab(id as RealityTabId)}
           active={activeReality}
-          tablistLabel="REALITY 配置示例"
+          tablistLabel="REALITY config examples"
         />
 
         <div className="reality-commands">
@@ -454,17 +457,18 @@ export default function ConfigSection() {
                 <pre>
                   <code>{item.command}</code>
                 </pre>
-                <CopyButton value={item.command} label="复制" className="copy-button-on-dark" />
+                <CopyButton value={item.command} label="Copy" className="copy-button-on-dark" />
               </div>
             </article>
           ))}
         </div>
 
         <div className="reality-warn">
-          <strong>注意</strong>
+          <strong>Note</strong>
           <p>
-            普通 <code>reality</code> 不能直接用于 QUIC mux；Native QUIC 可选证书 TLS，或使用
-            <code>security.type=reality-quic</code>。<code>tcptun config native --quic</code> 会生成后者。
+            Plain <code>reality</code> cannot be used directly with QUIC mux. Native QUIC can use
+            certificate TLS or <code>security.type=reality-quic</code>.{" "}
+            <code>tcptun config native --quic</code> generates the latter.
           </p>
         </div>
       </div>
@@ -473,9 +477,9 @@ export default function ConfigSection() {
       <div className="protocol-compare-panel" id="protocol-compare">
         <div className="section-subheading row-heading section-subheading-wide">
           <div>
-            <p className="eyebrow">对照</p>
-            <h3>四种隧道协议</h3>
-            <p>与 Xray 兼容的是线路协议，不是配置文件。</p>
+            <p className="eyebrow">Compare</p>
+            <h3>Four tunnel protocols</h3>
+            <p>Xray compatibility is for wire protocols, not config files.</p>
           </div>
         </div>
 
@@ -483,13 +487,13 @@ export default function ConfigSection() {
           <table className="compare-table">
             <thead>
               <tr>
-                <th>协议</th>
-                <th>凭据</th>
-                <th>互操作</th>
-                <th>默认安全</th>
+                <th>Protocol</th>
+                <th>Credential</th>
+                <th>Interop</th>
+                <th>Default security</th>
                 <th>Vision</th>
                 <th>Mux</th>
-                <th>场景</th>
+                <th>Best for</th>
               </tr>
             </thead>
             <tbody>
@@ -512,7 +516,7 @@ export default function ConfigSection() {
 
         <div className="snippet-panel">
           <div className="snippet-toolbar">
-            <div className="config-example-tabs" role="tablist" aria-label="协议 outbound 片段">
+            <div className="config-example-tabs" role="tablist" aria-label="Protocol outbound snippets">
               {(Object.keys(protocolOutboundSnippets) as SnippetKey[]).map((key) => (
                 <button
                   key={key}
@@ -526,7 +530,7 @@ export default function ConfigSection() {
                 </button>
               ))}
             </div>
-            <CopyButton value={activeSnippet} label="复制" className="copy-button-solid" />
+            <CopyButton value={activeSnippet} label="Copy" className="copy-button-solid" />
           </div>
           <pre className="config-example-code">
             <code>{activeSnippet}</code>
@@ -582,7 +586,7 @@ function ExamplePanel({
         </div>
         <div className="config-example-meta">
           <span>{active.hint}</span>
-          <CopyButton value={active.code} label="复制配置" className="copy-button-solid" />
+          <CopyButton value={active.code} label="Copy config" className="copy-button-solid" />
         </div>
       </div>
       <pre className="config-example-code" role="tabpanel">

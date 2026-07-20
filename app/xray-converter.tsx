@@ -25,7 +25,7 @@ export default function XrayConverter() {
     const items: Array<[ResultTab, string]> = [];
     if (result.clientJson) items.push(["client", "client.json"]);
     if (result.serverJson) items.push(["server", "server.json"]);
-    if (result.warnings.length) items.push(["warnings", `警告 (${result.warnings.length})`]);
+    if (result.warnings.length) items.push(["warnings", `Warnings (${result.warnings.length})`]);
     return items;
   }, [result]);
 
@@ -51,7 +51,7 @@ export default function XrayConverter() {
       else setTab("warnings");
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : "转换失败");
+      setError(err instanceof Error ? err.message : "Conversion failed");
     }
   }
 
@@ -59,10 +59,11 @@ export default function XrayConverter() {
     <section className="section converter-section" id="convert">
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">转换</p>
-          <h2>Xray 配置 → tcptun</h2>
+          <p className="eyebrow">Convert</p>
+          <h2>Xray config → tcptun</h2>
           <p>
-            支持完整 Xray JSON、单个 inbound/outbound，以及 vless / vmess / trojan 分享链接。仅转换线路协议与传输层，路由规则需自行核对。
+            Accepts full Xray JSON, a single inbound/outbound, or vless / vmess / trojan share links.
+            Only wire protocols and transports are converted; rebuild route rules yourself.
           </p>
         </div>
         <div className="chip-row">
@@ -76,11 +77,11 @@ export default function XrayConverter() {
       <div className="converter-grid">
         <form className="converter-form" onSubmit={handleConvert}>
           <label className="converter-input-label">
-            <span>Xray 配置或分享链接</span>
+            <span>Xray config or share link</span>
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="粘贴 Xray config.json，或一行一条 vless:// / vmess:// / trojan://"
+              placeholder="Paste Xray config.json, or one vless:// / vmess:// / trojan:// link per line"
               spellCheck={false}
               required
             />
@@ -88,7 +89,7 @@ export default function XrayConverter() {
 
           <div className="converter-options">
             <label>
-              <span>本地监听</span>
+              <span>Local listen</span>
               <input
                 value={localListen}
                 onChange={(event) => setLocalListen(event.target.value)}
@@ -96,7 +97,7 @@ export default function XrayConverter() {
               />
             </label>
             <label>
-              <span>本地端口</span>
+              <span>Local port</span>
               <input
                 type="number"
                 min={1}
@@ -106,11 +107,11 @@ export default function XrayConverter() {
               />
             </label>
             <label className="converter-option-wide">
-              <span>优先出口 tag（可选）</span>
+              <span>Preferred outbound tag (optional)</span>
               <input
                 value={preferredTag}
                 onChange={(event) => setPreferredTag(event.target.value)}
-                placeholder="例如 proxy"
+                placeholder="e.g. proxy"
                 autoComplete="off"
               />
             </label>
@@ -118,7 +119,7 @@ export default function XrayConverter() {
 
           <div className="converter-actions">
             <button type="submit" className="button primary">
-              转换为 tcptun
+              Convert to tcptun
             </button>
             <button
               type="button"
@@ -128,7 +129,7 @@ export default function XrayConverter() {
                 setError(null);
               }}
             >
-              填入示例
+              Load sample
             </button>
             <button
               type="button"
@@ -139,7 +140,7 @@ export default function XrayConverter() {
                 setError(null);
               }}
             >
-              清空
+              Clear
             </button>
           </div>
 
@@ -150,9 +151,9 @@ export default function XrayConverter() {
           ) : null}
 
           <ul className="converter-notes">
-            <li>可转换：VLESS / VMess / Trojan，传输 raw / ws / h2 / h3，TLS 与 REALITY</li>
-            <li>不转换：gRPC、xhttp、kcp 等；freedom / blackhole 会忽略</li>
-            <li>Xray 路由规则不会自动迁移，请在 tcptun route 中重建</li>
+            <li>Supported: VLESS / VMess / Trojan with raw / ws / h2 / h3, TLS, and REALITY</li>
+            <li>Not converted: gRPC, xhttp, kcp, and similar; freedom / blackhole are ignored</li>
+            <li>Xray route rules are not migrated; rebuild them under tcptun route</li>
           </ul>
         </form>
 
@@ -162,7 +163,7 @@ export default function XrayConverter() {
               <div className="converter-result-header">
                 <p className="converter-summary">{result.summary}</p>
                 <div className="generator-result-toolbar">
-                  <div className="config-example-tabs" role="tablist" aria-label="转换结果">
+                  <div className="config-example-tabs" role="tablist" aria-label="Conversion result">
                     {tabs.map(([id, label]) => (
                       <button
                         key={id}
@@ -178,7 +179,7 @@ export default function XrayConverter() {
                   </div>
                   {tab !== "warnings" && activeContent ? (
                     <div className="generator-result-actions">
-                      <CopyButton value={activeContent} label="复制" className="copy-button-solid" />
+                      <CopyButton value={activeContent} label="Copy" className="copy-button-solid" />
                       <button
                         type="button"
                         className="button secondary generator-download"
@@ -186,7 +187,7 @@ export default function XrayConverter() {
                           downloadText(tab === "client" ? "client.json" : "server.json", activeContent)
                         }
                       >
-                        下载
+                        Download
                       </button>
                     </div>
                   ) : null}
@@ -212,7 +213,7 @@ export default function XrayConverter() {
                     className="button secondary"
                     onClick={() => downloadText("client.json", result.clientJson!)}
                   >
-                    下载 client.json
+                    Download client.json
                   </button>
                 ) : null}
                 {result.serverJson ? (
@@ -221,20 +222,20 @@ export default function XrayConverter() {
                     className="button secondary"
                     onClick={() => downloadText("server.json", result.serverJson!)}
                   >
-                    下载 server.json
+                    Download server.json
                   </button>
                 ) : null}
               </div>
             </>
           ) : (
             <div className="generator-empty">
-              <p className="eyebrow">输出</p>
-              <h3>粘贴 Xray 配置后转换</h3>
-              <p>客户端配置会包一层 local mixed 入口；服务端入口会落到 direct 出口。</p>
+              <p className="eyebrow">Output</p>
+              <h3>Paste an Xray config to convert</h3>
+              <p>Client configs wrap a local mixed inbound; server inbounds land on a direct outbound.</p>
               <ul>
-                <li>兼容 streamSettings.network / security / realitySettings</li>
-                <li>支持多行分享链接批量导入</li>
-                <li>转换在浏览器本地完成</li>
+                <li>Understands streamSettings.network / security / realitySettings</li>
+                <li>Supports multi-line share-link batch import</li>
+                <li>Conversion runs entirely in the browser</li>
               </ul>
             </div>
           )}

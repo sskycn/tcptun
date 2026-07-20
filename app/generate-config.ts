@@ -22,10 +22,10 @@ export type GeneratedConfigs = {
 };
 
 export const protocols: Array<{ id: TunnelProtocol; label: string; hint: string }> = [
-  { id: "native", label: "native", hint: "tcptun 私有协议" },
-  { id: "vless", label: "vless", hint: "Xray 互通 + Vision" },
+  { id: "native", label: "native", hint: "tcptun private protocol" },
+  { id: "vless", label: "vless", hint: "Xray interop + Vision" },
   { id: "vmess", label: "vmess", hint: "Xray VMess AEAD" },
-  { id: "trojan", label: "trojan", hint: "密码认证" },
+  { id: "trojan", label: "trojan", hint: "Password auth" },
 ];
 
 export function defaultGenerateInput(): GenerateConfigInput {
@@ -44,19 +44,19 @@ export function defaultGenerateInput(): GenerateConfigInput {
 
 export function validateGenerateInput(input: GenerateConfigInput): string | null {
   if (!["native", "vless", "vmess", "trojan"].includes(input.protocol)) {
-    return "不支持的协议";
+    return "Unsupported protocol";
   }
-  if (!input.server.trim()) return "请填写服务端地址";
+  if (!input.server.trim()) return "Server address is required";
   if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {
-    return "端口需为 1–65535";
+    return "Port must be 1–65535";
   }
-  if (!input.listen.trim()) return "请填写服务端监听地址";
-  if (!input.localListen.trim()) return "请填写本地监听地址";
+  if (!input.listen.trim()) return "Server listen address is required";
+  if (!input.localListen.trim()) return "Local listen address is required";
   if (!Number.isInteger(input.localPort) || input.localPort < 1 || input.localPort > 65535) {
-    return "本地端口需为 1–65535";
+    return "Local port must be 1–65535";
   }
-  if (!input.serverName.trim()) return "请填写 REALITY server name";
-  if (input.quic && input.protocol !== "native") return "QUIC 配置生成仅支持 native 协议";
+  if (!input.serverName.trim()) return "REALITY server name is required";
+  if (input.quic && input.protocol !== "native") return "QUIC config generation supports only the native protocol";
   return null;
 }
 
@@ -219,7 +219,7 @@ function clientCredentialFields(protocol: TunnelProtocol, credential: string) {
 
 async function generateX25519Pair(): Promise<{ privateKey: string; publicKey: string }> {
   if (!globalThis.crypto?.subtle) {
-    throw new Error("当前环境不支持 Web Crypto");
+    throw new Error("Web Crypto is not available in this environment");
   }
 
   try {
@@ -231,11 +231,11 @@ async function generateX25519Pair(): Promise<{ privateKey: string; publicKey: st
     const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
     const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
     if (!privateJwk.d || !publicJwk.x) {
-      throw new Error("密钥导出失败");
+      throw new Error("Key export failed");
     }
     return { privateKey: privateJwk.d, publicKey: publicJwk.x };
   } catch {
-    throw new Error("浏览器不支持 X25519，请升级浏览器或使用 CLI：tcptun config …");
+    throw new Error("This browser does not support X25519. Upgrade the browser or use the CLI: tcptun config …");
   }
 }
 

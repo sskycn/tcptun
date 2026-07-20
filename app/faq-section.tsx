@@ -5,7 +5,7 @@ export default function FaqSection() {
     <section className="section faq-section" id="faq">
       <div className="section-heading">
         <p className="eyebrow">FAQ</p>
-        <h2>常见问题</h2>
+        <h2>Frequently asked questions</h2>
       </div>
 
       <div className="faq-list">

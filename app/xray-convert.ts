@@ -104,7 +104,7 @@ export { downloadText };
 export function convertXrayInput(raw: string, options: ConvertOptions = {}): ConvertResult {
   const text = raw.trim();
   if (!text) {
-    throw new Error("请粘贴 Xray 配置 JSON 或分享链接");
+    throw new Error("Paste an Xray config JSON or share links");
   }
 
   const warnings: string[] = [];
@@ -123,12 +123,12 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
       try {
         outbounds.push(parseShareLink(line, uniqueTag("proxy", index, outbounds)));
       } catch (err) {
-        warnings.push(`第 ${index + 1} 行链接无法解析：${err instanceof Error ? err.message : String(err)}`);
+        warnings.push(`Line ${index + 1} link could not be parsed: ${err instanceof Error ? err.message : String(err)}`);
       }
     });
 
     if (outbounds.length === 0) {
-      throw new Error("未能从分享链接中解析出可用的隧道出口");
+      throw new Error("Could not parse a usable tunnel outbound from the share links");
     }
 
     const client = buildClientConfig(outbounds, localListen, localPort, options.preferredOutboundTag, warnings);
@@ -136,7 +136,7 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
       clientJson: pretty(client),
       serverJson: null,
       warnings,
-      summary: `已从 ${outbounds.length} 条分享链接生成客户端配置`,
+      summary: `Generated a client config from ${outbounds.length} share links`,
     };
   }
 
@@ -144,7 +144,7 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("输入既不是合法 JSON，也不像分享链接");
+    throw new Error("Input is neither valid JSON nor share links");
   }
 
   if (Array.isArray(data)) {
@@ -156,22 +156,22 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
         try {
           outbounds.push(convertXrayOutbound(item, uniqueTag(String(item.tag || "proxy"), index, outbounds), warnings));
         } catch (err) {
-          warnings.push(`outbounds[${index}] 跳过：${err instanceof Error ? err.message : String(err)}`);
+          warnings.push(`outbounds[${index}] skipped: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     });
-    if (outbounds.length === 0) throw new Error("数组中没有可转换的 Xray outbound");
+    if (outbounds.length === 0) throw new Error("No convertible Xray outbounds in the array");
     const client = buildClientConfig(outbounds, localListen, localPort, options.preferredOutboundTag, warnings);
     return {
       clientJson: pretty(client),
       serverJson: null,
       warnings,
-      summary: `已转换 ${outbounds.length} 个出口`,
+      summary: `Converted ${outbounds.length} outbounds`,
     };
   }
 
   if (!isObject(data)) {
-    throw new Error("JSON 根节点必须是对象或数组");
+    throw new Error("JSON root must be an object or array");
   }
 
   // Single outbound object
@@ -182,7 +182,7 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
       clientJson: pretty(client),
       serverJson: null,
       warnings,
-      summary: "已转换单个 outbound",
+      summary: "Converted a single outbound",
     };
   }
 
@@ -194,7 +194,7 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
       clientJson: null,
       serverJson: pretty(server),
       warnings,
-      summary: "已转换单个 inbound",
+      summary: "Converted a single inbound",
     };
   }
 
@@ -206,7 +206,7 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
     if (!isObject(item)) return;
     if (!isTunnelProtocol(String(item.protocol || ""))) {
       if (String(item.protocol || "") && !["freedom", "blackhole", "dns", "loopback", "block"].includes(String(item.protocol))) {
-        warnings.push(`outbound ${item.tag || index}（${item.protocol}）暂不支持，已跳过`);
+        warnings.push(`outbound ${item.tag || index} (${item.protocol}) is not supported and was skipped`);
       }
       return;
     }
@@ -215,7 +215,7 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
         convertXrayOutbound(item, uniqueTag(String(item.tag || "proxy"), index, outbounds), warnings),
       );
     } catch (err) {
-      warnings.push(`outbound ${item.tag || index} 跳过：${err instanceof Error ? err.message : String(err)}`);
+      warnings.push(`outbound ${item.tag || index} skipped: ${err instanceof Error ? err.message : String(err)}`);
     }
   });
 
@@ -230,12 +230,12 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
         convertXrayInbound(item, uniqueTag(String(item.tag || "server"), index, inbounds), warnings),
       );
     } catch (err) {
-      warnings.push(`inbound ${item.tag || index} 跳过：${err instanceof Error ? err.message : String(err)}`);
+      warnings.push(`inbound ${item.tag || index} skipped: ${err instanceof Error ? err.message : String(err)}`);
     }
   });
 
   if (outbounds.length === 0 && inbounds.length === 0) {
-    throw new Error("未找到可转换的 VLESS / VMess / Trojan 入站或出站");
+    throw new Error("No convertible VLESS / VMess / Trojan inbounds or outbounds found");
   }
 
   const clientJson =
@@ -245,14 +245,14 @@ export function convertXrayInput(raw: string, options: ConvertOptions = {}): Con
   const serverJson = inbounds.length > 0 ? pretty(buildServerConfig(inbounds, warnings)) : null;
 
   const parts: string[] = [];
-  if (outbounds.length) parts.push(`${outbounds.length} 个出口`);
-  if (inbounds.length) parts.push(`${inbounds.length} 个入口`);
+  if (outbounds.length) parts.push(`${outbounds.length} outbounds`);
+  if (inbounds.length) parts.push(`${inbounds.length} inbounds`);
 
   return {
     clientJson,
     serverJson,
     warnings,
-    summary: `已转换 ${parts.join("、")}`,
+    summary: `Converted ${parts.join(", ")}`,
   };
 }
 
@@ -281,7 +281,7 @@ function isXrayInbound(value: JsonObject): boolean {
 function convertXrayOutbound(source: JsonObject, tag: string, warnings: string[]): TcptunOutbound {
   const protocol = String(source.protocol).toLowerCase();
   if (!isTunnelProtocol(protocol)) {
-    throw new Error(`不支持的协议 ${protocol}`);
+    throw new Error(`Unsupported protocol ${protocol}`);
   }
 
   const settings = isObject(source.settings) ? source.settings : {};
@@ -297,25 +297,25 @@ function convertXrayOutbound(source: JsonObject, tag: string, warnings: string[]
   if (protocol === "trojan") {
     const servers = Array.isArray(settings.servers) ? settings.servers : [];
     const first = isObject(servers[0]) ? servers[0] : null;
-    if (!first) throw new Error("trojan settings.servers 缺失");
+    if (!first) throw new Error("trojan settings.servers is missing");
     server = String(first.address || first.ip || "");
     port = Number(first.port);
     password = String(first.password || "");
   } else {
     const vnext = Array.isArray(settings.vnext) ? settings.vnext : [];
     const first = isObject(vnext[0]) ? vnext[0] : null;
-    if (!first) throw new Error(`${protocol} settings.vnext 缺失`);
+    if (!first) throw new Error(`${protocol} settings.vnext is missing`);
     server = String(first.address || "");
     port = Number(first.port);
     const users = Array.isArray(first.users) ? first.users : [];
     const user = isObject(users[0]) ? users[0] : null;
-    if (!user) throw new Error(`${protocol} users 缺失`);
+    if (!user) throw new Error(`${protocol} users is missing`);
     uuid = String(user.id || user.uuid || "");
     flow = String(user.flow || "");
   }
 
-  if (!server) throw new Error("缺少服务器地址");
-  if (!Number.isFinite(port) || port < 1 || port > 65535) throw new Error("端口无效");
+  if (!server) throw new Error("Server address is missing");
+  if (!Number.isFinite(port) || port < 1 || port > 65535) throw new Error("Invalid port");
 
   const outbound: TcptunOutbound = {
     tag,
@@ -327,10 +327,10 @@ function convertXrayOutbound(source: JsonObject, tag: string, warnings: string[]
   if (muxEnabled) outbound.mux = {};
 
   if (protocol === "trojan") {
-    if (!password) throw new Error("trojan password 缺失");
+    if (!password) throw new Error("trojan password is missing");
     outbound.password = password;
   } else {
-    if (!uuid) throw new Error("uuid 缺失");
+    if (!uuid) throw new Error("uuid is missing");
     outbound.uuid = uuid;
     if (flow) outbound.flow = flow;
   }
@@ -344,20 +344,20 @@ function convertXrayOutbound(source: JsonObject, tag: string, warnings: string[]
 function convertXrayInbound(source: JsonObject, tag: string, warnings: string[]): TcptunInbound {
   const protocol = String(source.protocol).toLowerCase();
   if (!isTunnelProtocol(protocol)) {
-    throw new Error(`不支持的协议 ${protocol}`);
+    throw new Error(`Unsupported protocol ${protocol}`);
   }
 
   const settings = isObject(source.settings) ? source.settings : {};
   const stream = isObject(source.streamSettings) ? source.streamSettings : {};
   const port = Number(source.port);
   if (!Number.isFinite(port) || port < 1 || port > 65535) {
-    throw new Error("inbound port 无效");
+    throw new Error("inbound port is invalid");
   }
 
   const listen = String(source.listen || "0.0.0.0");
   const clients = Array.isArray(settings.clients) ? settings.clients : [];
   if (clients.length === 0) {
-    throw new Error("inbound settings.clients 为空");
+    throw new Error("inbound settings.clients is empty");
   }
 
   const users = clients
@@ -365,17 +365,17 @@ function convertXrayInbound(source: JsonObject, tag: string, warnings: string[])
     .map((client) => {
       if (protocol === "trojan") {
         const password = String(client.password || "");
-        if (!password) throw new Error("trojan client password 缺失");
+        if (!password) throw new Error("trojan client password is missing");
         return { password };
       }
       const id = String(client.id || client.uuid || "");
-      if (!id) throw new Error("client id 缺失");
+      if (!id) throw new Error("client id is missing");
       const flow = String(client.flow || "");
       return flow ? { id, flow } : { id };
     });
 
   if (clients.length > 1) {
-    warnings.push(`inbound ${tag} 含 ${clients.length} 个用户，已全部保留`);
+    warnings.push(`inbound ${tag} has ${clients.length} users; all were kept`);
   }
 
   const inbound: TcptunInbound = {
@@ -407,10 +407,10 @@ function convertXrayInbound(source: JsonObject, tag: string, warnings: string[])
           key: keyFile,
         };
       } else if (certFile || keyFile) {
-        warnings.push(`inbound ${tag} 的证书是内联内容或路径不完整，请手动填写 security.cert/key`);
+        warnings.push(`inbound ${tag} certificate is inline or incomplete; fill security.cert/key manually`);
       }
     } else {
-      warnings.push(`inbound ${tag} 启用了 TLS，请手动补充 security.cert/key`);
+      warnings.push(`inbound ${tag} enables TLS; fill security.cert/key manually`);
     }
   }
 
@@ -459,7 +459,7 @@ function mapStreamTransport(
       break;
     case "grpc":
     case "gun":
-      warnings.push(`${label} 使用 gRPC，tcptun 当前不支持，已按 raw 占位，请改用 raw/ws/h2/h3`);
+      warnings.push(`${label} uses gRPC, which tcptun does not support yet; placeholder is raw — switch to raw/ws/h2/h3`);
       type = "raw";
       break;
     case "xhttp":
@@ -467,11 +467,11 @@ function mapStreamTransport(
     case "kcp":
     case "mkcp":
     case "quic":
-      warnings.push(`${label} 的 network=${network} 不受支持，已回退 raw`);
+      warnings.push(`${label} network=${network} is unsupported; fell back to raw`);
       type = "raw";
       break;
     default:
-      warnings.push(`${label} 未知 network=${network}，已回退 raw`);
+      warnings.push(`${label} has unknown network=${network}; fell back to raw`);
       type = "raw";
   }
 
@@ -491,7 +491,7 @@ function mapStreamSecurity(
 
   if (security === "tls" || security === "xtls") {
     if (security === "xtls") {
-      warnings.push(`${label} 使用 xtls，已按 TLS 处理`);
+      warnings.push(`${label} uses xtls; treated as TLS`);
     }
     const tls = isObject(stream.tlsSettings) ? stream.tlsSettings : {};
     const serverName = String(tls.serverName || tls.server_name || "");
@@ -508,7 +508,7 @@ function mapStreamSecurity(
   }
 
   if (transportHint !== "tcp" && transportHint !== "raw" && transportHint !== "none" && transportHint !== "") {
-    warnings.push(`${label} REALITY 通常配合 raw/tcp；当前 network=${transportHint}`);
+    warnings.push(`${label} REALITY usually pairs with raw/tcp; current network=${transportHint}`);
   }
 
   const reality = isObject(stream.realitySettings) ? stream.realitySettings : {};
@@ -516,8 +516,8 @@ function mapStreamSecurity(
     const serverName = String(reality.serverName || reality.server_name || "");
     const publicKey = String(reality.publicKey || reality.public_key || "");
     const shortId = String(reality.shortId || reality.short_id || "");
-    if (!publicKey) warnings.push(`${label} REALITY 缺少 publicKey`);
-    if (!serverName) warnings.push(`${label} REALITY 缺少 serverName`);
+    if (!publicKey) warnings.push(`${label} REALITY is missing publicKey`);
+    if (!serverName) warnings.push(`${label} REALITY is missing serverName`);
     return {
       type: "reality",
       server_name: serverName,
@@ -540,9 +540,9 @@ function mapStreamSecurity(
       ? [String(reality.shortId)]
       : [];
   const dest = String(reality.dest || reality.target || "");
-  if (!privateKey) warnings.push(`${label} REALITY 缺少 privateKey`);
-  if (serverNames.length === 0) warnings.push(`${label} REALITY 缺少 serverNames`);
-  if (!dest) warnings.push(`${label} REALITY 缺少 dest`);
+  if (!privateKey) warnings.push(`${label} REALITY is missing privateKey`);
+  if (serverNames.length === 0) warnings.push(`${label} REALITY is missing serverNames`);
+  if (!dest) warnings.push(`${label} REALITY is missing dest`);
 
   return {
     type: "reality",
@@ -565,7 +565,7 @@ function buildClientConfig(
   const defaultOutbound =
     preferredTag && tags.includes(preferredTag) ? preferredTag : tags[0];
   if (preferredTag && !tags.includes(preferredTag)) {
-    warnings.push(`未找到优先出口 tag=${preferredTag}，已使用 ${defaultOutbound}`);
+    warnings.push(`Preferred outbound tag=${preferredTag} not found; using ${defaultOutbound}`);
   }
 
   // Ensure direct exists for convenience
@@ -625,9 +625,9 @@ function parseShareLink(text: string, tag: string): TcptunOutbound {
   if (lower.startsWith("vless://")) return parseVlessOrTrojanLink(text, tag, "vless");
   if (lower.startsWith("trojan://")) return parseVlessOrTrojanLink(text, tag, "trojan");
   if (lower.startsWith("ss://")) {
-    throw new Error("Shadowsocks 暂不支持");
+    throw new Error("Shadowsocks is not supported yet");
   }
-  throw new Error("未知链接协议");
+  throw new Error("Unknown share-link protocol");
 }
 
 function parseVmessLink(text: string, tag: string): TcptunOutbound {
@@ -635,11 +635,11 @@ function parseVmessLink(text: string, tag: string): TcptunOutbound {
   const jsonText = decodeBase64Flexible(payload);
   const source = JSON.parse(jsonText) as JsonObject;
   const port = Number(source.port);
-  if (!Number.isFinite(port) || port < 1 || port > 65535) throw new Error("VMess 端口无效");
+  if (!Number.isFinite(port) || port < 1 || port > 65535) throw new Error("VMess Invalid port");
   const address = String(source.add || source.address || "");
-  if (!address) throw new Error("VMess 地址缺失");
+  if (!address) throw new Error("VMess address is missing");
   const uuid = String(source.id || "");
-  if (!uuid) throw new Error("VMess uuid 缺失");
+  if (!uuid) throw new Error("VMess uuid is missing");
 
   const network = String(source.net || source.network || "tcp").toLowerCase();
   const transportType = mapShareNetwork(network);
@@ -680,9 +680,9 @@ function parseVmessLink(text: string, tag: string): TcptunOutbound {
 function parseVlessOrTrojanLink(text: string, tag: string, protocol: "vless" | "trojan"): TcptunOutbound {
   const url = new URL(text);
   const port = Number(url.port || (url.protocol === "https:" ? 443 : 0));
-  if (!Number.isFinite(port) || port < 1 || port > 65535) throw new Error("端口无效");
+  if (!Number.isFinite(port) || port < 1 || port > 65535) throw new Error("Invalid port");
   const server = url.hostname;
-  if (!server) throw new Error("主机缺失");
+  if (!server) throw new Error("Host is missing");
 
   const credential = decodeURIComponent(url.username || "");
   // trojan://password@host:port - password may be in username
@@ -710,12 +710,12 @@ function parseVlessOrTrojanLink(text: string, tag: string, protocol: "vless" | "
   };
 
   if (protocol === "vless") {
-    if (!credential) throw new Error("VLESS uuid 缺失");
+    if (!credential) throw new Error("VLESS uuid is missing");
     outbound.uuid = credential;
     const flow = query.get("flow") || "";
     if (flow) outbound.flow = flow;
   } else {
-    if (!password) throw new Error("Trojan password 缺失");
+    if (!password) throw new Error("Trojan password is missing");
     outbound.password = password;
   }
 

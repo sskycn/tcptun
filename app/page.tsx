@@ -26,64 +26,64 @@ const displayVersion = `v${releaseVersion}`;
 const capabilities = [
   {
     label: "Runtime",
-    title: "多入口、多出口",
-    body: "一份配置描述完整拓扑。入口可直连出口，也可交给 route 选择。",
+    title: "Multi-inbound, multi-outbound",
+    body: "One config describes the full topology. Inbounds can pin an outbound or let route decide.",
   },
   {
     label: "Config",
-    title: "严格 JSON",
-    body: "address 使用 host:port 数组；拒绝未知字段；启动前校验 tag、引用、协议认证、TLS、REALITY 与 mux。",
+    title: "Strict JSON",
+    body: "address uses host:port arrays; unknown fields are rejected; tags, refs, auth, TLS, REALITY, and mux are validated before start.",
   },
   {
     label: "Route",
-    title: "规则路由",
-    body: "支持 direct、balance、隧道与 blackhole，可按域名、IP 和应用身份分流。",
+    title: "Rule-based routing",
+    body: "Supports direct, balance, tunnels, and blackhole, with domain, IP, and app-identity matching.",
   },
   {
     label: "Network",
     title: "TCP / UDP / mux / QUIC",
-    body: "Native QUIC 同时承载 stream 与 DATAGRAM，并提供分片恢复、自适应 FEC 和多连接池。",
+    body: "Native QUIC carries both streams and DATAGRAMs, with fragmentation recovery, adaptive FEC, and multi-connection pools.",
   },
   {
     label: "Reverse",
-    title: "反向发布",
-    body: "native mux / QUIC 支持 publish 与 expose，把 NAT 后的 TCP/UDP 服务挂到边缘端口。",
+    title: "Reverse publish",
+    body: "native mux / QUIC supports publish and expose to hang NAT-side TCP/UDP services on edge ports.",
   },
   {
     label: "Outbound",
-    title: "负载与热切换",
-    body: "balance 按负载、延迟与失败选择成员；同一 outbound 的多 address 是候选入口竞速。",
+    title: "Load balance and hot switch",
+    body: "balance picks members by load, latency, and failures; multiple addresses on one outbound race as candidate entry points.",
   },
   {
     label: "Library",
-    title: "可嵌入库",
-    body: "以 Go 库组合 flow、endpoint、route、transport 与 engine，并适配标准 net 接口。",
+    title: "Embeddable library",
+    body: "Compose flow, endpoint, route, transport, and engine as a Go library, with standard net interfaces.",
   },
 ];
 
 const workflows = [
   {
     name: "run",
-    title: "运行配置",
-    body: "加载并校验 JSON，通过后启动全部入口。",
+    title: "Run a config",
+    body: "Load and validate JSON, then start every inbound.",
     command: "tcptun --config config.json",
   },
   {
     name: "check",
-    title: "仅校验",
-    body: "完成校验与编译，不监听端口。",
+    title: "Validate only",
+    body: "Validate and compile without listening on ports.",
     command: "tcptun config check --config config.json",
   },
   {
     name: "generate",
-    title: "生成配置对",
-    body: "生成 server / client 配置，含协议凭据与匹配的 REALITY 密钥。",
+    title: "Generate a pair",
+    body: "Generate matching server / client configs with credentials and REALITY keys.",
     command: "tcptun config vless --server proxy.example.com --port 9443",
   },
   {
     name: "uri",
-    title: "导入 URI",
-    body: "从 native / VLESS / VMess / Trojan URI 生成客户端配置。",
+    title: "Import URI",
+    body: "Build a client config from native / VLESS / VMess / Trojan URIs.",
     command: "tcptun uri import --input client.uri --client --output client.json",
   },
 ];
@@ -114,7 +114,7 @@ export default function Home() {
       </div>
 
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="tcptun 首页">
+        <a className="brand" href="#top" aria-label="tcptun home">
           <Image src="/tcptun-logo.png" alt="" width={36} height={36} priority />
           <span>tcptun</span>
         </a>
@@ -134,49 +134,50 @@ export default function Home() {
             <span className="release-tagline">proxy runtime</span>
           </div>
           <h1>
-            一份配置，
+            One config,
             <br />
-            <span className="title-accent">编排全部代理流量。</span>
+            <span className="title-accent">orchestrate all proxy traffic.</span>
           </h1>
           <p className="lede">
-            tcptun 是配置驱动的多入口、多出口代理运行时。用严格 JSON 描述入口、出口与路由，统一启动 TCP/UDP 服务。
+            tcptun is a config-driven multi-inbound, multi-outbound proxy runtime. Describe
+            inbounds, outbounds, and routes in strict JSON, then start TCP/UDP services together.
           </p>
           <div className="hero-actions">
             <a className="button primary" href="#download">
-              下载 {displayVersion}
+              Download {displayVersion}
               <span className="button-arrow" aria-hidden="true">↓</span>
             </a>
             <a className="button secondary" href={npmLinks.package} target="_blank" rel="noreferrer">
-              npm 安装
+              Install via npm
             </a>
-            <a className="button ghost" href="#generate">生成配置</a>
+            <a className="button ghost" href="#generate">Generate config</a>
           </div>
 
           <InstallCommand variant="hero" />
 
-          <div className="release-facts" aria-label="能力概览">
+          <div className="release-facts" aria-label="Capability overview">
             <div className="fact">
               <strong>{inboundTypes.length}</strong>
-              <span>类 inbound</span>
+              <span>inbound types</span>
             </div>
             <div className="fact">
               <strong>{outboundTypes.length}</strong>
-              <span>类 outbound</span>
+              <span>outbound types</span>
             </div>
             <div className="fact">
               <strong>{binaryDownloads.length}</strong>
-              <span>个平台构建</span>
+              <span>platform builds</span>
             </div>
           </div>
         </div>
 
-        <div className="terminal" aria-label="tcptun 命令预览">
+        <div className="terminal" aria-label="tcptun command preview">
           <div className="terminal-heading">
             <div className="terminal-dots" aria-hidden="true">
               <span /><span /><span />
             </div>
             <span className="terminal-title">tcptun · {displayVersion}</span>
-            <CopyButton value={terminalSnippet} label="复制" className="copy-button-ghost" />
+            <CopyButton value={terminalSnippet} label="Copy" className="copy-button-ghost" />
           </div>
           <pre className="terminal-body"><code>{terminalSnippet}</code></pre>
         </div>
@@ -184,9 +185,12 @@ export default function Home() {
 
       <section className="section" id="features">
         <div className="section-heading">
-          <p className="eyebrow">能力</p>
-          <h2>配置定义拓扑，运行时负责校验与执行。</h2>
-          <p>从入口到出口，同一套模型覆盖本地代理、隧道、规则路由、负载均衡与出口链。</p>
+          <p className="eyebrow">Capabilities</p>
+          <h2>Config defines the topology; the runtime validates and runs it.</h2>
+          <p>
+            From inbound to outbound, one model covers local proxies, tunnels, rule routing,
+            load balancing, and outbound chains.
+          </p>
         </div>
         <div className="capability-grid">
           {capabilities.map((item, index) => (
@@ -205,11 +209,11 @@ export default function Home() {
       <section className="section architecture-section" id="architecture">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">架构</p>
-            <h2>入口、路由、出口显式编排。</h2>
-            <p>每个组件有唯一 tag，引用关系在启动前完成编译与校验。</p>
+            <p className="eyebrow">Architecture</p>
+            <h2>Inbounds, routes, and outbounds are explicit.</h2>
+            <p>Every component has a unique tag; references are compiled and checked before start.</p>
           </div>
-          <ol className="pipeline" aria-label="启动流水线">
+          <ol className="pipeline" aria-label="Startup pipeline">
             {pipeline.map((step, index) => (
               <li key={step}>
                 <span className="pipeline-step">{step}</span>
@@ -251,7 +255,7 @@ export default function Home() {
               <span>config.json</span>
               <div className="config-heading-actions">
                 <span className="config-badge">strict schema</span>
-                <CopyButton value={topologyExample} label="复制" className="copy-button-ghost" />
+                <CopyButton value={topologyExample} label="Copy" className="copy-button-ghost" />
               </div>
             </div>
             <pre><code>{topologyExample}</code></pre>
@@ -270,9 +274,9 @@ export default function Home() {
       <section className="section protocol-section" id="protocols">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">协议</p>
-            <h2>四种隧道协议，同一套拓扑。</h2>
-            <p>与 Xray 兼容的是线路协议，不是配置文件格式。</p>
+            <p className="eyebrow">Protocols</p>
+            <h2>Four tunnel protocols, one topology.</h2>
+            <p>Xray compatibility is for wire protocols, not config file format.</p>
           </div>
           <div className="chip-row">
             {transports.map((item) => (
@@ -297,11 +301,11 @@ export default function Home() {
               <p className="protocol-description">{protocol.description}</p>
               <dl>
                 <div>
-                  <dt>互操作</dt>
+                  <dt>Interop</dt>
                   <dd>{protocol.interoperability}</dd>
                 </div>
                 <div>
-                  <dt>默认安全</dt>
+                  <dt>Default security</dt>
                   <dd>{protocol.generatedSecurity}</dd>
                 </div>
                 <div className="wide">
@@ -311,13 +315,13 @@ export default function Home() {
               </dl>
               <div className="protocol-command-row">
                 <pre className="protocol-command"><code>{protocol.command}</code></pre>
-                <CopyButton value={protocol.command} label="复制" className="copy-button-on-dark" />
+                <CopyButton value={protocol.command} label="Copy" className="copy-button-on-dark" />
               </div>
               <a
                 className="protocol-doc-link"
                 href={protocol.name === "native" ? "#native-reality-quic" : "#protocol-compare"}
               >
-                {protocol.name === "native" ? "Native / QUIC 说明 →" : "协议对照 →"}
+                {protocol.name === "native" ? "Native / QUIC notes →" : "Protocol comparison →"}
               </a>
             </article>
           ))}
@@ -330,9 +334,9 @@ export default function Home() {
 
       <section className="section quickstart-section" id="start">
         <div className="section-heading">
-          <p className="eyebrow">命令行</p>
-          <h2>运行、校验、生成、导入。</h2>
-          <p>常用能力都在 JSON 里；CLI 负责加载、校验与生成配置。</p>
+          <p className="eyebrow">CLI</p>
+          <h2>Run, check, generate, import.</h2>
+          <p>Most power lives in JSON; the CLI loads, validates, and generates configs.</p>
         </div>
         <div className="mode-grid">
           {workflows.map((item, index) => (
@@ -345,7 +349,7 @@ export default function Home() {
               <p>{item.body}</p>
               <div className="mode-command-row">
                 <pre><code>{item.command}</code></pre>
-                <CopyButton value={item.command} label="复制" className="copy-button-on-dark" />
+                <CopyButton value={item.command} label="Copy" className="copy-button-on-dark" />
               </div>
             </article>
           ))}
@@ -355,7 +359,7 @@ export default function Home() {
           <Image src="/tcptun-logo.png" alt="" width={64} height={64} />
           <div>
             <p className="eyebrow">tcptun {displayVersion}</p>
-            <h2>下载后即可运行。</h2>
+            <h2>Download and run.</h2>
           </div>
           <PlatformDownloadButton />
         </div>
@@ -370,31 +374,31 @@ export default function Home() {
               <Image src="/tcptun-logo.png" alt="" width={36} height={36} />
               <div>
                 <strong>tcptun {displayVersion}</strong>
-                <p>配置驱动的代理运行时</p>
+                <p>Config-driven proxy runtime</p>
               </div>
             </div>
           </div>
 
           <div className="footer-columns">
             <div className="footer-column">
-              <h3>产品</h3>
-              <a href="#architecture">架构</a>
-              <a href="#config">配置</a>
-              <a href="#generate">生成</a>
-              <a href="#convert">转换</a>
-              <a href="#protocols">协议</a>
-              <a href="#start">命令行</a>
+              <h3>Product</h3>
+              <a href="#architecture">Architecture</a>
+              <a href="#config">Config</a>
+              <a href="#generate">Generate</a>
+              <a href="#convert">Convert</a>
+              <a href="#protocols">Protocols</a>
+              <a href="#start">CLI</a>
               <a href="#faq">FAQ</a>
             </div>
             <div className="footer-column">
-              <h3>下载</h3>
-              <a href="#download">二进制</a>
+              <h3>Download</h3>
+              <a href="#download">Binaries</a>
               <a href={npmLinks.package} target="_blank" rel="noreferrer">npm</a>
               <a href={npmLinks.tarball}>tarball</a>
               <a href="/install.sh">install.sh</a>
             </div>
             <div className="footer-column">
-              <h3>协议</h3>
+              <h3>Protocols</h3>
               {tunnelProtocols.map((protocol) => (
                 <a href="#protocols" key={protocol.name}>{protocol.name}</a>
               ))}
@@ -404,7 +408,7 @@ export default function Home() {
 
         <div className="footer-bottom">
           <span>tcptun {displayVersion}</span>
-          <a href="#top">返回顶部</a>
+          <a href="#top">Back to top</a>
         </div>
       </footer>
     </main>

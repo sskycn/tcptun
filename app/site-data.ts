@@ -14,68 +14,68 @@ export const pinnedInstallCommand = `curl -fsSL https://tcptun.com/install.sh | 
 
 export const faqItems = [
   {
-    question: "能直接使用 Xray 配置文件吗？",
-    answer: "不能。tcptun 使用自己的 JSON 拓扑。与 Xray 兼容的是 VLESS / VMess / Trojan 等线路协议。",
+    question: "Can I use Xray config files directly?",
+    answer: "No. tcptun uses its own JSON topology. Xray compatibility covers wire protocols such as VLESS / VMess / Trojan, not the config format.",
   },
   {
-    question: "如何校验配置？",
-    answer: "运行 tcptun config check --config config.json。会完成校验与编译，但不监听端口。",
+    question: "How do I validate a config?",
+    answer: "Run tcptun config check --config config.json. It validates and compiles without listening on ports.",
   },
   {
-    question: "一键安装装到哪里？如何固定版本？",
+    question: "Where does one-line install put the binary, and how do I pin a version?",
     answer:
-      "默认安装到 /usr/local/bin。用 TCPTUN_INSTALL_DIR 改目录，用 TCPTUN_VERSION 固定版本（从 tcptun.com/releases 下载）。",
+      "It installs to /usr/local/bin by default. Use TCPTUN_INSTALL_DIR to change the directory and TCPTUN_VERSION to pin a version (downloaded from tcptun.com/releases).",
   },
   {
-    question: "支持哪些平台？",
-    answer: "macOS、Linux、Windows 的 amd64 / arm64（Linux 另含 armv7）。",
+    question: "Which platforms are supported?",
+    answer: "macOS, Linux, and Windows on amd64 / arm64 (Linux also includes armv7).",
   },
   {
-    question: "native 的 token 如何配置？",
-    answer: "服务端 users[].id 与客户端 token 必须相同。可用 tcptun config native 生成配对配置。",
+    question: "How is the native token configured?",
+    answer: "Server users[].id and client token must match. Use tcptun config native to generate a paired config.",
   },
   {
-    question: "何时开启 mux 或 QUIC？",
+    question: "When should I enable mux or QUIC?",
     answer:
-      "短连接多、两端同版本时建议配置 mux: {}。原生 QUIC 要求 native + raw + mux.mode=quic，安全层可用 TLS 或 reality-quic；CLI 可用 tcptun config native --quic 生成后者。",
+      "With many short connections and matching versions on both ends, prefer mux: {}. Native QUIC requires native + raw + mux.mode=quic; the security layer can be TLS or reality-quic. The CLI can generate the latter with tcptun config native --quic.",
   },
   {
-    question: "REALITY 能和 TLS 一起用吗？",
-    answer: "不能。REALITY 仅配合 raw，且不能与 security.type=tls 并用。",
+    question: "Can REALITY be used together with TLS?",
+    answer: "No. REALITY works only with raw and cannot be combined with security.type=tls.",
   },
   {
-    question: "address 字段怎么写？",
+    question: "How should the address field be written?",
     answer:
-      "inbound / outbound 的 address 都是 host:port 字符串数组。多地址表示同一逻辑服务的候选入口，首次连接会错峰竞争握手，不是 balance 负载均衡。",
+      "Both inbound and outbound address values are host:port string arrays. Multiple addresses are candidate entry points for the same logical service and race on first handshake; they are not balance load balancing.",
   },
   {
-    question: "什么是反向发布？",
+    question: "What is reverse publish?",
     answer:
-      "native + raw + mux（group 或 QUIC）支持把 NAT 后的 TCP/UDP 服务发布到服务端：服务端配置 publish，客户端配置 expose，两端 service 名一致。",
+      "native + raw + mux (group or QUIC) can publish NAT-side TCP/UDP services to the server: configure publish on the server and expose on the client, with matching service names.",
   },
   {
-    question: "四种隧道协议怎么选？",
-    answer: "两端都是 tcptun、偏吞吐用 native。对接 Xray 用 vless / vmess / trojan。",
+    question: "How do I choose among the four tunnel protocols?",
+    answer: "Prefer native for tcptun-to-tcptun throughput. Use vless / vmess / trojan when interoperating with Xray.",
   },
   {
-    question: "网站上的配置生成安全吗？",
+    question: "Is browser-based config generation safe?",
     answer:
-      "密钥与凭据在浏览器本地用 Web Crypto 生成，不会上传。也可用 CLI：tcptun config <protocol> --server …。",
+      "Keys and credentials are generated locally with Web Crypto and never uploaded. You can also use the CLI: tcptun config <protocol> --server ….",
   },
   {
-    question: "如何把 Xray 配置转成 tcptun？",
+    question: "How do I convert an Xray config to tcptun?",
     answer:
-      "在「转换」中粘贴 Xray JSON 或 vless/vmess/trojan 链接。支持 REALITY/TLS 与 raw/ws/h2/h3；gRPC 等不支持的传输会提示警告。",
+      "Paste Xray JSON or vless/vmess/trojan links in Convert. REALITY/TLS and raw/ws/h2/h3 are supported; unsupported transports such as gRPC produce warnings.",
   },
   {
-    question: "无配置文件时会怎样启动？",
+    question: "What happens when no config file is provided?",
     answer:
-      "tcptun 会先预留 127.0.0.1:1080，再扫描私有 IPv4 局域网中可用的 SOCKS5:1080；首次握手成功后启动 mixed 代理。--retry 可在保留监听的同时持续重试。",
+      "tcptun first reserves 127.0.0.1:1080, then scans private IPv4 LAN peers for an available SOCKS5:1080. After the first successful handshake it starts a mixed proxy. --retry keeps the listener while continuing to retry.",
   },
   {
-    question: "如何在多个出口间负载与切换？",
+    question: "How do I load-balance and switch among outbounds?",
     answer:
-      "使用 balance outbound 组合成员并设置权重与 affinity_ttl。同一 outbound 的多 address 只是候选入口竞速，不是负载均衡。嵌入式 Runtime 和 Android bridge 还支持启停、探测及原子切换已声明的 outbound。",
+      "Use a balance outbound to group members with weights and affinity_ttl. Multiple addresses on one outbound only race as candidate entry points; they are not load balancing. The embeddable Runtime and Android bridge also support start/stop, probing, and atomic switches of declared outbounds.",
   },
 ] as const;
 
@@ -110,37 +110,37 @@ export const tunnelProtocols = [
     name: "native",
     credential: "Token",
     interoperability: "tcptun ↔ tcptun",
-    generatedSecurity: "raw + REALITY；QUIC 用 reality-quic",
-    mux: "推荐同版本开启",
+    generatedSecurity: "raw + REALITY; QUIC uses reality-quic",
+    mux: "Recommended when both ends match",
     command: "tcptun config native --server proxy.example.com --port 9443",
-    description: "私有低开销协议。吞吐优先用 raw + mux；--quic 使用 raw + reality-quic + mux.mode=quic。支持反向 publish/expose。",
+    description: "Private low-overhead protocol. Prefer raw + mux for throughput; --quic uses raw + reality-quic + mux.mode=quic. Supports reverse publish/expose.",
   },
   {
     name: "vless",
     credential: "UUID",
     interoperability: "Xray VLESS",
     generatedSecurity: "raw + REALITY + Vision",
-    mux: "可选",
+    mux: "Optional",
     command: "tcptun config vless --server proxy.example.com --port 9443",
-    description: "支持 TCP/UDP。生成配置默认 Vision + REALITY，可与 Xray 互通。",
+    description: "Supports TCP/UDP. Generated configs default to Vision + REALITY and can interoperate with Xray.",
   },
   {
     name: "vmess",
     credential: "UUID",
     interoperability: "Xray VMess AEAD",
     generatedSecurity: "raw + REALITY",
-    mux: "可选",
+    mux: "Optional",
     command: "tcptun config vmess --server proxy.example.com --port 9443",
-    description: "VMess AEAD，支持 TCP/UDP，可与 Xray 互通。",
+    description: "VMess AEAD with TCP/UDP support and Xray interop.",
   },
   {
     name: "trojan",
     credential: "Password",
     interoperability: "Xray Trojan",
     generatedSecurity: "raw + REALITY",
-    mux: "可选",
+    mux: "Optional",
     command: "tcptun config trojan --server proxy.example.com --port 9443",
-    description: "密码认证的 Trojan 隧道，支持 TCP/UDP。",
+    description: "Password-authenticated Trojan tunnel with TCP/UDP support.",
   },
 ] as const;
 
@@ -339,160 +339,160 @@ export const nativeReverseClientExample = `{
 
 export const nativeConfigHighlights = [
   {
-    title: "认证",
-    body: "服务端 users[].id 与客户端 token 必须一致。",
+    title: "Auth",
+    body: "Server users[].id and client token must match.",
   },
   {
-    title: "地址",
-    body: "address 为 host:port 数组。多地址是同一服务的候选入口竞速，不是 balance。",
+    title: "Address",
+    body: "address is a host:port array. Multiple addresses race as candidate entry points for the same service; they are not balance.",
   },
   {
-    title: "吞吐",
-    body: "优先 native + raw + mux。TLS / REALITY / ws / h2 / h3 更灵活，但开销更高。",
+    title: "Throughput",
+    body: "Prefer native + raw + mux. TLS / REALITY / ws / h2 / h3 are more flexible but cost more.",
   },
   {
-    title: "反向发布",
-    body: "服务端 publish + 客户端 expose，可把 NAT 后的 TCP/UDP 服务挂到边缘监听端口。",
+    title: "Reverse publish",
+    body: "Server publish + client expose can hang NAT-side TCP/UDP services on edge listeners.",
   },
   {
-    title: "版本",
-    body: "mux 为私有协议，两端需同版本；滚动升级时可先去掉 mux 字段。",
+    title: "Version",
+    body: "mux is a private protocol and both ends must match; drop the mux field first during rolling upgrades.",
   },
   {
-    title: "生成",
-    body: "tcptun config native 生成配对的 server / client 配置；URI 由 tcptun uri export 单独导出。",
+    title: "Generate",
+    body: "tcptun config native generates paired server / client configs; export URIs separately with tcptun uri export.",
   },
 ] as const;
 
 export const nativeFieldGroups = [
   {
-    name: "公共字段",
+    name: "Common fields",
     fields: [
-      { key: "tag", side: "两端", detail: "唯一标识，供路由引用。" },
-      { key: "type", side: "两端", detail: '"native"。' },
-      { key: "address", side: "两端", detail: "host:port 字符串数组；outbound 可配置多候选入口。" },
-      { key: "network", side: "两端", detail: "tcp / udp，可组合。" },
-      { key: "transport", side: "两端", detail: "仅 type / path（raw / ws / h2 / h3）。" },
-      { key: "security", side: "两端", detail: "tls、reality 或 reality-quic；安全参数都写在这里。" },
-      { key: "mux", side: "两端", detail: "出现即开启；{} 表示默认参数。连接池参数主要在客户端。" },
+      { key: "tag", side: "both", detail: "Unique identifier referenced by routes." },
+      { key: "type", side: "both", detail: '"native".' },
+      { key: "address", side: "both", detail: "host:port string array; outbounds may list multiple candidate entry points." },
+      { key: "network", side: "both", detail: "tcp / udp, combinable." },
+      { key: "transport", side: "both", detail: "Only type / path (raw / ws / h2 / h3)." },
+      { key: "security", side: "both", detail: "tls, reality, or reality-quic; all security parameters live here." },
+      { key: "mux", side: "both", detail: "Presence enables mux; {} uses defaults. Pool parameters are mainly on the client." },
     ],
   },
   {
-    name: "服务端",
+    name: "Server",
     fields: [
-      { key: "address", side: "server", detail: "监听地址列表，如 [\"0.0.0.0:9443\"]。" },
-      { key: "users[].id", side: "server", detail: "认证凭据，对应客户端 token。" },
-      { key: "publish", side: "server", detail: "反向发布：service + address，可选 network=tcp|udp。" },
-      { key: "security.cert/key", side: "server", detail: "TLS 入站必填；reality-quic 则使用 REALITY 密钥字段。" },
+      { key: "address", side: "server", detail: "Listen address list, e.g. [\"0.0.0.0:9443\"]." },
+      { key: "users[].id", side: "server", detail: "Auth credential matching the client token." },
+      { key: "publish", side: "server", detail: "Reverse publish: service + address, optional network=tcp|udp." },
+      { key: "security.cert/key", side: "server", detail: "Required for TLS inbounds; reality-quic uses REALITY key fields instead." },
     ],
   },
   {
-    name: "客户端",
+    name: "Client",
     fields: [
-      { key: "address", side: "client", detail: "远端入口，可写多个候选 host:port。" },
-      { key: "token", side: "client", detail: "必填，对应服务端 users[].id。" },
-      { key: "security.server_name", side: "client", detail: "TLS/QUIC 的 SNI。" },
-      { key: "expose", side: "client", detail: "反向发布：service + target，可选 network=tcp|udp。" },
-      { key: "mux.max_sessions", side: "client", detail: "连接池上限，1–32，默认 4。" },
-      { key: "mux.max_streams_per_session", side: "client", detail: "单连接 stream 上限，1–4096。" },
-      { key: "mux.warm_spares", side: "client", detail: "预热空闲连接数，须小于 max_sessions。" },
-      { key: "mux.udp_mode", side: "client", detail: "quic 专用：reliable / auto / datagram。" },
-      { key: "mux.*_receive_window", side: "两端", detail: "QUIC 接收窗口；stream 最大 16 MiB，connection 最大 64 MiB。" },
+      { key: "address", side: "client", detail: "Remote entry points; multiple candidate host:port values are allowed." },
+      { key: "token", side: "client", detail: "Required; matches server users[].id." },
+      { key: "security.server_name", side: "client", detail: "SNI for TLS/QUIC." },
+      { key: "expose", side: "client", detail: "Reverse publish: service + target, optional network=tcp|udp." },
+      { key: "mux.max_sessions", side: "client", detail: "Connection pool cap, 1–32, default 4." },
+      { key: "mux.max_streams_per_session", side: "client", detail: "Per-connection stream cap, 1–4096." },
+      { key: "mux.warm_spares", side: "client", detail: "Warm idle connections; must be less than max_sessions." },
+      { key: "mux.udp_mode", side: "client", detail: "QUIC only: reliable / auto / datagram." },
+      { key: "mux.*_receive_window", side: "both", detail: "QUIC receive windows; stream max 16 MiB, connection max 64 MiB." },
     ],
   },
 ] as const;
 
 export const nativeMuxNotes = [
   {
-    title: "开启方式",
-    body: "配置 mux 对象即开启（常用 \"mux\": {}）。不要再写 enabled；省略 mux 字段即关闭。",
+    title: "How to enable",
+    body: "Any mux object enables mux (commonly \"mux\": {}). Do not use enabled; omit the mux field to disable it.",
   },
   {
     title: "TCP mux",
-    body: "开启后复用物理连接。目标不可达时不会提前向本地代理返回成功。",
+    body: "Reuses physical connections. Unreachable targets are not reported as success to the local proxy early.",
   },
   {
-    title: "失败回退",
-    body: "session 失效会替换重试；持续失败则回退到独立隧道连接。",
+    title: "Failure fallback",
+    body: "Failed sessions are replaced and retried; persistent failure falls back to standalone tunnel connections.",
   },
   {
     title: "QUIC",
-    body: 'mux.mode: "quic" 使用 UDP/QUIC 连接池，要求 native + raw，security.type 可为 tls 或 reality-quic。',
+    body: 'mux.mode: "quic" uses a UDP/QUIC connection pool and requires native + raw; security.type may be tls or reality-quic.',
   },
   {
     title: "UDP",
-    body: "reliable 走 stream；auto 优先 DATAGRAM 并可回退；datagram 不降级。DATAGRAM 支持分片、恢复与自适应 FEC。",
+    body: "reliable uses streams; auto prefers DATAGRAM with fallback; datagram does not degrade. DATAGRAM supports fragmentation, recovery, and adaptive FEC.",
   },
 ] as const;
 
 export const reversePublishNotes = [
   {
-    title: "协议范围",
-    body: "仅 native + raw，且必须开启 group mux 或 QUIC mux。VLESS / VMess / Trojan 会在校验阶段被拒绝。",
+    title: "Protocol scope",
+    body: "Only native + raw, and group mux or QUIC mux must be enabled. VLESS / VMess / Trojan are rejected during validation.",
   },
   {
-    title: "配对规则",
-    body: "服务端 publish 与客户端 expose 的 service 名必须一致，network 也必须匹配（默认 tcp）。",
+    title: "Pairing rules",
+    body: "Server publish and client expose service names must match, and network must match as well (default tcp).",
   },
   {
-    title: "安全边界",
-    body: "客户端本地 target 不下发到服务端；服务端只能打通白名单内的 service。",
+    title: "Security boundary",
+    body: "The client local target is not sent to the server; the server can only open allowlisted services.",
   },
   {
-    title: "QUIC 要求",
-    body: "QUIC 反向发布两端要使用匹配的 TLS 或 reality-quic 安全层；TLS 服务端需 cert/key。",
+    title: "QUIC requirements",
+    body: "QUIC reverse publish needs matching TLS or reality-quic on both ends; TLS servers need cert/key.",
   },
 ] as const;
 
 export const nativeWorkflowCommands = [
   {
     name: "generate",
-    title: "生成配置对",
+    title: "Generate a pair",
     command: "tcptun config native --server proxy.example.com --port 9443",
-    body: "输出 server.json 与 client.json。",
+    body: "Writes server.json and client.json.",
   },
   {
     name: "check",
-    title: "校验",
+    title: "Validate",
     command: "tcptun config check --config server.json",
-    body: "不监听端口，适合改配置后自检。",
+    body: "Does not listen; useful after editing a config.",
   },
   {
     name: "quic",
-    title: "生成 QUIC 配置对",
+    title: "Generate a QUIC pair",
     command: "tcptun config native --quic --server proxy.example.com --port 9443",
-    body: "输出 reality-quic + QUIC mux 的匹配配置。",
+    body: "Writes matching reality-quic + QUIC mux configs.",
   },
   {
     name: "run",
-    title: "启动",
+    title: "Start",
     command: "tcptun --config server.json\ntcptun --config client.json",
-    body: "先起服务端，再起客户端。",
+    body: "Start the server first, then the client.",
   },
   {
     name: "uri",
-    title: "导出 URI",
+    title: "Export URI",
     command: "tcptun uri export --config client.json --output client.uri",
-    body: "从 tunnel outbound 导出 URI；多 address 会导出多条。",
+    body: "Exports URIs from tunnel outbounds; multiple addresses become multiple URIs.",
   },
 ] as const;
 
 export const configModelNotes = [
   {
-    title: "结构",
-    body: "顶层仅含 log、inbounds、outbounds、route、dns。未知字段会被拒绝。",
+    title: "Structure",
+    body: "Top-level fields are only log, inbounds, outbounds, route, and dns. Unknown fields are rejected.",
   },
   {
-    title: "地址",
-    body: "inbound.address 与 outbound.address 均为 host:port 数组。多地址是候选入口竞速，独立节点请用 balance。",
+    title: "Address",
+    body: "inbound.address and outbound.address are both host:port arrays. Multiple addresses race as candidate entry points; use balance for independent nodes.",
   },
   {
-    title: "引用",
-    body: "组件通过 tag 关联；via 出口链和 balance 成员会检查缺失与循环。",
+    title: "References",
+    body: "Components link through tags; via chains and balance members are checked for missing refs and cycles.",
   },
   {
-    title: "启动",
-    body: "Load → Validate → Compile → Start，校验通过后才监听。",
+    title: "Startup",
+    body: "Load → Validate → Compile → Start. Listening begins only after validation succeeds.",
   },
 ] as const;
 
@@ -621,69 +621,69 @@ export const nativeRealityClientExample = `{
 
 export const realityRules = [
   {
-    title: "仅 raw",
-    body: "transport 必须是 raw，不能与 ws / h2 / h3 组合。",
+    title: "raw only",
+    body: "transport must be raw and cannot be combined with ws / h2 / h3.",
   },
   {
-    title: "不叠 TLS",
-    body: "普通 reality 不能与 security.type=tls 叠加；安全层 type 始终只选一种。",
+    title: "No stacked TLS",
+    body: "Plain reality cannot stack with security.type=tls; choose exactly one security type.",
   },
   {
-    title: "适用端点",
-    body: "可用于 native / vless / vmess / trojan。mixed、socks5 不支持。",
+    title: "Supported endpoints",
+    body: "Works with native / vless / vmess / trojan. mixed and socks5 are unsupported.",
   },
   {
-    title: "密钥成对",
-    body: "服务端 private_key 与客户端 public_key 对应；short_id 两端一致。",
+    title: "Key pairing",
+    body: "Server private_key pairs with client public_key; short_id must match on both ends.",
   },
   {
-    title: "QUIC 变体",
-    body: "reality-quic 仅用于 native + raw + QUIC mux，复用 REALITY 密钥字段，且不使用 spider_x。",
+    title: "QUIC variant",
+    body: "reality-quic is only for native + raw + QUIC mux, reuses REALITY key fields, and does not use spider_x.",
   },
 ] as const;
 
 export const realityFieldGroups = [
   {
-    name: "服务端",
+    name: "Server",
     fields: [
-      { key: "type", detail: '"reality"。' },
-      { key: "private_key", detail: "X25519 私钥（base64url）。" },
-      { key: "server_names", detail: "允许的 SNI 列表。" },
-      { key: "short_ids", detail: "允许的 short id（hex）。" },
-      { key: "dest", detail: "伪装目标，如 example.com:443。" },
-      { key: "max_time_diff", detail: "可选时钟偏差，默认 30s。" },
+      { key: "type", detail: '"reality".' },
+      { key: "private_key", detail: "X25519 private key (base64url)." },
+      { key: "server_names", detail: "Allowed SNI list." },
+      { key: "short_ids", detail: "Allowed short ids (hex)." },
+      { key: "dest", detail: "Camouflage target, e.g. example.com:443." },
+      { key: "max_time_diff", detail: "Optional clock skew, default 30s." },
     ],
   },
   {
-    name: "客户端",
+    name: "Client",
     fields: [
-      { key: "type", detail: '"reality"。' },
-      { key: "public_key", detail: "服务端公钥。" },
-      { key: "server_name", detail: "SNI，需落在 server_names 中。" },
-      { key: "short_id", detail: "单个 short id。" },
-      { key: "fingerprint", detail: "uTLS 指纹，常用 chrome。" },
-      { key: "spider_x", detail: "可选路径，默认 /。" },
+      { key: "type", detail: '"reality".' },
+      { key: "public_key", detail: "Server public key." },
+      { key: "server_name", detail: "SNI; must be in server_names." },
+      { key: "short_id", detail: "A single short id." },
+      { key: "fingerprint", detail: "uTLS fingerprint, commonly chrome." },
+      { key: "spider_x", detail: "Optional path, default /." },
     ],
   },
 ] as const;
 
 export const realityCommands = [
   {
-    title: "生成 REALITY 配置对",
+    title: "Generate a REALITY pair",
     command:
       "tcptun config vless --server proxy.example.com --port 443 --server-name example.com --dest example.com:443",
-    body: "输出配对的 server.json 与 client.json；需要 URI 时再执行 tcptun uri export。",
+    body: "Writes paired server.json and client.json; run tcptun uri export if you need URIs.",
   },
   {
     title: "native + REALITY",
     command:
       "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
-    body: "为 native 生成带 REALITY 的两端配置。",
+    body: "Generates matching REALITY configs for native on both ends.",
   },
   {
-    title: "校验并启动",
+    title: "Validate and start",
     command: "tcptun config check --config server.json && tcptun --config server.json",
-    body: "先校验密钥与字段，再启动。",
+    body: "Validate keys and fields first, then start.",
   },
 ] as const;
 
@@ -691,11 +691,11 @@ export const protocolComparison = [
   {
     name: "native",
     credential: "token ↔ users[].id",
-    interop: "仅 tcptun",
+    interop: "tcptun only",
     securityDefault: "raw + REALITY",
     vision: "—",
-    muxNote: "私有 mux，推荐开启",
-    bestFor: "吞吐 / 反向发布",
+    muxNote: "Private mux, recommended",
+    bestFor: "Throughput / reverse publish",
     generator: "tcptun config native --server … --port …",
   },
   {
@@ -704,8 +704,8 @@ export const protocolComparison = [
     interop: "Xray VLESS",
     securityDefault: "raw + REALITY + Vision",
     vision: "xtls-rprx-vision",
-    muxNote: "可选",
-    bestFor: "Xray 互通 / 伪装",
+    muxNote: "Optional",
+    bestFor: "Xray interop / camouflage",
     generator: "tcptun config vless --server … --port …",
   },
   {
@@ -714,8 +714,8 @@ export const protocolComparison = [
     interop: "Xray VMess",
     securityDefault: "raw + REALITY",
     vision: "—",
-    muxNote: "可选",
-    bestFor: "VMess 生态",
+    muxNote: "Optional",
+    bestFor: "VMess ecosystem",
     generator: "tcptun config vmess --server … --port …",
   },
   {
@@ -724,8 +724,8 @@ export const protocolComparison = [
     interop: "Xray Trojan",
     securityDefault: "raw + REALITY",
     vision: "—",
-    muxNote: "可选",
-    bestFor: "密码认证",
+    muxNote: "Optional",
+    bestFor: "Password auth",
     generator: "tcptun config trojan --server … --port …",
   },
 ] as const;
