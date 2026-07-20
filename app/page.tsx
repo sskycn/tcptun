@@ -412,7 +412,8 @@ export default function Home() {
 
         <div className="footer-bottom">
           <span>
-            tcptun {displayVersion} · Lawful use only · Use at your own risk · No warranty.{" "}
+            tcptun {displayVersion} ·{" "}
+            <strong>Lawful use only · You bear all consequences · No warranty or promise.</strong>{" "}
             <a href="#disclaimer">Disclaimer</a>
           </span>
           <a href="#top">Back to top</a>
