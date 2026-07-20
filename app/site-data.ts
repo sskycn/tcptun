@@ -79,6 +79,33 @@ export const faqItems = [
   },
 ] as const;
 
+export const disclaimerItems = [
+  {
+    title: "Lawful use only",
+    body: "tcptun is a networking and proxy runtime for legitimate purposes such as development, testing, research, and authorized network operations. You must comply with all applicable laws, regulations, and network policies in your jurisdiction.",
+  },
+  {
+    title: "Your responsibility",
+    body: "You are solely responsible for how you install, configure, and operate tcptun, including the systems you connect to and the traffic you forward. Unauthorized access, interception, or circumvention of access controls may be illegal.",
+  },
+  {
+    title: "No warranty",
+    body: "The software, website, binaries, install scripts, and browser tools are provided “as is”, without warranties of any kind, express or implied, including merchantability, fitness for a particular purpose, and non-infringement.",
+  },
+  {
+    title: "Limitation of liability",
+    body: "To the maximum extent permitted by law, authors, contributors, and operators of this site are not liable for any direct, indirect, incidental, special, consequential, or punitive damages arising from use or inability to use tcptun or this website.",
+  },
+  {
+    title: "Local processing",
+    body: "Config generation, URI conversion, and Xray conversion on this site run in your browser. Keys and credentials are not uploaded by those tools, but you remain responsible for safeguarding secrets and the configs you create.",
+  },
+  {
+    title: "Third-party interop",
+    body: "References to Xray, VLESS, VMess, Trojan, REALITY, and other third-party protocols or products are for technical interoperability only and do not imply endorsement, affiliation, or support.",
+  },
+] as const;
+
 export const binaryDownloads = [
   binary("tcptun-android-arm64-v0.2.2.apk", "android", "Android", "arm64", "ARM64", 51714794),
   binary("tcptun-android-armv7-v0.2.2.apk", "android", "Android", "armv7", "ARMv7", 48436568),

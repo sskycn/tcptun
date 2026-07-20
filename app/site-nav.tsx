@@ -12,6 +12,7 @@ const links = [
   { href: "#download", id: "download", label: "Download" },
   { href: "#start", id: "start", label: "CLI" },
   { href: "#faq", id: "faq", label: "FAQ" },
+  { href: "#disclaimer", id: "disclaimer", label: "Legal" },
 ] as const;
 
 export default function SiteNav() {
