@@ -1309,7 +1309,7 @@ pre {
   color: var(--terminal-text);
 }
 
-/* ---------- protocols ---------- */
+/* ---------- protocols / native guide ---------- */
 
 .protocol-grid-single {
   grid-template-columns: minmax(0, 1fr);
@@ -1322,6 +1322,225 @@ pre {
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.02em;
+}
+
+.native-guide-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.native-guide-hero-card {
+  min-height: 100%;
+}
+
+.native-guide-points {
+  display: grid;
+  gap: 12px;
+}
+
+.native-guide-points article {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  padding: 16px 18px;
+}
+
+.native-guide-points span {
+  color: var(--primary);
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+
+.native-guide-points h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.native-guide-points p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.native-guide-concepts,
+.native-guide-tutorial,
+.native-guide-examples {
+  margin-top: 28px;
+}
+
+.native-guide-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 18px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 28%, var(--line));
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--primary-soft) 45%, var(--surface));
+  padding: 14px 16px;
+  color: var(--text);
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.native-guide-flow .arrow {
+  color: var(--primary);
+}
+
+.native-tutorial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.native-tutorial-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  padding: 18px;
+  box-shadow: 0 1px 2px rgb(var(--shadow) / 0.04);
+}
+
+.native-tutorial-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.native-tutorial-card h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.native-tutorial-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.native-tutorial-card .mode-command-row {
+  margin-top: 4px;
+}
+
+.native-usecase-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.native-usecase-tabs button {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 8px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    background 160ms var(--ease-out);
+}
+
+.native-usecase-tabs button:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+}
+
+.native-usecase-tabs button.is-active {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 70%, var(--surface));
+  color: var(--text);
+}
+
+.native-usecase-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.native-usecase-copy {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 20px;
+}
+
+.native-usecase-copy h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+.native-usecase-summary,
+.native-usecase-copy > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.native-usecase-copy strong {
+  color: var(--text);
+}
+
+.native-usecase-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.native-usecase-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.native-usecase-code {
+  min-width: 0;
+}
+
+.native-usecase-code .config-example-toolbar {
+  margin-bottom: 0;
+}
+
+.native-usecase-code .config-example-code {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  max-height: min(58vh, 560px);
+  overflow: auto;
 }
 
 .protocol-grid {
@@ -3728,8 +3947,14 @@ button:focus-visible {
   .mux-grid,
   .reality-fields,
   .reality-commands,
-  .disclaimer-grid {
+  .disclaimer-grid,
+  .native-tutorial-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .native-guide-overview,
+  .native-usecase-panel {
+    grid-template-columns: 1fr;
   }
 
   .highlight-grid,
@@ -3836,7 +4061,8 @@ button:focus-visible {
     flex-direction: column;
   }
 
-  .disclaimer-grid {
+  .disclaimer-grid,
+  .native-tutorial-grid {
     grid-template-columns: 1fr;
   }
 

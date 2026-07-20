@@ -15,7 +15,11 @@ export const pinnedInstallCommand = `curl -fsSL https://tcptun.com/install.sh | 
 export const faqItems = [
   {
     question: "What is the native protocol?",
-    answer: "native is tcptun’s private tunnel protocol. Prefer it for tcptun-to-tcptun setups with low overhead, mux, QUIC, and reverse publish.",
+    answer: "native is tcptun’s private tunnel protocol for tcptun-to-tcptun setups. A typical path is local mixed → native outbound → native inbound → direct, with matching users[].id and token. See the Native section for a full tutorial and examples.",
+  },
+  {
+    question: "How do I run my first native tunnel?",
+    answer: "Install tcptun, run tcptun config native --server <host> --port <port>, edit the generated server/client endpoints and token, validate with tcptun config check, start the server then the client, and point apps at 127.0.0.1:1080.",
   },
   {
     question: "How do I validate a config?",
@@ -144,6 +148,112 @@ export const tunnelProtocols = [
     mux: "Recommended when both ends match",
     command: "tcptun config native --server proxy.example.com --port 9443",
     description: "Private low-overhead protocol. Prefer raw + mux for throughput; --quic uses raw + reality-quic + mux.mode=quic. Supports reverse publish/expose.",
+  },
+] as const;
+
+/** Long-form native protocol guide shown on the homepage. */
+export const nativeGuideIntro = {
+  eyebrow: "Native protocol",
+  title: "How native works, and how to run it end to end.",
+  lede: "native is tcptun’s private tunnel protocol for tcptun-to-tcptun deployments. One JSON topology describes server and client; the runtime validates auth, transport, security, mux, and reverse publish before listening.",
+  points: [
+    {
+      title: "What it is",
+      body: "A token-authenticated tunnel that carries TCP and UDP. The server exposes a native inbound; the client usually listens as mixed/socks5 locally and forwards through a native outbound.",
+    },
+    {
+      title: "When to use it",
+      body: "Use native when both ends run tcptun and you want low overhead, optional mux, native QUIC, REALITY / reality-quic, or reverse publish of services behind NAT.",
+    },
+    {
+      title: "What you configure",
+      body: "Match users[].id with token, set address as host:port arrays, choose transport (prefer raw), optional security, and optional mux. Everything else is ordinary tcptun route / inbound / outbound wiring.",
+    },
+  ],
+} as const;
+
+export const nativeGuideConcepts = [
+  {
+    title: "Topology",
+    body: "Typical path: app → local mixed :1080 → native outbound → internet → native :9443 → direct. Server and client are two configs that share credentials and security parameters.",
+  },
+  {
+    title: "Authentication",
+    body: "Server inbound users[].id must equal client outbound token. Generate long random tokens; never reuse example values like change-me in production.",
+  },
+  {
+    title: "Address",
+    body: "address is always a string array of host:port. Multiple outbound addresses race as candidate entry points for the same logical service; they are not load balancing (use balance for that).",
+  },
+  {
+    title: "Transport",
+    body: "raw is the default and best for throughput. ws / h2 / h3 are available when you need path-based fronting; QUIC mode requires raw.",
+  },
+  {
+    title: "Security",
+    body: "Optional. Use security.type=reality on raw TCP, or reality-quic with mux.mode=quic. TLS needs cert/key on the server. Do not stack reality with tls.",
+  },
+  {
+    title: "Mux & QUIC",
+    body: "Presence of mux enables multiplexing (\"mux\": {} is enough). mux.mode=quic switches to a UDP/QUIC pool and requires native + raw plus tls or reality-quic.",
+  },
+] as const;
+
+export const nativeTutorialSteps = [
+  {
+    step: "01",
+    title: "Install tcptun",
+    body: "Install a binary for your platform, or use the one-line installer / npm package.",
+    commands: [
+      "curl -fsSL https://tcptun.com/install.sh | sh",
+      "tcptun --version",
+    ],
+  },
+  {
+    step: "02",
+    title: "Generate a native pair",
+    body: "Create matching server.json and client.json with REALITY keys and a shared token. Prefer the CLI on the server host, or use the browser generator on this site.",
+    commands: [
+      "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
+      "# writes server.json and client.json in the current directory (CLI defaults may vary by version flags)",
+    ],
+  },
+  {
+    step: "03",
+    title: "Edit the real endpoints",
+    body: "On the server config, set the native inbound listen address (for example 0.0.0.0:9443). On the client, set the outbound address to the public host:port, and keep token identical to users[].id.",
+    commands: [
+      "# server inbound address → where this machine listens",
+      "# client outbound address → public host:port clients dial",
+      "# users[].id  ===  token",
+    ],
+  },
+  {
+    step: "04",
+    title: "Validate before start",
+    body: "config check compiles the topology without opening ports. Fix any missing keys, bad tags, or REALITY mismatches here.",
+    commands: [
+      "tcptun config check --config server.json",
+      "tcptun config check --config client.json",
+    ],
+  },
+  {
+    step: "05",
+    title: "Start server, then client",
+    body: "Bring the edge up first. Then start the client so the local mixed proxy can dial the tunnel.",
+    commands: [
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+  },
+  {
+    step: "06",
+    title: "Test the local proxy",
+    body: "With the client running, apps should use the local mixed inbound (default 127.0.0.1:1080). Verify with a tool that supports SOCKS5 or HTTP depending on your mixed settings.",
+    commands: [
+      "curl -x socks5h://127.0.0.1:1080 https://example.com -I",
+      "# or point your system / app proxy to 127.0.0.1:1080",
+    ],
   },
 ] as const;
 
@@ -621,6 +731,97 @@ export const nativeRealityClientExample = `{
   ],
   "route": { "default_outbound": "proxy", "rules": [] }
 }`;
+
+export const nativeUseCases = [
+  {
+    id: "basic",
+    title: "Basic proxy (raw + mux)",
+    summary: "Lowest-friction tcptun-to-tcptun tunnel. Good default for LAN, VPS-to-VPS, and private links.",
+    when: "Both ends are trusted or already on a private path; you mainly need throughput and simple token auth.",
+    steps: [
+      "Generate or copy the minimal server / client pair below.",
+      "Replace change-me with a long random token on both sides.",
+      "Set client outbound address to the server’s public host:port.",
+      "Run server, then client; use 127.0.0.1:1080 as the local proxy.",
+    ],
+    commands: [
+      "tcptun config native --server proxy.example.com --port 9443",
+      "tcptun config check --config server.json",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: nativeServerExample,
+    clientCode: nativeClientExample,
+    serverHint: "server-native.json",
+    clientHint: "client-native.json",
+  },
+  {
+    id: "reality",
+    title: "Hardened path (raw + REALITY)",
+    summary: "Adds REALITY on raw TCP so the handshake can blend with a camouflage site without deploying your own cert.",
+    when: "You need stronger outer camouflage on a public TCP port while staying on native.",
+    steps: [
+      "Generate with --server-name and --dest pointing at a legitimate site you intend to mimic.",
+      "Keep private_key on the server and public_key on the client paired.",
+      "Keep short_id / short_ids and server_name consistent on both ends.",
+      "transport must remain raw; do not combine with ws/h2/h3 or tls.",
+    ],
+    commands: [
+      "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
+      "tcptun config check --config server.json && tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: nativeRealityServerExample,
+    clientCode: nativeRealityClientExample,
+    serverHint: "server-native-reality.json",
+    clientHint: "client-native-reality.json",
+  },
+  {
+    id: "quic",
+    title: "Native QUIC (reality-quic + mux.mode=quic)",
+    summary: "UDP/QUIC connection pool for streams and DATAGRAMs. Layer stack is fixed: native + raw + reality-quic + mux.mode=quic.",
+    when: "You want QUIC multiplexing, DATAGRAM-friendly UDP, and REALITY-style keys without managing TLS certificates.",
+    steps: [
+      "Generate with --quic so both sides get reality-quic and mux.mode=quic.",
+      "Open UDP on the server listen port end-to-end (not only TCP).",
+      "Do not replace reality-quic with plain reality for this mode.",
+      "Tune mux.max_sessions / warm_spares on the client if needed.",
+    ],
+    commands: [
+      "tcptun config native --quic --server proxy.example.com --port 9443",
+      "tcptun config check --config server.json",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: nativeQuicServerExample,
+    clientCode: nativeQuicClientExample,
+    serverHint: "server-native-quic.json",
+    clientHint: "client-native-quic.json",
+  },
+  {
+    id: "reverse",
+    title: "Reverse publish (NAT → edge)",
+    summary: "Publish a service behind the client onto a port on the server edge. Server publish + client expose must use the same service name.",
+    when: "A home or office machine has the real service; the public VPS should accept traffic and forward through the tunnel.",
+    steps: [
+      "Enable mux (group or QUIC) on both ends; reverse publish requires it with native + raw.",
+      "On the server, set publish with service + public listen address.",
+      "On the client, set expose with the same service and a local target host:port.",
+      "Dial the server publish address externally; traffic reaches the client target.",
+    ],
+    commands: [
+      "tcptun config check --config server-reverse.json",
+      "tcptun --config server-reverse.json",
+      "tcptun --config client-reverse.json",
+      "# then connect to the server publish listen, e.g. server.example.com:8080",
+    ],
+    serverCode: nativeReverseServerExample,
+    clientCode: nativeReverseClientExample,
+    serverHint: "server-reverse.json",
+    clientHint: "client-reverse.json",
+  },
+] as const;
+
 
 export const realityRules = [
   {

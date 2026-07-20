@@ -7,7 +7,7 @@ import CookieSettingsLink from "./cookie-settings-link";
 import DisclaimerSection from "./disclaimer-section";
 import FaqSection from "./faq-section";
 import InstallCommand from "./install-command";
-import ProtocolIcon from "./protocol-icon";
+import NativeGuide from "./native-guide";
 import { DownloadSection, PlatformDownloadButton } from "./platform-download";
 import SiteNav from "./site-nav";
 import ThemeToggle from "./theme-toggle";
@@ -19,7 +19,6 @@ import {
   outboundTypes,
   releaseVersion,
   topologyExample,
-  tunnelProtocols,
   binaryDownloads,
 } from "./site-data";
 
@@ -91,7 +90,6 @@ const workflows = [
 ];
 
 const pipeline = ["Load", "Validate", "Compile", "Start"] as const;
-const transports = ["raw", "ws", "h2", "h3"] as const;
 
 const terminalSnippet = `$ ${installCommand}
 
@@ -272,62 +270,7 @@ export default function Home() {
 
       <UriConverter />
 
-      <section className="section protocol-section" id="protocols">
-        <div className="section-heading row-heading">
-          <div>
-            <p className="eyebrow">Native</p>
-            <h2>The native tunnel protocol.</h2>
-            <p>
-              Private, low-overhead tunneling for tcptun-to-tcptun setups: mux, QUIC, REALITY, and
-              reverse publish under one topology.
-            </p>
-          </div>
-          <div className="chip-row">
-            {transports.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-        </div>
-
-        <div className="protocol-grid protocol-grid-single">
-          {tunnelProtocols.map((protocol, index) => (
-            <article className="protocol-card" key={protocol.name}>
-              <div className="protocol-card-heading">
-                <div className="protocol-title-row">
-                  <ProtocolIcon name={protocol.name} />
-                  <div>
-                    <span className="protocol-index">{String(index + 1).padStart(2, "0")}</span>
-                    <h3>{protocol.name}</h3>
-                  </div>
-                </div>
-                <span className="security-badge">{protocol.credential}</span>
-              </div>
-              <p className="protocol-description">{protocol.description}</p>
-              <dl>
-                <div>
-                  <dt>Interop</dt>
-                  <dd>{protocol.interoperability}</dd>
-                </div>
-                <div>
-                  <dt>Default security</dt>
-                  <dd>{protocol.generatedSecurity}</dd>
-                </div>
-                <div className="wide">
-                  <dt>Mux</dt>
-                  <dd>{protocol.mux}</dd>
-                </div>
-              </dl>
-              <div className="protocol-command-row">
-                <pre className="protocol-command"><code>{protocol.command}</code></pre>
-                <CopyButton value={protocol.command} label="Copy" className="copy-button-on-dark" />
-              </div>
-              <a className="protocol-doc-link" href="#native-reality-quic">
-                Native / QUIC notes →
-              </a>
-            </article>
-          ))}
-        </div>
-      </section>
+      <NativeGuide />
 
       <section className="section download-section" id="download">
         <DownloadSection releaseVersion={releaseVersion} />
@@ -405,6 +348,8 @@ export default function Home() {
             <div className="footer-column">
               <h3>Native</h3>
               <a href="#protocols">Overview</a>
+              <a href="#native-tutorial">Tutorial</a>
+              <a href="#native-examples">Examples</a>
               <a href="#config-native">Config</a>
               <a href="#native-reality-quic">QUIC</a>
               <a href="#reverse">Reverse publish</a>
