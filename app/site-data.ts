@@ -106,6 +106,21 @@ export const disclaimerItems = [
   },
 ] as const;
 
+export const cookieNotice = {
+  title: "Cookies and local storage",
+  intro:
+    "This website may use cookies and similar technologies (including browser local storage) to operate the site and remember preferences.",
+  points: [
+    "Theme preference may be stored in your browser (for example localStorage key tcptun-theme) so light, dark, or system mode can be restored on later visits.",
+    "Hosting, CDN, or security infrastructure that serves this site may set technical cookies or logs needed to deliver pages, assets, and basic reliability.",
+    "Browser tools on this site (config generation, URI conversion, and Xray conversion) process data locally in your browser; those tools are not used by us to set advertising cookies.",
+    "We do not use first-party advertising or marketing tracking cookies on this site. Third-party services outside our control may still process requests according to their own policies.",
+    "You can clear cookies and site data in your browser settings at any time. Disabling storage may reset preferences such as theme.",
+  ],
+  acceptance:
+    "By continuing to browse or use this website, you acknowledge and accept this cookies statement. If you do not agree, please stop using the site and clear this site’s cookies and stored data from your browser.",
+} as const;
+
 export const binaryDownloads = [
   binary("tcptun-android-arm64-v0.2.2.apk", "android", "Android", "arm64", "ARM64", 51714794),
   binary("tcptun-android-armv7-v0.2.2.apk", "android", "Android", "armv7", "ARMv7", 48436568),
