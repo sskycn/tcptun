@@ -2,6 +2,7 @@ import Image from "next/image";
 import ConfigGenerator from "./config-generator";
 import ConfigSection from "./config-section";
 import CopyButton from "./copy-button";
+import DisclaimerSection from "./disclaimer-section";
 import FaqSection from "./faq-section";
 import InstallCommand from "./install-command";
 import ProtocolIcon from "./protocol-icon";
@@ -367,6 +368,8 @@ export default function Home() {
 
       <FaqSection />
 
+      <DisclaimerSection />
+
       <footer className="footer">
         <div className="footer-main">
           <div className="footer-brand-block">
@@ -389,6 +392,7 @@ export default function Home() {
               <a href="#protocols">Protocols</a>
               <a href="#start">CLI</a>
               <a href="#faq">FAQ</a>
+              <a href="#disclaimer">Disclaimer</a>
             </div>
             <div className="footer-column">
               <h3>Download</h3>
@@ -407,7 +411,10 @@ export default function Home() {
         </div>
 
         <div className="footer-bottom">
-          <span>tcptun {displayVersion}</span>
+          <span>
+            tcptun {displayVersion} · Use only in accordance with applicable law.{" "}
+            <a href="#disclaimer">Disclaimer</a>
+          </span>
           <a href="#top">Back to top</a>
         </div>
       </footer>

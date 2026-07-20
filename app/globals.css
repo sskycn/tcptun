@@ -3317,6 +3317,97 @@ html[data-theme="dark"] .platform-mark.android {
   line-height: 1.75;
 }
 
+/* ---------- disclaimer ---------- */
+
+.disclaimer-section .section-heading > p:last-child {
+  max-width: 62ch;
+}
+
+.disclaimer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.disclaimer-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 100%;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: var(--radius-small);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 96%, var(--accent-soft)),
+      var(--surface)
+    );
+  padding: 18px 18px 20px;
+  box-shadow: 0 10px 28px rgb(var(--shadow) / 0.04);
+}
+
+.disclaimer-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.disclaimer-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-text);
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.disclaimer-card h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.disclaimer-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.disclaimer-footnote {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+  padding: 16px 18px;
+}
+
+.disclaimer-footnote strong {
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.disclaimer-footnote p {
+  margin: 0;
+  max-width: 78ch;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
 /* ---------- footer ---------- */
 
 .footer {
@@ -3401,8 +3492,15 @@ html[data-theme="dark"] .platform-mark.android {
 }
 
 .footer-bottom a {
-  flex-shrink: 0;
   font-weight: 700;
+}
+
+.footer-bottom > a {
+  flex-shrink: 0;
+}
+
+.footer-bottom > span a {
+  color: var(--primary);
 }
 
 /* ---------- a11y ---------- */
@@ -3473,7 +3571,8 @@ button:focus-visible {
   .field-group-grid,
   .mux-grid,
   .reality-fields,
-  .reality-commands {
+  .reality-commands,
+  .disclaimer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -3579,6 +3678,10 @@ button:focus-visible {
   .footer-bottom {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .disclaimer-grid {
+    grid-template-columns: 1fr;
   }
 
   .faq-answer {
