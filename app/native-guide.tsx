@@ -271,35 +271,37 @@ export default function NativeGuide() {
           </div>
 
           <div className="native-usecase-code">
-            <div className="config-example-toolbar">
-              <div className="config-example-tabs" role="tablist" aria-label="Server or client config">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={side === "server"}
-                  className={side === "server" ? "is-active" : undefined}
-                  onClick={() => setSide("server")}
-                >
-                  Server
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={side === "client"}
-                  className={side === "client" ? "is-active" : undefined}
-                  onClick={() => setSide("client")}
-                >
-                  Client
-                </button>
+            <div className="config-example-panel native-usecase-example-panel">
+              <div className="config-example-toolbar">
+                <div className="config-example-tabs" role="tablist" aria-label="Server or client config">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={side === "server"}
+                    className={side === "server" ? "is-active" : undefined}
+                    onClick={() => setSide("server")}
+                  >
+                    Server
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={side === "client"}
+                    className={side === "client" ? "is-active" : undefined}
+                    onClick={() => setSide("client")}
+                  >
+                    Client
+                  </button>
+                </div>
+                <div className="config-example-meta">
+                  <span>{activeHint}</span>
+                  <CopyButton value={activeCode} label="Copy config" className="copy-button-solid" />
+                </div>
               </div>
-              <div className="config-example-meta">
-                <span>{activeHint}</span>
-                <CopyButton value={activeCode} label="Copy config" className="copy-button-solid" />
-              </div>
+              <pre className="config-example-code" role="tabpanel">
+                <code>{activeCode}</code>
+              </pre>
             </div>
-            <pre className="config-example-code" role="tabpanel">
-              <code>{activeCode}</code>
-            </pre>
           </div>
         </div>
       </section>
