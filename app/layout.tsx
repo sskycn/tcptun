@@ -33,8 +33,8 @@ const themeInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: `tcptun v${releaseVersion} · 配置驱动的代理运行时`,
-  description: `tcptun 是多入口、多出口代理运行时。支持 native、VLESS、VMess、Trojan、REALITY、native + raw + reality-quic、mux、原生 QUIC、反向发布、balance 与规则路由。`,
+  title: `tcptun v${releaseVersion} · Config-driven proxy runtime`,
+  description: `tcptun is a multi-inbound, multi-outbound proxy runtime. It supports native, VLESS, VMess, Trojan, REALITY, native + raw + reality-quic, mux, native QUIC, reverse publish, balance, and rule-based routing.`,
   icons: {
     icon: "/tcptun-logo.png",
     apple: "/tcptun-logo.png",
@@ -48,7 +48,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="zh-CN"
+      lang="en"
       className={`h-full antialiased ${sans.variable} ${mono.variable}`}
       suppressHydrationWarning
     >

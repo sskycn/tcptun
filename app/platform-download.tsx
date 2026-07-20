@@ -21,7 +21,7 @@ type PlatformDownloadButtonProps = {
 
 export function PlatformDownloadButton({
   className = "button primary",
-  fallbackLabel = "下载 Linux x64",
+  fallbackLabel = "Download Linux x64",
   fallbackHref,
 }: PlatformDownloadButtonProps) {
   const [recommended, setRecommended] = useState<BinaryDownload | null>(null);
@@ -58,7 +58,7 @@ export function PlatformDownloadButton({
 
   return (
     <a className={className} href={recommended.url} download={recommended.filename}>
-      下载 {recommended.platformLabel} {recommended.archLabel}
+      Download {recommended.platformLabel} {recommended.archLabel}
     </a>
   );
 }
@@ -94,9 +94,9 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
     <>
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">下载</p>
-          <h2>多平台二进制，开箱即用。</h2>
-          <p>由本站 GitHub Pages 托管（/releases/{releaseVersion}/）。</p>
+          <p className="eyebrow">Download</p>
+          <h2>Multi-platform binaries, ready to run.</h2>
+          <p>Hosted on this site&apos;s GitHub Pages under /releases/{releaseVersion}/.</p>
         </div>
         <a className="button secondary" href={`/releases/${releaseVersion}/SHA256SUMS`}>
           SHA256SUMS
@@ -106,14 +106,14 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
       {recommended && detected ? (
         <div className="platform-recommend">
           <div className="platform-recommend-copy">
-            <span className="platform-recommend-badge">为你推荐</span>
+            <span className="platform-recommend-badge">Recommended for you</span>
             <div>
               <strong>
-                检测到 {detected.label}
+                Detected {detected.label}
               </strong>
               <p>
-                推荐下载 <code>{recommended.filename}</code>
-                （{formatBytes(recommended.size)}）
+                Recommended download <code>{recommended.filename}</code>
+                {" "}({formatBytes(recommended.size)})
               </p>
             </div>
           </div>
@@ -122,7 +122,7 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
             href={recommended.url}
             download={recommended.filename}
           >
-            下载推荐版本
+            Download recommended build
           </a>
         </div>
       ) : null}
@@ -142,13 +142,13 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
                 <div className="download-title">
                   <h3>{item.platformLabel}</h3>
                   <span>{item.archLabel}</span>
-                  {isRecommended ? <span className="recommend-pill">推荐</span> : null}
+                  {isRecommended ? <span className="recommend-pill">Recommended</span> : null}
                 </div>
                 <code>{item.filename}</code>
                 <p>{formatBytes(item.size)} · Pages</p>
               </div>
               <a className="download-link" href={item.url} download={item.filename}>
-                下载
+                Download
               </a>
             </article>
           );

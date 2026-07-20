@@ -45,7 +45,7 @@ export default function ConfigGenerator() {
       setTab("server");
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : "生成失败");
+      setError(err instanceof Error ? err.message : "Generation failed");
     } finally {
       setBusy(false);
     }
@@ -55,10 +55,11 @@ export default function ConfigGenerator() {
     <section className="section generator-section" id="generate">
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">生成</p>
-          <h2>在浏览器生成配对配置。</h2>
+          <p className="eyebrow">Generate</p>
+          <h2>Generate paired configs in the browser.</h2>
           <p>
-            server/client 逻辑对齐 <code>tcptun config</code>：普通模式使用 raw + REALITY，Native QUIC 模式使用 reality-quic + QUIC mux。密钥仅在本机生成，不会上传。
+            Server/client logic matches <code>tcptun config</code>: normal mode uses raw + REALITY;
+            Native QUIC mode uses reality-quic + QUIC mux. Keys are generated locally and never uploaded.
           </p>
         </div>
         <div className="chip-row">
@@ -71,8 +72,8 @@ export default function ConfigGenerator() {
       <div className="generator-grid">
         <form className="generator-form" onSubmit={handleGenerate}>
           <fieldset className="generator-fieldset">
-            <legend>协议</legend>
-            <div className="generator-protocol-grid" role="radiogroup" aria-label="隧道协议">
+            <legend>Protocol</legend>
+            <div className="generator-protocol-grid" role="radiogroup" aria-label="Tunnel protocol">
               {protocols.map((item) => (
                 <label
                   key={item.id}
@@ -100,7 +101,7 @@ export default function ConfigGenerator() {
 
           <div className="generator-fields">
             <label>
-              <span>服务端地址</span>
+              <span>Server address</span>
               <input
                 value={form.server}
                 onChange={(event) => update("server", event.target.value)}
@@ -110,7 +111,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>端口</span>
+              <span>Port</span>
               <input
                 type="number"
                 min={1}
@@ -121,7 +122,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>服务端监听</span>
+              <span>Server listen</span>
               <input
                 value={form.listen}
                 onChange={(event) => update("listen", event.target.value)}
@@ -131,7 +132,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>本地监听</span>
+              <span>Local listen</span>
               <input
                 value={form.localListen}
                 onChange={(event) => update("localListen", event.target.value)}
@@ -141,7 +142,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>本地端口</span>
+              <span>Local port</span>
               <input
                 type="number"
                 min={1}
@@ -162,7 +163,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label className="generator-field-wide">
-              <span>REALITY dest（可选，默认 server-name:443）</span>
+              <span>REALITY dest (optional, default server-name:443)</span>
               <input
                 value={form.dest}
                 onChange={(event) => update("dest", event.target.value)}
@@ -179,13 +180,13 @@ export default function ConfigGenerator() {
                 checked={Boolean(form.quic)}
                 onChange={(event) => update("quic", event.target.checked)}
               />
-              <span>生成 Native QUIC 配置（等价于 <code>--quic</code>）</span>
+              <span>Generate Native QUIC config (same as <code>--quic</code>)</span>
             </label>
           ) : null}
 
           <div className="generator-actions">
             <button type="submit" className="button primary" disabled={busy}>
-              {busy ? "生成中…" : "生成配置"}
+              {busy ? "Generating…" : "Generate config"}
             </button>
             <button
               type="button"
@@ -196,7 +197,7 @@ export default function ConfigGenerator() {
                 setError(null);
               }}
             >
-              重置
+              Reset
             </button>
           </div>
 
@@ -207,7 +208,7 @@ export default function ConfigGenerator() {
           {result ? (
             <>
               <div className="generator-result-toolbar">
-                <div className="config-example-tabs" role="tablist" aria-label="生成结果">
+                <div className="config-example-tabs" role="tablist" aria-label="Generated result">
                   {(
                     [
                       ["server", "server.json"],
@@ -228,7 +229,7 @@ export default function ConfigGenerator() {
                   ))}
                 </div>
                 <div className="generator-result-actions">
-                  <CopyButton value={activeContent} label="复制" className="copy-button-solid" />
+                  <CopyButton value={activeContent} label="Copy" className="copy-button-solid" />
                   <button
                     type="button"
                     className="button secondary generator-download"
@@ -240,7 +241,7 @@ export default function ConfigGenerator() {
                       )
                     }
                   >
-                    下载
+                    Download
                   </button>
                 </div>
               </div>
@@ -251,8 +252,8 @@ export default function ConfigGenerator() {
 
               <div className="generator-cli">
                 <div className="generator-cli-heading">
-                  <span>等价 CLI</span>
-                  <CopyButton value={result.cliCommand} label="复制" className="copy-button-ghost" />
+                  <span>Equivalent CLI</span>
+                  <CopyButton value={result.cliCommand} label="Copy" className="copy-button-ghost" />
                 </div>
                 <pre>
                   <code>{result.cliCommand}</code>
@@ -265,37 +266,37 @@ export default function ConfigGenerator() {
                   className="button secondary"
                   onClick={() => downloadText("server.json", result.serverJson)}
                 >
-                  下载 server.json
+                  Download server.json
                 </button>
                 <button
                   type="button"
                   className="button secondary"
                   onClick={() => downloadText("client.json", result.clientJson)}
                 >
-                  下载 client.json
+                  Download client.json
                 </button>
                 <button
                   type="button"
                   className="button secondary"
                   onClick={() => downloadText("client.uri", result.clientUri, "text/plain")}
                 >
-                  下载 client.uri
+                  Download client.uri
                 </button>
               </div>
             </>
           ) : (
             <div className="generator-empty">
-              <p className="eyebrow">输出</p>
-              <h3>填写参数后点击生成</h3>
+              <p className="eyebrow">Output</p>
+              <h3>Fill in the form, then generate</h3>
               <p>
-                将创建 server.json、client.json 与 client.uri；JSON 对齐{" "}
-                <code>tcptun config {form.protocol}</code>，URI 对齐 <code>tcptun uri export</code>。
+                Creates server.json, client.json, and client.uri. JSON matches{" "}
+                <code>tcptun config {form.protocol}</code>; URI matches <code>tcptun uri export</code>.
               </p>
               <ul>
-                <li>自动生成 X25519 密钥对与 short id</li>
-                <li>按协议生成 token / UUID / password</li>
-                <li>vless 默认启用 Vision flow</li>
-                <li>Native 可选 reality-quic + QUIC mux 配置</li>
+                <li>Generates an X25519 key pair and short id</li>
+                <li>Creates token / UUID / password by protocol</li>
+                <li>vless enables Vision flow by default</li>
+                <li>Native can optionally emit reality-quic + QUIC mux</li>
               </ul>
             </div>
           )}

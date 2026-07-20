@@ -138,8 +138,8 @@ export async function configToUris(
   if (endpoints.length === 0) {
     throw new Error(
       scope === "inbounds"
-        ? "配置中没有可导出 URI 的 tunnel inbound"
-        : "配置中没有可导出 URI 的 tunnel outbound",
+        ? "No tunnel inbound in the config can be exported as a URI"
+        : "No tunnel outbound in the config can be exported as a URI",
     );
   }
 
@@ -156,7 +156,7 @@ export async function configToUris(
     uriText: uris.join("\n"),
     profileText: profiles.join("\n"),
     count: uris.length,
-    summary: `已从 ${uris.length} 个 ${scope === "inbounds" ? "inbound 地址" : "outbound 地址"} 生成 URI`,
+    summary: `Generated URIs from ${uris.length} ${scope === "inbounds" ? "inbound addresses" : "outbound addresses"}`,
   };
 }
 
@@ -165,7 +165,7 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-  if (lines.length === 0) throw new Error("请粘贴至少一条 URI");
+  if (lines.length === 0) throw new Error("Paste at least one URI");
 
   const outbounds = lines.map((line, index) => parseOutboundUri(line, uniqueProxyTag(index)));
   const client = options.client !== false;
@@ -174,7 +174,7 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
   if (client) {
     const localListen = options.localListen?.trim() || "127.0.0.1";
     const localPort = options.localPort ?? 1080;
-    assertPort(localPort, "本地端口");
+    assertPort(localPort, "Local port");
     const defaultOutbound = outbounds[0].tag;
     const networks = outbounds[0].network?.length ? [...outbounds[0].network] : ["tcp", "udp"];
     output = {
@@ -198,7 +198,7 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
   return {
     configJson: JSON.stringify(output, null, 2),
     count: outbounds.length,
-    summary: `已从 ${outbounds.length} 个分享端点生成${client ? "客户端配置" : " outbound 配置"}`,
+    summary: `Generated ${client ? "a client config" : " outbound config"} from ${outbounds.length} share endpoints`,
   };
 }
 
@@ -300,7 +300,7 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
 
 export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   const value = text.trim();
-  if (!value) throw new Error("URI 不能为空");
+  if (!value) throw new Error("URI cannot be empty");
   if (value.startsWith("T3:") || value.startsWith("T2:")) {
     return decodeProfilePayload(value, tag).outbound;
   }
@@ -310,30 +310,30 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   try {
     uri = new URL(value);
   } catch {
-    throw new Error("URI 格式无效");
+    throw new Error("Invalid URI format");
   }
   const query = uri.searchParams;
-  if (query.has("mode")) throw new Error("URI 已不支持 mode 参数，请在 JSON 中配置路由");
+  if (query.has("mode")) throw new Error("The mode query parameter is no longer supported; configure routing in JSON");
 
   let protocol = uri.protocol.replace(/:$/, "").toLowerCase();
   if (protocol === "native" || protocol === "tcptun") {
     validateNativeQuery(query);
     const version = query.get("v")?.trim();
-    if (version && version !== "1") throw new Error(`不支持的 tcptun URI 版本 ${version}`);
+    if (version && version !== "1") throw new Error(`Unsupported tcptun URI version ${version}`);
     const legacyProtocol = query.get("protocol")?.trim().toLowerCase();
     if (legacyProtocol && legacyProtocol !== "native") {
-      throw new Error(`tcptun URI protocol 必须是 native，不能是 ${legacyProtocol}`);
+      throw new Error(`tcptun URI protocol must be native, not ${legacyProtocol}`);
     }
     protocol = "native";
   }
   if (protocol !== "native" && protocol !== "vless" && protocol !== "trojan") {
-    throw new Error(`不支持的 URI 协议 ${protocol || "(空)"}`);
+    throw new Error(`Unsupported URI protocol ${protocol || "(empty)"}`);
   }
 
   const port = Number(uri.port);
-  assertPort(port, "URI 端口");
+  assertPort(port, "URI port");
   const server = uri.hostname.replace(/^\[|\]$/g, "");
-  if (!server) throw new Error("URI 缺少主机地址");
+  if (!server) throw new Error("URI is missing a host");
   const transport: TcptunTransport = {
     type: query.get("type") || query.get("transport") || "raw",
   };
@@ -410,12 +410,12 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
     if (!isObject(parsed)) throw new Error();
     source = parsed;
   } catch {
-    throw new Error("VMess URI payload 不是有效的 Base64 JSON");
+    throw new Error("VMess URI payload is not valid Base64 JSON");
   }
   const port = Number(source.port);
-  assertPort(port, "VMess URI 端口");
+  assertPort(port, "VMess URI port");
   const server = String(source.add || "").trim();
-  if (!server) throw new Error("VMess URI 缺少服务器地址");
+  if (!server) throw new Error("VMess URI is missing a server address");
   const outbound: TcptunOutbound = {
     tag,
     type: "vmess",
@@ -516,7 +516,7 @@ async function outboundFromInbound(
   address: string,
 ): Promise<TcptunOutbound> {
   if (inbound.users?.length !== 1) {
-    throw new Error(`inbound ${inbound.tag} 导出 URI 时必须且只能包含一个用户`);
+    throw new Error(`inbound ${inbound.tag} must contain exactly one user when exporting a URI`);
   }
   const user = inbound.users[0];
   const protocol = normalizedProtocol(inbound.type);
@@ -539,8 +539,8 @@ async function outboundFromInbound(
   const security = inbound.security || {};
   const securityType = (security.type || "").toLowerCase();
   if (securityType === "reality" || securityType === "reality-quic") {
-    if (!security.private_key) throw new Error(`inbound ${inbound.tag} 缺少 REALITY private_key`);
-    if (!security.server_names?.length) throw new Error(`inbound ${inbound.tag} 缺少 REALITY server_names`);
+    if (!security.private_key) throw new Error(`inbound ${inbound.tag} is missing REALITY private_key`);
+    if (!security.server_names?.length) throw new Error(`inbound ${inbound.tag} is missing REALITY server_names`);
     outbound.security = {
       type: securityType,
       server_name: security.server_names[0],
@@ -570,13 +570,13 @@ function normalizeAddressList(
   kind: string,
 ): string[] {
   if (!Array.isArray(address) || address.length === 0) {
-    throw new Error(`${kind} ${tag} 缺少 address 数组`);
+    throw new Error(`${kind} ${tag} is missing an address array`);
   }
   const seen = new Set<string>();
   const result: string[] = [];
   address.forEach((value, index) => {
     const text = String(value || "").trim();
-    if (!text) throw new Error(`${kind} ${tag} address[${index}] 不能为空`);
+    if (!text) throw new Error(`${kind} ${tag} address[${index}] cannot be empty`);
     // validate host:port
     splitAddress(text);
     if (seen.has(text)) return;
@@ -587,8 +587,8 @@ function normalizeAddressList(
 }
 
 function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtocol) {
-  if (outbound.via) throw new Error(`outbound ${outbound.tag} 使用了 via，URI 无法表示出口链`);
-  if (outbound.username) throw new Error(`outbound ${outbound.tag} 的 username 无法写入 tunnel URI`);
+  if (outbound.via) throw new Error(`outbound ${outbound.tag} uses via; URIs cannot represent outbound chains`);
+  if (outbound.username) throw new Error(`outbound ${outbound.tag} username cannot be written into a tunnel URI`);
   if (
     outbound.discover ||
     outbound.primary ||
@@ -598,14 +598,14 @@ function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtoco
     outbound.positive_ttl ||
     outbound.failure_threshold
   ) {
-    throw new Error(`outbound ${outbound.tag} 的发现或策略字段无法写入 URI`);
+    throw new Error(`outbound ${outbound.tag} discovery or policy fields cannot be written into a URI`);
   }
   const security = outbound.security || {};
   if (security.cert || security.key) {
-    throw new Error(`outbound ${outbound.tag} 的证书或密钥文件无法写入 URI`);
+    throw new Error(`outbound ${outbound.tag} certificate or key files cannot be written into a URI`);
   }
   if (security.type && !["none", "tls", "reality", "reality-quic", ""].includes(security.type)) {
-    throw new Error(`outbound ${outbound.tag} 的 security.type=${security.type} 无法写入 URI`);
+    throw new Error(`outbound ${outbound.tag} security.type=${security.type} cannot be written into a URI`);
   }
   if (
     security.server_names?.length ||
@@ -614,32 +614,32 @@ function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtoco
     security.dest ||
     security.max_time_diff
   ) {
-    throw new Error(`outbound ${outbound.tag} 含服务端 security 字段，无法写入客户端 URI`);
+    throw new Error(`outbound ${outbound.tag} contains server-side security fields and cannot be written into a client URI`);
   }
   if (protocol === "native" && (outbound.password || outbound.uuid)) {
-    throw new Error(`outbound ${outbound.tag} 包含非 Native 凭据`);
+    throw new Error(`outbound ${outbound.tag} contains non-Native credentials`);
   }
   if ((protocol === "vless" || protocol === "vmess") && (outbound.password || outbound.token)) {
-    throw new Error(`outbound ${outbound.tag} 包含非 ${protocol.toUpperCase()} 凭据`);
+    throw new Error(`outbound ${outbound.tag} contains non-${protocol.toUpperCase()} credentials`);
   }
   if (protocol === "trojan" && (outbound.uuid || outbound.token)) {
-    throw new Error(`outbound ${outbound.tag} 包含非 Trojan 凭据`);
+    throw new Error(`outbound ${outbound.tag} contains non-Trojan credentials`);
   }
 }
 
 function validateNativeQuery(query: URLSearchParams) {
   for (const key of new Set(query.keys())) {
-    if (!NATIVE_URI_PARAMETERS.has(key)) throw new Error(`不支持的 tcptun URI 参数 ${key}`);
-    if (query.getAll(key).length !== 1) throw new Error(`tcptun URI 参数 ${key} 只能出现一次`);
+    if (!NATIVE_URI_PARAMETERS.has(key)) throw new Error(`Unsupported tcptun URI parameter ${key}`);
+    if (query.getAll(key).length !== 1) throw new Error(`tcptun URI parameter ${key} can appear only once`);
   }
 }
 
 function parseJson(raw: string): unknown {
-  if (!raw.trim()) throw new Error("请粘贴 tcptun 配置 JSON");
+  if (!raw.trim()) throw new Error("Paste a tcptun config JSON");
   try {
     return JSON.parse(raw);
   } catch {
-    throw new Error("配置不是合法 JSON");
+    throw new Error("Config is not valid JSON");
   }
 }
 
@@ -729,7 +729,7 @@ function isObject(value: unknown): value is JsonObject {
 
 function normalizedProtocol(value: string): TunnelProtocol {
   const protocol = value.trim().toLowerCase();
-  if (!isUriProtocol(protocol)) throw new Error(`URI 不支持协议 ${value || "(空)"}`);
+  if (!isUriProtocol(protocol)) throw new Error(`URI does not support protocol ${value || "(empty)"}`);
   return protocol;
 }
 
@@ -740,7 +740,7 @@ function isUriProtocol(value: string): value is TunnelProtocol {
 function outboundEndpoint(outbound: TcptunOutbound): { server: string; port: number } {
   const addresses = outbound.address;
   if (!addresses || addresses.length !== 1) {
-    throw new Error(`outbound ${outbound.tag} 导出 URI 时 address 必须恰好包含 1 项`);
+    throw new Error(`outbound ${outbound.tag} address must contain exactly 1 item when exporting a URI`);
   }
   return splitAddress(addresses[0]);
 }
@@ -750,9 +750,9 @@ function splitAddress(address: string): { server: string; port: number } {
   const bracket = /^\[([^\]]+)]:(\d+)$/.exec(text);
   const plain = /^(.*):(\d+)$/.exec(text);
   const match = bracket || plain;
-  if (!match || !match[1]) throw new Error(`地址 ${address} 必须包含主机和端口`);
+  if (!match || !match[1]) throw new Error(`Address ${address} must include host and port`);
   const port = Number(match[2]);
-  assertPort(port, "地址端口");
+  assertPort(port, "Address port");
   return { server: match[1].replace(/^\[|\]$/g, ""), port };
 }
 
@@ -765,11 +765,11 @@ function joinHostPort(host: string, port: number): string {
 }
 
 function assertPort(value: number, label: string) {
-  if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error(`${label}需为 1–65535`);
+  if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error(`${label} must be 1–65535`);
 }
 
 function requiredCredential(value: string | undefined, label: string): string {
-  if (!value) throw new Error(`${label} 不能为空`);
+  if (!value) throw new Error(`${label} cannot be empty`);
   return value;
 }
 
@@ -779,7 +779,7 @@ function positiveInteger(value: number | undefined): value is number {
 
 function parseNetworkList(value: string): string[] {
   const items = value.split(",").map((item) => item.trim().toLowerCase());
-  if (items.some((item) => !item)) throw new Error("URI network 包含空值");
+  if (items.some((item) => !item)) throw new Error("URI network contains empty values");
   return items;
 }
 
@@ -788,7 +788,7 @@ function optionalBoolean(value: string | null, label: string): boolean | undefin
   const normalized = value.toLowerCase();
   if (["1", "t", "true"].includes(normalized)) return true;
   if (["0", "f", "false"].includes(normalized)) return false;
-  throw new Error(`URI ${label} 必须是布尔值`);
+  throw new Error(`URI ${label} must be a boolean`);
 }
 
 function optionalSourceBoolean(value: unknown, label: string): boolean | undefined {
@@ -808,14 +808,14 @@ function setOptionalText<T extends object, K extends keyof T>(target: T, key: K,
 function setOptionalInteger<T extends object, K extends keyof T>(target: T, key: K, value: string | null) {
   if (value === null || value === "") return;
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`URI ${String(key)} 必须是非负整数`);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`URI ${String(key)} must be a non-negative integer`);
   target[key] = parsed as T[K];
 }
 
 function setSourceInteger<T extends object, K extends keyof T>(target: T, key: K, value: unknown) {
   if (value === undefined || value === null || value === "" || value === 0) return;
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`VMess URI ${String(key)} 必须是非负整数`);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`VMess URI ${String(key)} must be a non-negative integer`);
   target[key] = parsed as T[K];
 }
 
@@ -827,7 +827,7 @@ function decodeUserInfo(value: string): string {
   try {
     return decodeURIComponent(value);
   } catch {
-    throw new Error("URI 凭据的百分号编码无效");
+    throw new Error("URI credential percent-encoding is invalid");
   }
 }
 
@@ -852,7 +852,7 @@ function decodeBase64UrlBytes(input: string): Uint8Array {
   try {
     binary = atob(normalized + padding);
   } catch {
-    throw new Error("REALITY private_key 不是有效的 Base64URL");
+    throw new Error("REALITY private_key is not valid Base64URL");
   }
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
@@ -866,7 +866,7 @@ function bytesToBase64Url(bytes: Uint8Array): string {
 // RFC 7748 Montgomery ladder; used only to derive an inbound REALITY public key for URI export.
 function x25519PublicKey(privateKey: string): string {
   const scalar = decodeBase64UrlBytes(privateKey.trim());
-  if (scalar.length !== 32) throw new Error("REALITY private_key 必须是 32 字节");
+  if (scalar.length !== 32) throw new Error("REALITY private_key must be 32 bytes");
   const clamped = new Uint8Array(scalar);
   clamped[0] &= 248;
   clamped[31] &= 127;

@@ -56,7 +56,7 @@ export function encodeT3(outbound: TcptunOutbound, name: string): string {
   const profile = compactProfileFromOutbound(outbound, name);
   const data = encodeCompactProfile(profile);
   if (data.length > MAX_BINARY_LENGTH) {
-    throw new Error(`T3 二进制载荷超过 ${MAX_BINARY_LENGTH} 字节`);
+    throw new Error(`T3 binary payload exceeds ${MAX_BINARY_LENGTH} bytes`);
   }
   return PREFIX_T3 + encodeBase45(data);
 }
@@ -71,14 +71,14 @@ export function decodeProfilePayload(value: string, tag = "proxy"): DecodedProfi
     encoded = text.slice(PREFIX_T3.length);
   } else if (text.startsWith(PREFIX_T2)) {
     t3 = false;
-    if (!text.endsWith(":")) throw new Error("T2 payload 缺少结束标记");
+    if (!text.endsWith(":")) throw new Error("T2 payload is missing the end marker");
     encoded = text.slice(PREFIX_T2.length, -1);
   } else {
-    throw new Error("不支持的 profile 前缀");
+    throw new Error("Unsupported profile prefix");
   }
   const data = decodeBase45(encoded);
   if (data.length > MAX_BINARY_LENGTH) {
-    throw new Error(`${t3 ? "T3" : "T2"} 二进制载荷超过 ${MAX_BINARY_LENGTH} 字节`);
+    throw new Error(`${t3 ? "T3" : "T2"} binary payload exceeds ${MAX_BINARY_LENGTH} bytes`);
   }
   const profile = decodeCompactProfile(data, t3);
   return {
@@ -90,27 +90,27 @@ export function decodeProfilePayload(value: string, tag = "proxy"): DecodedProfi
 
 function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): CompactProfile {
   if (!outbound.address || outbound.address.length !== 1) {
-    throw new Error(`T3 要求 outbound address 恰好包含 1 项`);
+    throw new Error(`T3 requires outbound address to contain exactly 1 item`);
   }
-  if (outbound.via) throw new Error("T3 无法表示 outbound 链");
-  if (outbound.username) throw new Error("T3 无法表示 outbound username");
-  if (outbound.discover) throw new Error("T3 无法表示 discovery");
-  if (outbound.expose?.length) throw new Error("T3 无法表示反向服务 expose");
+  if (outbound.via) throw new Error("T3 cannot represent outbound chains");
+  if (outbound.username) throw new Error("T3 cannot represent outbound username");
+  if (outbound.discover) throw new Error("T3 cannot represent discovery");
+  if (outbound.expose?.length) throw new Error("T3 cannot represent reverse-service expose");
   if (outbound.members?.length || hasDuration(outbound.affinity_ttl)) {
-    throw new Error("T3 无法表示 balance 设置");
+    throw new Error("T3 cannot represent balance settings");
   }
 
   const protocol = outbound.type.trim().toLowerCase();
   if (!PROTOCOLS.includes(protocol as (typeof PROTOCOLS)[number])) {
-    throw new Error(`T3 不支持协议 ${outbound.type}`);
+    throw new Error(`T3 does not support protocol ${outbound.type}`);
   }
   const transport = (outbound.transport?.type || "raw").trim().toLowerCase();
   if (!TRANSPORTS.includes(transport as (typeof TRANSPORTS)[number])) {
-    throw new Error(`T3 不支持传输 ${outbound.transport?.type || ""}`);
+    throw new Error(`T3 does not support transport ${outbound.transport?.type || ""}`);
   }
   const path = outbound.transport?.path?.trim() || DEFAULT_PATH;
   if (transport === "raw" && path !== DEFAULT_PATH) {
-    throw new Error("T3 无法表示自定义 raw transport path");
+    throw new Error("T3 cannot represent a custom raw transport path");
   }
 
   const networkCode = encodeNetworks(outbound.network);
@@ -120,7 +120,7 @@ function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): Com
   const security = normalizeSecurity(securityConfig.type);
   validateSecurity(securityConfig, security);
   const sni = securityConfig.server_name?.trim() || "";
-  if (security && !sni) throw new Error("T3 安全端点必须显式设置 server_name");
+  if (security && !sni) throw new Error("T3 security endpoints must set server_name explicitly");
 
   const flowSource = outbound.flow?.trim() || "";
   const flowExplicitEmpty = protocol === "vless" && security === "reality" && flowSource === "";
@@ -162,7 +162,7 @@ function normalizeSecurity(value: string | undefined): string {
   const security = (value || "").trim().toLowerCase();
   if (security === "none") return "";
   if (!SECURITIES.includes(security as (typeof SECURITIES)[number])) {
-    throw new Error(`T3 不支持 security ${value || ""}`);
+    throw new Error(`T3 does not support security ${value || ""}`);
   }
   return security;
 }
@@ -177,19 +177,19 @@ function validateSecurity(config: TcptunSecurity, security: string) {
     config.dest ||
     hasDuration(config.max_time_diff)
   ) {
-    throw new Error("T3 无法表示服务端 security 字段");
+    throw new Error("T3 cannot represent server-side security fields");
   }
   if (config.insecure && security !== "tls") {
-    throw new Error("T3 insecure 仅适用于 TLS security");
+    throw new Error("T3 insecure applies only to TLS security");
   }
   const hasRealityFields = Boolean(
     config.fingerprint || config.public_key || config.short_id || config.spider_x,
   );
   if (security !== "reality" && security !== "reality-quic" && hasRealityFields) {
-    throw new Error("T3 REALITY 字段需要 REALITY security");
+    throw new Error("T3 REALITY fields require REALITY security");
   }
   if (security === "reality-quic" && config.spider_x) {
-    throw new Error("T3 REALITY QUIC 无法表示 SpiderX");
+    throw new Error("T3 REALITY QUIC cannot represent SpiderX");
   }
 }
 
@@ -203,11 +203,11 @@ function normalizeMux(value: TcptunMux | null | undefined) {
   }
   const mode = (value.mode || "").trim().toLowerCase();
   if (mode && mode !== "group" && mode !== "quic") {
-    throw new Error(`T3 不支持 mux mode ${value.mode}`);
+    throw new Error(`T3 does not support mux mode ${value.mode}`);
   }
   const udpMode = (value.udp_mode || "").trim().toLowerCase();
   if (udpMode && !["reliable", "auto", "datagram"].includes(udpMode)) {
-    throw new Error(`T3 不支持 mux UDP mode ${value.udp_mode}`);
+    throw new Error(`T3 does not support mux UDP mode ${value.udp_mode}`);
   }
   const fields = [
     ["max_sessions", value.max_sessions || 0],
@@ -220,12 +220,12 @@ function normalizeMux(value: TcptunMux | null | undefined) {
   ] as const;
   for (const [field, number] of fields) {
     if (!Number.isInteger(number) || number < 0 || number > MAX_INT32) {
-      throw new Error(`T3 mux.${field} 必须是 0–${MAX_INT32} 的整数`);
+      throw new Error(`T3 mux.${field} must be an integer between 0 and ${MAX_INT32}`);
     }
   }
   const hasQuicFields = udpMode || fields.slice(3).some(([, number]) => number !== 0);
   if (hasQuicFields && (mode || "group") !== "quic") {
-    throw new Error("T3 mux UDP mode 和接收窗口需要 quic mode");
+    throw new Error("T3 mux UDP mode and receive windows require quic mode");
   }
   return {
     mode,
@@ -266,7 +266,7 @@ function encodeCompactProfile(profile: CompactProfile): Uint8Array {
 
   let extensions = 0;
   const udpModeCode = ["", "reliable", "auto", "datagram"].indexOf(profile.muxUDPMode);
-  if (udpModeCode < 0) throw new Error(`无效的 T3 mux UDP mode ${profile.muxUDPMode}`);
+  if (udpModeCode < 0) throw new Error(`Invalid T3 mux UDP mode ${profile.muxUDPMode}`);
   extensions |= udpModeCode << 2;
   if (profile.flowExplicitEmpty) extensions |= 1 << 4;
   if (profile.initialStreamWindow > 0) extensions |= 1 << 5;
@@ -330,27 +330,27 @@ function decodeCompactProfile(data: Uint8Array, t3: boolean): CompactProfile {
   if (networkCode === 3 && t3) {
     extensions = reader.varUInt();
     if (!extensions || (extensions & ~0x1ff) !== 0 || (extensions & 0x03) === 3 || (extensions & ~0x03) === 0) {
-      throw new Error("不支持的 T3 extension flags");
+      throw new Error("Unsupported T3 extension flags");
     }
     networkCode = extensions & 0x03;
   } else if (networkCode === 3) {
-    throw new Error("不支持的 T2 network code");
+    throw new Error("Unsupported T2 network code");
   }
   const muxUDPMode = t3 ? ["", "reliable", "auto", "datagram"][(extensions >> 2) & 0x03] : "";
   const muxModeBits = (header1 >> 3) & 0x03;
-  if (muxModeBits === 3) throw new Error(`不支持的 ${t3 ? "T3" : "T2"} mux mode`);
+  if (muxModeBits === 3) throw new Error(`Unsupported ${t3 ? "T3" : "T2"} mux mode`);
   const muxMode = muxModeBits === 1 ? "group" : muxModeBits === 2 ? "quic" : "";
   if (t3 && (extensions & (1 << 4)) && (protocol !== "vless" || security !== "reality" || (header2 & 1))) {
-    throw new Error("无效的 T3 显式空 flow 标记");
+    throw new Error("Invalid T3 explicit empty flow marker");
   }
   if (t3 && (extensions & 0x1ec) && (!(header0 & 0x80) || muxMode !== "quic")) {
-    throw new Error("T3 QUIC mux extension 需要 quic mux mode");
+    throw new Error("T3 QUIC mux extension requires quic mux mode");
   }
 
   const port = reader.port();
   const credential = reader.credential();
   const host = reader.host();
-  if (!host.trim()) throw new Error(`${t3 ? "T3" : "T2"} host 不能为空`);
+  if (!host.trim()) throw new Error(`${t3 ? "T3" : "T2"} host cannot be empty`);
   const path = header1 & 0x20 ? reader.string() : DEFAULT_PATH;
   const sni = header1 & 0x40 ? reader.string() : security ? host : "";
   const flow = header2 & 1
@@ -389,7 +389,7 @@ function decodeCompactProfile(data: Uint8Array, t3: boolean): CompactProfile {
 function readPositiveExtension(reader: CompactReader, extensions: number, bit: number, label: string): number {
   if (!(extensions & (1 << bit))) return 0;
   const value = reader.varUInt();
-  if (!value) throw new Error(`非 canonical T3 ${label}`);
+  if (!value) throw new Error(`Non-canonical T3 ${label}`);
   return value;
 }
 
@@ -470,7 +470,7 @@ class CompactWriter {
     if (port === 443) this.byte(0);
     else if (port === 9443) this.byte(1);
     else {
-      if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("T3 端口需为 1–65535");
+      if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("T3 port must be 1–65535");
       this.byte(2);
       this.byte(port >> 8);
       this.byte(port);
@@ -478,7 +478,7 @@ class CompactWriter {
   }
 
   credential(protocol: string, value: string) {
-    if (value !== value.trim()) throw new Error("T3 无法保留凭据首尾空白");
+    if (value !== value.trim()) throw new Error("T3 cannot preserve credential leading/trailing whitespace");
     const uuid = protocol === "vless" || protocol === "vmess" ? parseUUID(value) : null;
     if (uuid) {
       this.byte(0);
@@ -549,7 +549,7 @@ class CompactReader {
   }
 
   byte(): number {
-    if (this.offset >= this.data.length) throw new Error(`${this.label} payload 被截断`);
+    if (this.offset >= this.data.length) throw new Error(`${this.label} payload is truncated`);
     return this.data[this.offset++];
   }
 
@@ -557,15 +557,15 @@ class CompactReader {
     let value = 0;
     for (let index = 0; index < 5; index++) {
       const part = this.byte();
-      if (index === 4 && (part & 0xf0)) throw new Error(`${this.label} 整数过大`);
+      if (index === 4 && (part & 0xf0)) throw new Error(`${this.label} integer is too large`);
       value += (part & 0x7f) * 2 ** (7 * index);
       if (!(part & 0x80)) {
-        if (index > 0 && part === 0) throw new Error(`非 canonical ${this.label} 整数`);
-        if (value > MAX_INT32) throw new Error(`${this.label} 整数超过 int32`);
+        if (index > 0 && part === 0) throw new Error(`Non-canonical ${this.label} integer`);
+        if (value > MAX_INT32) throw new Error(`${this.label} integer exceeds int32`);
         return value;
       }
     }
-    throw new Error(`${this.label} 整数过大`);
+    throw new Error(`${this.label} integer is too large`);
   }
 
   string(): string {
@@ -573,7 +573,7 @@ class CompactReader {
     try {
       return new TextDecoder("utf-8", { fatal: true }).decode(data);
     } catch {
-      throw new Error(`${this.label} 字符串不是有效 UTF-8`);
+      throw new Error(`${this.label} string is not valid UTF-8`);
     }
   }
 
@@ -581,9 +581,9 @@ class CompactReader {
     const kind = this.byte();
     if (kind === 0) return 443;
     if (kind === 1) return 9443;
-    if (kind !== 2) throw new Error(`无效的 ${this.label} 端口编码`);
+    if (kind !== 2) throw new Error(`Invalid ${this.label} port encoding`);
     const port = (this.byte() << 8) | this.byte();
-    if (!port) throw new Error(`无效的 ${this.label} 端口`);
+    if (!port) throw new Error(`Invalid ${this.label} port`);
     return port;
   }
 
@@ -591,7 +591,7 @@ class CompactReader {
     const kind = this.byte();
     if (kind === 0) return formatUUID(this.bytes(16));
     if (kind === 1) return this.string();
-    throw new Error(`无效的 ${this.label} 凭据编码`);
+    throw new Error(`Invalid ${this.label} credential encoding`);
   }
 
   host(): string {
@@ -600,32 +600,32 @@ class CompactReader {
     if (kind === 1) return formatIPv6(this.bytes(16));
     if (kind >= 2 && kind < 2 + SUFFIXES.length) return this.string() + SUFFIXES[kind - 2];
     if (kind === 2 + SUFFIXES.length) return this.string();
-    throw new Error(`无效的 ${this.label} host 编码`);
+    throw new Error(`Invalid ${this.label} host encoding`);
   }
 
   realityKey(): string {
     const kind = this.byte();
     if (kind === 0) return encodeBase64Url(this.bytes(32));
     if (kind === 1) return this.string();
-    throw new Error(`无效的 ${this.label} REALITY key 编码`);
+    throw new Error(`Invalid ${this.label} REALITY key encoding`);
   }
 
   shortID(): string {
     const length = this.byte();
     if (!length) return this.string();
-    if (length > 16) throw new Error(`无效的 ${this.label} short ID 长度`);
+    if (length > 16) throw new Error(`Invalid ${this.label} short ID length`);
     return encodeHex(this.bytes(length));
   }
 
   bytes(length: number): Uint8Array {
-    if (length < 0 || length > this.data.length - this.offset) throw new Error(`${this.label} 字段被截断`);
+    if (length < 0 || length > this.data.length - this.offset) throw new Error(`${this.label} field is truncated`);
     const value = this.data.slice(this.offset, this.offset + length);
     this.offset += length;
     return value;
   }
 
   end() {
-    if (this.offset !== this.data.length) throw new Error(`${this.label} 包含意外的尾部数据`);
+    if (this.offset !== this.data.length) throw new Error(`${this.label} contains unexpected trailing data`);
   }
 }
 
@@ -637,12 +637,12 @@ function encodeNetworks(networks: string[] | undefined): number {
     const network = value.trim().toLowerCase();
     if (network === "tcp") tcp = true;
     else if (network === "udp") udp = true;
-    else throw new Error(`T3 network[${index}] 不支持 ${value}`);
+    else throw new Error(`T3 network[${index}] does not support ${value}`);
   });
   if (tcp && udp) return 0;
   if (tcp) return 1;
   if (udp) return 2;
-  throw new Error("T3 network 不能为空");
+  throw new Error("T3 network cannot be empty");
 }
 
 function decodeNetworks(code: number): string[] {
@@ -651,14 +651,14 @@ function decodeNetworks(code: number): string[] {
 
 function outboundCredential(outbound: TcptunOutbound, protocol: string): string {
   if (protocol === "vless" || protocol === "vmess") {
-    if (outbound.password || outbound.token) throw new Error(`T3 ${protocol} profile 包含其他协议凭据`);
+    if (outbound.password || outbound.token) throw new Error(`T3 ${protocol} profile contains credentials from another protocol`);
     return outbound.uuid || "";
   }
   if (protocol === "trojan") {
-    if (outbound.uuid || outbound.token) throw new Error("T3 Trojan profile 包含其他协议凭据");
+    if (outbound.uuid || outbound.token) throw new Error("T3 Trojan profile contains credentials from another protocol");
     return outbound.password || "";
   }
-  if (outbound.uuid || outbound.password) throw new Error("T3 Native profile 包含其他协议凭据");
+  if (outbound.uuid || outbound.password) throw new Error("T3 Native profile contains credentials from another protocol");
   return outbound.token || "";
 }
 
@@ -667,10 +667,10 @@ function splitEndpoint(value: string): { host: string; port: number } {
   const bracket = /^\[([^\]]+)]:(\d+)$/.exec(text);
   const plain = /^([^:]+):(\d+)$/.exec(text);
   const match = bracket || plain;
-  if (!match) throw new Error(`T3 outbound address 无效: ${value}`);
+  if (!match) throw new Error(`Invalid T3 outbound address: ${value}`);
   const port = Number(match[2]);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("T3 端口需为 1–65535");
-  if (!match[1]) throw new Error("T3 host 不能为空");
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("T3 port must be 1–65535");
+  if (!match[1]) throw new Error("T3 host cannot be empty");
   return { host: match[1], port };
 }
 
@@ -732,8 +732,8 @@ function encodeBase45(data: Uint8Array): string {
 }
 
 function decodeBase45(value: string): Uint8Array {
-  if (!value) throw new Error("Base45 payload 为空");
-  if (value.length % 3 === 1) throw new Error("Base45 payload 长度无效");
+  if (!value) throw new Error("Base45 payload is empty");
+  if (value.length % 3 === 1) throw new Error("Invalid Base45 payload length");
   const output: number[] = [];
   for (let index = 0; index < value.length;) {
     const remaining = value.length - index;
@@ -741,12 +741,12 @@ function decodeBase45(value: string): Uint8Array {
     const second = base45Digit(value[index + 1]);
     if (remaining >= 3) {
       const combined = first + second * 45 + base45Digit(value[index + 2]) * 2025;
-      if (combined > 0xffff) throw new Error("Base45 group 无效");
+      if (combined > 0xffff) throw new Error("Invalid Base45 group");
       output.push(combined >> 8, combined & 0xff);
       index += 3;
     } else {
       const combined = first + second * 45;
-      if (combined > 0xff) throw new Error("Base45 tail 无效");
+      if (combined > 0xff) throw new Error("Invalid Base45 tail");
       output.push(combined);
       index += 2;
     }
@@ -756,7 +756,7 @@ function decodeBase45(value: string): Uint8Array {
 
 function base45Digit(value: string): number {
   const digit = BASE45.indexOf(value);
-  if (digit < 0) throw new Error(`Base45 字符无效: ${value}`);
+  if (digit < 0) throw new Error(`Invalid Base45 character: ${value}`);
   return digit;
 }
 

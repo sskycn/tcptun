@@ -98,14 +98,14 @@ export default function UriConverter() {
       setResult({
         content: uriText,
         filename: uriText.startsWith("T3:") || uriText.startsWith("T2:") ? "client.profile" : "client.uri",
-        summary: `已从 ${files.length} 张二维码识别 ${converted.count} 个分享端点`,
+        summary: `Recognized ${converted.count} share endpoints from ${files.length} QR codes`,
         qrCodes: [],
         qrPayloads: [],
       });
       setQrIndex(0);
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : "二维码识别失败");
+      setError(err instanceof Error ? err.message : "QR code recognition failed");
     } finally {
       setBusy(false);
       if (qrFileInput.current) qrFileInput.current.value = "";
@@ -133,7 +133,7 @@ export default function UriConverter() {
         setResult({
           content: converted.uriText,
           filename: "client.uri",
-          summary: `${converted.summary}，并生成 ${qrCodes.length} 张二维码`,
+          summary: `${converted.summary}, and generated ${qrCodes.length} QR codes`,
           qrCodes,
           qrPayloads: profiles,
         });
@@ -155,7 +155,7 @@ export default function UriConverter() {
         setResult({
           content: profiles.join("\n"),
           filename: "client.profile",
-          summary: `已从 ${shares.length} 个分享端点生成 ${qrCodes.length} 张 T3 二维码`,
+          summary: `Generated ${qrCodes.length} T3 QR codes from ${shares.length} share endpoints`,
           qrCodes,
           qrPayloads: profiles,
         });
@@ -163,7 +163,7 @@ export default function UriConverter() {
       }
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : "转换失败");
+      setError(err instanceof Error ? err.message : "Conversion failed");
     } finally {
       setBusy(false);
     }
@@ -174,19 +174,19 @@ export default function UriConverter() {
       <div className="section-heading row-heading">
         <div>
           <p className="eyebrow">URI</p>
-          <h2>配置、分享 URI 与二维码互转。</h2>
+          <h2>Convert between configs, share URIs, and QR codes.</h2>
           <p>
-            对齐 <code>tcptun uri export/import</code>：文本保留普通 URI，二维码默认使用更紧凑的 <code>T3:</code> Base45 profile；导入兼容 T3、旧 T2 和 URI。
+            Matches <code>tcptun uri export/import</code>: text keeps plain URIs, QR codes default to the denser <code>T3:</code> Base45 profile, and import accepts T3, legacy T2, and URIs.
           </p>
         </div>
         <div className="chip-row">
           <span>Config ↔ URI</span>
           <span>QR Code</span>
-          <span>本地处理</span>
+          <span>Local only</span>
         </div>
       </div>
 
-      <div className="uri-mode-switch" role="tablist" aria-label="URI 转换方向">
+      <div className="uri-mode-switch" role="tablist" aria-label="URI conversion direction">
         <button
           type="button"
           role="tab"
@@ -194,7 +194,7 @@ export default function UriConverter() {
           className={mode === "export" ? "is-active" : undefined}
           onClick={() => switchMode("export")}
         >
-          配置 → URI + 二维码
+          Config → URI + QR
         </button>
         <button
           type="button"
@@ -203,7 +203,7 @@ export default function UriConverter() {
           className={mode === "import" ? "is-active" : undefined}
           onClick={() => switchMode("import")}
         >
-          URI → 配置
+          URI → config
         </button>
         <button
           type="button"
@@ -212,21 +212,21 @@ export default function UriConverter() {
           className={mode === "qrcode" ? "is-active" : undefined}
           onClick={() => switchMode("qrcode")}
         >
-          分享端点 ↔ 二维码
+          Share endpoints ↔ QR
         </button>
       </div>
 
       <div className="converter-grid">
         <form className="converter-form" onSubmit={handleConvert}>
           <label className="converter-input-label">
-            <span>{mode === "export" ? "tcptun 配置 JSON" : "分享 URI / T3 / T2（一行一条）"}</span>
+            <span>{mode === "export" ? "tcptun config JSON" : "Share URI / T3 / T2 (one per line)"}</span>
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
               placeholder={
                 mode === "export"
-                  ? "粘贴完整 config.json、outbound 对象或 outbound 数组"
-                  : "粘贴 T3: / T2: / native:// / vless:// / vmess:// / trojan://"
+                  ? "Paste a full config.json, outbound object, or outbound array"
+                  : "Paste T3: / T2: / native:// / vless:// / vmess:// / trojan://"
               }
               spellCheck={false}
               required
@@ -247,22 +247,22 @@ export default function UriConverter() {
                 disabled={busy}
                 onChange={handleQrFileChange}
               />
-              <strong>{busy ? "正在识别二维码…" : "上传二维码图片"}</strong>
-              <span>点击选择或拖放 PNG / JPEG，可一次识别多张</span>
+              <strong>{busy ? "Reading QR codes…" : "Upload QR images"}</strong>
+              <span>Click to choose or drop PNG / JPEG files; multiple images are supported</span>
             </label>
           ) : null}
 
           {mode === "export" ? (
             <div className="converter-options">
               <label>
-                <span>导出端点</span>
+                <span>Export endpoints</span>
                 <select value={scope} onChange={(event) => setScope(event.target.value as UriExportScope)}>
-                  <option value="outbounds">outbounds（客户端配置）</option>
-                  <option value="inbounds">inbounds（服务端配置）</option>
+                  <option value="outbounds">outbounds (client config)</option>
+                  <option value="inbounds">inbounds (server config)</option>
                 </select>
               </label>
               <label>
-                <span>显示名称</span>
+                <span>Display name</span>
                 <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" />
               </label>
             </div>
@@ -270,7 +270,7 @@ export default function UriConverter() {
             <>
               <div className="converter-options">
                 <label>
-                  <span>本地监听</span>
+                  <span>Local listen</span>
                   <input
                     value={localListen}
                     onChange={(event) => setLocalListen(event.target.value)}
@@ -279,7 +279,7 @@ export default function UriConverter() {
                   />
                 </label>
                 <label>
-                  <span>本地端口</span>
+                  <span>Local port</span>
                   <input
                     type="number"
                     min={1}
@@ -292,7 +292,7 @@ export default function UriConverter() {
               </div>
               <label className="generator-check">
                 <input type="checkbox" checked={client} onChange={(event) => setClient(event.target.checked)} />
-                <span>生成可直接运行的完整客户端配置（关闭则仅输出 outbound）</span>
+                <span>Generate a full runnable client config (turn off to output outbounds only)</span>
               </label>
             </>
           ) : null}
@@ -300,12 +300,12 @@ export default function UriConverter() {
           <div className="converter-actions">
             <button type="submit" className="button primary" disabled={busy}>
               {busy
-                ? "转换中…"
+                ? "Converting…"
                 : mode === "export"
-                  ? "生成 URI 与二维码"
+                  ? "Generate URI and QR"
                   : mode === "import"
-                    ? "生成配置"
-                    : "生成二维码"}
+                    ? "Generate config"
+                    : "Generate QR codes"}
             </button>
             <button
               type="button"
@@ -316,7 +316,7 @@ export default function UriConverter() {
                 setError(null);
               }}
             >
-              填入示例
+              Load sample
             </button>
             <button
               type="button"
@@ -328,7 +328,7 @@ export default function UriConverter() {
                 if (qrFileInput.current) qrFileInput.current.value = "";
               }}
             >
-              清空
+              Clear
             </button>
           </div>
 
@@ -336,16 +336,16 @@ export default function UriConverter() {
 
           {mode === "qrcode" ? (
             <ul className="converter-notes">
-              <li>新生成的二维码使用 T3 Base45 profile，码密度更低</li>
-              <li>上传识别兼容 T3、旧 T2 和普通 URI</li>
-              <li>每条 URI 生成独立的 512 × 512 PNG</li>
-              <li>识别与生成过程完全在浏览器本地完成</li>
+              <li>New QR codes use the denser T3 Base45 profile</li>
+              <li>Upload recognition accepts T3, legacy T2, and plain URIs</li>
+              <li>Each URI becomes its own 512 × 512 PNG</li>
+              <li>Recognition and generation run entirely in the browser</li>
             </ul>
           ) : (
             <ul className="converter-notes">
-              <li>完整配置会自动筛选支持 URI 的 tunnel inbound / outbound</li>
-              <li>多端点导出为一行一条 URI，并分别生成 T3 二维码</li>
-              <li>URI 无法承载出口链、路由规则、服务端私钥等配置字段</li>
+              <li>Full configs automatically select tunnel inbounds / outbounds that support URIs</li>
+              <li>Multiple endpoints export as one URI per line with separate T3 QR codes</li>
+              <li>URIs cannot carry outbound chains, route rules, server private keys, and similar fields</li>
             </ul>
           )}
         </form>
@@ -358,7 +358,7 @@ export default function UriConverter() {
                 <div className="generator-result-toolbar">
                   <span className="uri-result-label">{result.filename}</span>
                   <div className="generator-result-actions">
-                    <CopyButton value={result.content} label="复制" className="copy-button-solid" />
+                    <CopyButton value={result.content} label="Copy" className="copy-button-solid" />
                     <button
                       type="button"
                       className="button secondary generator-download"
@@ -370,7 +370,7 @@ export default function UriConverter() {
                         )
                       }
                     >
-                      下载
+                      Download
                     </button>
                   </div>
                 </div>
@@ -378,7 +378,7 @@ export default function UriConverter() {
 
               <pre
                 className={`generator-result-code uri-result-code${mode === "import" ? " is-config" : ""}`}
-                aria-label={`${result.filename} 内容`}
+                aria-label={`${result.filename} content`}
                 tabIndex={0}
               >
                 <code>{result.content}</code>
@@ -388,7 +388,7 @@ export default function UriConverter() {
                 <div className="uri-qr-panel">
                   <div className="uri-qr-heading">
                     <div>
-                      <span>T3 Profile 二维码</span>
+                      <span>T3 Profile QR code</span>
                       <small>{result.qrCodes.length > 1 ? `${qrIndex + 1} / ${result.qrCodes.length}` : "PNG · 512 × 512"}</small>
                     </div>
                     <button
@@ -396,11 +396,11 @@ export default function UriConverter() {
                       className="button secondary generator-download"
                       onClick={() => downloadDataUrl(`client-${qrIndex + 1}.png`, result.qrCodes[qrIndex])}
                     >
-                      下载二维码
+                      Download QR
                     </button>
                   </div>
                   {result.qrCodes.length > 1 ? (
-                    <div className="uri-qr-tabs" role="tablist" aria-label="选择 T3 Profile 二维码">
+                    <div className="uri-qr-tabs" role="tablist" aria-label="Select T3 Profile QR code">
                       {result.qrCodes.map((_, index) => (
                         <button
                           key={qrPayloads[index] || index}
@@ -418,7 +418,7 @@ export default function UriConverter() {
                   <div className="uri-qr-image">
                     <Image
                       src={result.qrCodes[qrIndex]}
-                      alt={`第 ${qrIndex + 1} 个 T3 profile 的二维码`}
+                      alt={`QR code for T3 profile ${qrIndex + 1}`}
                       width={256}
                       height={256}
                       unoptimized
@@ -430,25 +430,25 @@ export default function UriConverter() {
             </>
           ) : (
             <div className="generator-empty">
-              <p className="eyebrow">输出</p>
+              <p className="eyebrow">Output</p>
               <h3>
                 {mode === "export"
-                  ? "粘贴配置后生成分享入口"
+                  ? "Paste a config to generate share endpoints"
                   : mode === "import"
-                    ? "粘贴 URI 后还原配置"
-                    : "粘贴分享端点后生成 T3 二维码"}
+                    ? "Paste URIs to restore a config"
+                    : "Paste share endpoints to generate T3 QR codes"}
               </h3>
               <p>
                 {mode === "export"
-                  ? "输出 URI 文本与二维码 PNG；可从客户端 outbound 或服务端 inbound 导出。"
+                  ? "Outputs URI text and QR PNGs; export from client outbounds or server inbounds."
                   : mode === "import"
-                    ? "可生成单个 outbound，或带 mixed 本地入口、路由的完整 client.json。"
-                    : "粘贴 URI / profile 生成 T3 二维码，或上传图片识别分享端点。"}
+                    ? "Can generate a single outbound or a full client.json with mixed local inbound and routing."
+                    : "Paste URIs / profiles to generate T3 QR codes, or upload images to recover share endpoints."}
               </p>
               <ul>
-                <li>支持 Native / VLESS / VMess / Trojan</li>
-                <li>保留 raw / ws / h2 / h3、TLS / REALITY 与 mux 参数</li>
-                <li>兼容 IPv4、IPv6 与域名端点</li>
+                <li>Supports Native / VLESS / VMess / Trojan</li>
+                <li>Preserves raw / ws / h2 / h3, TLS / REALITY, and mux parameters</li>
+                <li>Supports IPv4, IPv6, and domain endpoints</li>
               </ul>
             </div>
           )}
@@ -498,7 +498,7 @@ function profilePayloadFromShare(share: string, index: number): string {
 
 async function decodeQrFile(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
-    throw new Error(`${file.name} 不是图片文件`);
+    throw new Error(`${file.name} is not an image file`);
   }
 
   const imageUrl = URL.createObjectURL(file);
@@ -512,11 +512,11 @@ async function decodeQrFile(file: File): Promise<string> {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("当前浏览器无法读取二维码图片");
+    if (!context) throw new Error("This browser cannot read QR images");
     context.drawImage(image, 0, 0, width, height);
     const pixels = context.getImageData(0, 0, width, height);
     const decoded = jsQR(pixels.data, width, height, { inversionAttempts: "attemptBoth" });
-    if (!decoded?.data.trim()) throw new Error(`${file.name} 中未识别到二维码`);
+    if (!decoded?.data.trim()) throw new Error(`No QR code found in ${file.name}`);
     return decoded.data.trim();
   } finally {
     URL.revokeObjectURL(imageUrl);
@@ -527,7 +527,7 @@ function loadImage(src: string, filename: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = document.createElement("img");
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`无法读取图片 ${filename}`));
+    image.onerror = () => reject(new Error(`Unable to read image ${filename}`));
     image.src = src;
   });
 }

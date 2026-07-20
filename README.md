@@ -1,41 +1,41 @@
 # tcptun.com
 
-tcptun 的 Next.js 静态网站，通过 GitHub Pages 发布到 [tcptun.com](https://tcptun.com/)。
+Next.js static site for tcptun, published to [tcptun.com](https://tcptun.com/) via GitHub Pages.
 
-网站说明与示例依据同级 `../tcptun-go` 源码整理。CLI / Android 安装包由本机编译后放入 `public/releases/`，随 Pages 一起上线。
+Site copy and examples are based on the sibling `../tcptun-go` source. CLI / Android packages are built locally into `public/releases/` and ship with Pages.
 
-## 本地开发
+## Local development
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-生产构建：
+Production build:
 
 ```bash
 pnpm build
 ```
 
-## 发布二进制到 GitHub Pages
+## Publish binaries to GitHub Pages
 
-在网站仓库根目录执行（默认读取同级 `../tcptun-go`、`../tcptun-kotlin`）：
+Run from the website repo root (defaults to sibling `../tcptun-go` and `../tcptun-kotlin`):
 
 ```bash
-# 编译 Go（+ Android）并写入 public/releases/<version>/ 与 latest/
+# Build Go (+ Android) into public/releases/<version>/ and latest/
 ./scripts/publish-pages-assets.sh --version v0.2.2
 
-# 只编译 Go
+# Go only
 ./scripts/publish-pages-assets.sh --version v0.2.2 --only go
 
-# 同步版本号与文件大小到 app/site-data.ts
+# Sync version and file sizes into app/site-data.ts
 ./scripts/publish-pages-assets.sh --version v0.2.2 --only go --update-site-data
 
-# 已有 dist / APK 时跳过编译
+# Skip build when dist / APKs already exist
 ./scripts/publish-pages-assets.sh --version v0.2.2 --skip-build
 ```
 
-然后提交并推送，Pages workflow 会构建并部署（`public/` 会进入 `out/`）：
+Then commit and push. The Pages workflow builds and deploys (`public/` is copied into `out/`):
 
 ```bash
 git add public/releases app/site-data.ts public/install.sh
@@ -43,25 +43,25 @@ git commit -m "release: publish v0.2.2 assets"
 git push origin main
 ```
 
-上线后地址示例：
+Example URLs after deploy:
 
-| 路径 | 说明 |
-|------|------|
-| `https://tcptun.com/releases/0.2.2/tcptun-linux-amd64` | 固定版本 |
+| Path | Description |
+|------|-------------|
+| `https://tcptun.com/releases/0.2.2/tcptun-linux-amd64` | Pinned version |
 | `https://tcptun.com/releases/0.2.2/tcptun-android-arm64-v0.2.2.apk` | Android ARM64 APK |
 | `https://tcptun.com/releases/0.2.2/tcptun-android-armv7-v0.2.2.apk` | Android ARMv7 APK |
 | `https://tcptun.com/releases/0.2.2/tcptun-android-x86_64-v0.2.2.apk` | Android x86_64 APK |
-| `https://tcptun.com/releases/latest/tcptun-linux-amd64` | 最新副本 |
-| `https://tcptun.com/install.sh` | 一键安装（从 `/releases/...` 拉二进制） |
+| `https://tcptun.com/releases/latest/tcptun-linux-amd64` | Latest copy |
+| `https://tcptun.com/install.sh` | One-line install (pulls binaries from `/releases/...`) |
 
 ```bash
 curl -fsSL https://tcptun.com/install.sh | sh
 TCPTUN_VERSION=0.2.2 sh -c "$(curl -fsSL https://tcptun.com/install.sh)"
 ```
 
-Android 需在 `tcptun-kotlin` 配置 `signing.properties` 或 `TCPTUN_RELEASE_*` 环境变量。
+Android builds need `signing.properties` or `TCPTUN_RELEASE_*` env vars in `tcptun-kotlin`.
 
-## 网站内容
+## Site content
 
-推送到 `main` 会触发 `.github/workflows/pages.yml` 部署静态站。  
-发新版本后请用上面的脚本更新 `public/releases/`，并视需要改 `app/site-data.ts` 文案与版本号。
+Pushing to `main` triggers `.github/workflows/pages.yml` to deploy the static site.
+After a new release, update `public/releases/` with the script above and, if needed, the copy and version in `app/site-data.ts`.
