@@ -1311,6 +1311,19 @@ pre {
 
 /* ---------- protocols ---------- */
 
+.protocol-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 560px;
+}
+
+.snippet-label {
+  color: var(--muted);
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
 .protocol-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

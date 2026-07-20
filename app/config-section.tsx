@@ -16,14 +16,11 @@ import {
   nativeReverseServerExample,
   nativeServerExample,
   nativeWorkflowCommands,
-  protocolComparison,
   protocolOutboundSnippets,
   realityCommands,
   realityFieldGroups,
   realityRules,
   reversePublishNotes,
-  vlessRealityClientExample,
-  vlessRealityServerExample,
 } from "./site-data";
 
 const nativeExampleTabs = [
@@ -67,18 +64,6 @@ const nativeExampleTabs = [
 
 const realityExampleTabs = [
   {
-    id: "vless-server",
-    label: "VLESS server",
-    hint: "server-vless-reality.json",
-    code: vlessRealityServerExample,
-  },
-  {
-    id: "vless-client",
-    label: "VLESS client",
-    hint: "client-vless-reality.json",
-    code: vlessRealityClientExample,
-  },
-  {
     id: "native-server",
     label: "Native server",
     hint: "native + REALITY server",
@@ -117,18 +102,16 @@ const nativeRealityQuicLayers = [
 
 type NativeTabId = (typeof nativeExampleTabs)[number]["id"];
 type RealityTabId = (typeof realityExampleTabs)[number]["id"];
-type SnippetKey = keyof typeof protocolOutboundSnippets;
 
 export default function ConfigSection() {
   const [nativeTab, setNativeTab] = useState<NativeTabId>("server");
-  const [realityTab, setRealityTab] = useState<RealityTabId>("vless-server");
-  const [snippetKey, setSnippetKey] = useState<SnippetKey>("native");
+  const [realityTab, setRealityTab] = useState<RealityTabId>("native-server");
 
   const activeNative =
     nativeExampleTabs.find((tab) => tab.id === nativeTab) ?? nativeExampleTabs[0];
   const activeReality =
     realityExampleTabs.find((tab) => tab.id === realityTab) ?? realityExampleTabs[0];
-  const activeSnippet = protocolOutboundSnippets[snippetKey];
+  const activeSnippet = protocolOutboundSnippets.native;
 
   return (
     <section className="section config-section" id="config">
@@ -136,7 +119,10 @@ export default function ConfigSection() {
         <div>
           <p className="eyebrow">Config</p>
           <h2>JSON topology, native, and REALITY.</h2>
-          <p>Describe inbounds, outbounds, and security in one config. Start with native, then REALITY and protocol choice.</p>
+          <p>
+            Describe inbounds, outbounds, and security in one config. This site documents the native
+            tunnel protocol end to end.
+          </p>
         </div>
         <div className="chip-row">
           <a className="chip-link" href="#config-native">
@@ -154,8 +140,8 @@ export default function ConfigSection() {
           <a className="chip-link" href="#generate">
             Generate
           </a>
-          <a className="chip-link" href="#protocol-compare">
-            Compare
+          <a className="chip-link" href="#native-snippet">
+            Snippet
           </a>
         </div>
       </div>
@@ -401,8 +387,8 @@ export default function ConfigSection() {
             <p className="eyebrow">REALITY</p>
             <h3>REALITY and REALITY QUIC</h3>
             <p>
-              Configured under <code>security</code>. All four tunnel protocols can use it; VLESS
-              generated configs enable Vision by default.
+              Configured under <code>security</code> on native endpoints. Plain{" "}
+              <code>reality</code> pairs with raw TCP; <code>reality-quic</code> pairs with QUIC mux.
             </p>
           </div>
           <div className="chip-row">
@@ -473,73 +459,26 @@ export default function ConfigSection() {
         </div>
       </div>
 
-      {/* ---------- Protocol compare ---------- */}
-      <div className="protocol-compare-panel" id="protocol-compare">
+      {/* ---------- Native outbound snippet ---------- */}
+      <div className="protocol-compare-panel" id="native-snippet">
         <div className="section-subheading row-heading section-subheading-wide">
           <div>
-            <p className="eyebrow">Compare</p>
-            <h3>Four tunnel protocols</h3>
-            <p>Xray compatibility is for wire protocols, not config files.</p>
+            <p className="eyebrow">Snippet</p>
+            <h3>Native outbound shape</h3>
+            <p>Minimal client-side native tunnel outbound used across the examples on this site.</p>
           </div>
-        </div>
-
-        <div className="compare-table-wrap">
-          <table className="compare-table">
-            <thead>
-              <tr>
-                <th>Protocol</th>
-                <th>Credential</th>
-                <th>Interop</th>
-                <th>Default security</th>
-                <th>Vision</th>
-                <th>Mux</th>
-                <th>Best for</th>
-              </tr>
-            </thead>
-            <tbody>
-              {protocolComparison.map((row) => (
-                <tr key={row.name}>
-                  <td>
-                    <code className="protocol-name-cell">{row.name}</code>
-                  </td>
-                  <td>{row.credential}</td>
-                  <td>{row.interop}</td>
-                  <td>{row.securityDefault}</td>
-                  <td>{row.vision}</td>
-                  <td>{row.muxNote}</td>
-                  <td>{row.bestFor}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
 
         <div className="snippet-panel">
           <div className="snippet-toolbar">
-            <div className="config-example-tabs" role="tablist" aria-label="Protocol outbound snippets">
-              {(Object.keys(protocolOutboundSnippets) as SnippetKey[]).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={snippetKey === key}
-                  className={snippetKey === key ? "is-active" : undefined}
-                  onClick={() => setSnippetKey(key)}
-                >
-                  {key}
-                </button>
-              ))}
-            </div>
+            <span className="snippet-label">native outbound</span>
             <CopyButton value={activeSnippet} label="Copy" className="copy-button-solid" />
           </div>
           <pre className="config-example-code">
             <code>{activeSnippet}</code>
           </pre>
           <p className="snippet-footnote">
-            <code>
-              {protocolComparison.find((item) => item.name === snippetKey)?.generator ??
-                "tcptun config <protocol> --server … --port …"}
-            </code>
+            <code>tcptun config native --server … --port …</code>
           </p>
         </div>
       </div>
