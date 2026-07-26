@@ -7,7 +7,7 @@ import { releaseVersion } from "../site-data";
 export const metadata: Metadata = {
   title: `Setup wizard · tcptun v${releaseVersion}`,
   description:
-    "Step-by-step wizard to deploy tcptun with native + raw + reality automatic dual carriers.",
+    "Interactive wizard supporting native, VLESS, VMess, and Trojan. native + raw + reality is recommended first; generates runnable server/client configs and a runbook.",
 };
 
 export default function GuidePage() {
@@ -15,11 +15,11 @@ export default function GuidePage() {
     <SiteChrome>
       <PageHero
         eyebrow="Wizard"
-        title="Set up native + raw + reality step by step."
-        description="A guided path for first-time operators: install, generate a Reality-auto pair, validate, start server then client, and test the local proxy on 127.0.0.1:1080."
+        title="Choose a protocol. Fill the form. Get a runnable plan."
+        description="All tunnel protocols are supported. native + raw + reality (QUIC-first auto carriers) is listed first and recommended. Generate server.json, client.json, and a complete install/check/run checklist."
         actions={[
-          { href: "/generate/", label: "Open generator", variant: "secondary" },
-          { href: "/download/", label: "Download", variant: "ghost" },
+          { href: "/download/", label: "Download binaries", variant: "secondary" },
+          { href: "/examples/", label: "More examples", variant: "ghost" },
         ]}
       />
       <GuideWizard />

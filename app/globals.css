@@ -522,6 +522,211 @@ main {
   font-size: 12px;
 }
 
+.guide-wizard-form {
+  display: grid;
+  gap: 14px;
+}
+
+.guide-field {
+  display: grid;
+  gap: 6px;
+}
+
+.guide-field > span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.guide-field input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  padding: 0 12px;
+  color: var(--text);
+  font: inherit;
+}
+
+.guide-field input:focus {
+  outline: 3px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  outline-offset: 1px;
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--line));
+}
+
+.guide-field-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.guide-field-hint code,
+.guide-wizard-body code {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.92em;
+}
+
+.guide-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.guide-profile-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.guide-profile-grid button {
+  appearance: none;
+  display: grid;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  padding: 14px 16px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms var(--ease-out),
+    background 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out);
+}
+
+.guide-profile-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.guide-profile-heading strong {
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+}
+
+.guide-recommended {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  padding: 3px 8px;
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.guide-profile-stack {
+  color: var(--cyan-text);
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.guide-profile-grid button:hover {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+}
+
+.guide-profile-grid button.is-active {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 72%, var(--surface));
+  color: var(--text);
+  box-shadow: 0 10px 24px rgb(var(--shadow) / 0.06);
+}
+
+.guide-choice-grid button {
+  appearance: none;
+  display: grid;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  padding: 12px 14px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms var(--ease-out),
+    background 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+
+.guide-choice-grid button strong {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 750;
+}
+
+.guide-choice-grid button span {
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.guide-choice-grid button:hover {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+}
+
+.guide-choice-grid button.is-active {
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 70%, var(--surface));
+  color: var(--text);
+}
+
+.guide-review-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.guide-review-list > div {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.guide-review-list dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.guide-review-list dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.guide-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.guide-reset-button {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .page-bg {
   position: fixed;
   inset: 0;
@@ -4500,7 +4705,9 @@ button:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .guide-wizard-main {
+  .guide-wizard-main,
+  .guide-choice-grid,
+  .guide-review-list > div {
     grid-template-columns: 1fr;
   }
 
