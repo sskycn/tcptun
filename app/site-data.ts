@@ -326,6 +326,191 @@ export const nativeGuideConcepts = [
   },
 ] as const;
 
+/**
+ * Interactive wizard for first-time setup with the recommended v0.2.3 stack:
+ * native + raw + group mux + security.type=reality (QUIC-first, TCP fallback).
+ */
+export const realityAutoWizardSteps = [
+  {
+    id: "goal",
+    title: "What you will build",
+    summary: "A private native tunnel with automatic Reality carriers.",
+    body: "This wizard walks through the recommended v0.2.3 path: native + raw + group mux + security.type=reality. One public address carries Reality QUIC (preferred) and Reality TCP (fallback). Your laptop runs a local mixed proxy on 127.0.0.1:1080 and forwards through the tunnel.",
+    bullets: [
+      "Server: VPS or edge host with a public IP (or DNS name)",
+      "Client: laptop / phone / second host that needs a local proxy",
+      "Stack: type=native, transport raw, mux group mode, security reality",
+      "Outcome: apps use socks5h://127.0.0.1:1080 after both sides start",
+    ],
+    tips: [
+      "Use the same tcptun version (v0.2.3+) on both ends for auto carriers and optional resume.",
+      "Camouflage dest should support HTTPS on TCP and ideally HTTP/3 on UDP.",
+    ],
+    commands: [] as string[],
+    configSide: null as null | "server" | "client" | "both",
+  },
+  {
+    id: "install",
+    title: "Install tcptun",
+    summary: "Put the binary on the server and the client.",
+    body: "Install on both machines. Prefer the one-line installer on Linux/macOS, or download a platform build from this site. Confirm the binary works with --version.",
+    bullets: [
+      "Server and client both need the tcptun binary",
+      "Android can use the APK builds from the download page",
+      "npm also publishes a package if you prefer that install path",
+    ],
+    tips: [
+      "If you pin a version: TCPTUN_VERSION=0.2.3 sh -c \"$(curl -fsSL https://tcptun.com/install.sh)\"",
+    ],
+    commands: [
+      "curl -fsSL https://tcptun.com/install.sh | sh",
+      "tcptun --version",
+    ],
+    configSide: null as null | "server" | "client" | "both",
+  },
+  {
+    id: "stack",
+    title: "Understand the stack",
+    summary: "Why native + raw + reality + group mux.",
+    body: "Automatic dual carriers only activate when all four pieces are present. Missing mux keeps Reality TCP-only. Forced modes use reality-tcp or reality-quic instead of the auto path.",
+    bullets: [
+      "native — private tunnel protocol and token auth",
+      "raw — required transport for Reality auto carriers",
+      "security.type=reality — QUIC-first with TCP fallback on one address",
+      "mux.mode=group — enables dual carriers (and optional mux.resume later)",
+    ],
+    tips: [
+      "Server binds TCP and UDP on the same port.",
+      "Client tries Reality QUIC first, falls back to Reality TCP with backoff, then probes to restore QUIC.",
+    ],
+    commands: [] as string[],
+    configSide: null as null | "server" | "client" | "both",
+  },
+  {
+    id: "generate",
+    title: "Generate a matching pair",
+    summary: "Create server.json and client.json with REALITY keys.",
+    body: "Run the generator on a trusted machine. It creates paired credentials: users[].id ↔ token, private_key ↔ public_key, short_ids ↔ short_id. You can use the CLI or the browser generator on this site.",
+    bullets: [
+      "--server is the public host clients will dial",
+      "--port is the public listen/dial port",
+      "--server-name and --dest are the REALITY camouflage site",
+      "dest should look like example.com:443 and support HTTPS (+ HTTP/3 if possible)",
+    ],
+    tips: [
+      "Browser path: open /generate/, choose native, keep Reality auto enabled.",
+      "Do not reuse sample tokens or placeholder keys in production.",
+    ],
+    commands: [
+      "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
+      "ls -l server.json client.json",
+    ],
+    configSide: "both" as null | "server" | "client" | "both",
+  },
+  {
+    id: "edit",
+    title: "Edit endpoints and secrets",
+    summary: "Point configs at real hosts and keep credentials matched.",
+    body: "Open the generated files and replace placeholders. Server listen address is usually 0.0.0.0:PORT. Client outbound address is the public host:port. users[].id on the server must equal token on the client.",
+    bullets: [
+      "Server inbound.address → where this machine listens",
+      "Client outbound.address → public DNS/IP:port clients dial",
+      "users[].id === token",
+      "Keep transport raw, security.type reality, and mux group mode",
+    ],
+    tips: [
+      "If the server is behind a firewall/security group, open both TCP and UDP for the listen port.",
+      "Multiple client addresses race as candidates for one logical service; use balance for independent nodes.",
+    ],
+    commands: [
+      "# server: inbounds[0].address = [\"0.0.0.0:9443\"]",
+      "# client: outbounds[0].address = [\"your.domain.or.ip:9443\"]",
+      "# client: outbounds[0].token  = server users[0].id",
+    ],
+    configSide: "both" as null | "server" | "client" | "both",
+  },
+  {
+    id: "validate",
+    title: "Validate before listening",
+    summary: "Catch missing keys and bad references without opening ports.",
+    body: "Run config check on both files. Fix any REALITY field mismatches, empty credentials, or unknown fields before you start the process.",
+    bullets: [
+      "Does not bind listeners",
+      "Compiles tags, refs, auth, transport, security, and mux",
+      "Run it after every edit",
+    ],
+    tips: [
+      "If check fails on security fields, regenerate keys rather than hand-editing base64.",
+    ],
+    commands: [
+      "tcptun config check --config server.json",
+      "tcptun config check --config client.json",
+    ],
+    configSide: "both" as null | "server" | "client" | "both",
+  },
+  {
+    id: "run",
+    title: "Start server, then client",
+    summary: "Bring the edge up first so the client can dial.",
+    body: "Start the server process on the public host, confirm it is listening, then start the client. The client local mixed inbound (default 127.0.0.1:1080) becomes the app-facing proxy.",
+    bullets: [
+      "Server first, client second",
+      "Keep both processes running",
+      "Client default local proxy: 127.0.0.1:1080",
+    ],
+    tips: [
+      "Use a process supervisor (systemd, launchd, tmux) for long-running edges.",
+      "Logs at log.level=info help confirm carrier selection during first connects.",
+    ],
+    commands: [
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    configSide: "both" as null | "server" | "client" | "both",
+  },
+  {
+    id: "test",
+    title: "Test the local proxy",
+    summary: "Send traffic through 127.0.0.1:1080.",
+    body: "With both sides running, point a browser or CLI tool at the client mixed proxy. A successful fetch means the native tunnel, Reality carrier, and local inbound are healthy.",
+    bullets: [
+      "SOCKS5 / mixed on 127.0.0.1:1080 by default",
+      "Use socks5h so DNS happens on the proxy path",
+      "If it fails, re-check UDP/TCP firewall and token/key pairing",
+    ],
+    tips: [
+      "If only TCP works, UDP may be blocked and Reality auto fell back to TCP — that can still be success.",
+      "Optional next step: set mux.resume=true on both ends for resumable TCP streams (v0.2.3+).",
+    ],
+    commands: [
+      "curl -x socks5h://127.0.0.1:1080 https://example.com -I",
+      "# or point your app / system proxy to 127.0.0.1:1080",
+    ],
+    configSide: "client" as null | "server" | "client" | "both",
+  },
+  {
+    id: "next",
+    title: "Optional next steps",
+    summary: "Harden, resume, or explore more topologies.",
+    body: "Once the basic Reality-auto tunnel works, you can enable resumable TCP streams, reverse publish services from behind NAT, or force a single carrier when the network requires it.",
+    bullets: [
+      "Resumable: mux.resume=true on both Reality-auto peers",
+      "Force TCP only: security.type=reality-tcp",
+      "Force QUIC only: security.type=reality-quic with mux.mode=quic",
+      "Browse more copy-ready topologies on the Examples page",
+    ],
+    tips: [
+      "Keep resume off during rolling upgrades until both peers run v0.2.3+.",
+      "Resumable streams need one unique server process address — not multi-backend L4 load balancing.",
+    ],
+    commands: [
+      "tcptun config native --quic --server proxy.example.com --port 9443",
+      "# or open /examples/ for reverse publish, balance, and route split",
+    ],
+    configSide: null as null | "server" | "client" | "both",
+  },
+] as const;
+
 export const nativeTutorialSteps = [
   {
     step: "01",

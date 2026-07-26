@@ -44,6 +44,12 @@ const capabilities = [
 
 const featureLinks = [
   {
+    href: "/guide/",
+    label: "Wizard",
+    title: "Guided first tunnel",
+    body: "Step-by-step setup for native + raw + reality: install, generate, validate, run, and test.",
+  },
+  {
     href: "/examples/",
     label: "Examples",
     title: "Copy-ready topologies",
@@ -53,19 +59,13 @@ const featureLinks = [
     href: "/protocols/native/",
     label: "Native guide",
     title: "Deep native tutorial",
-    body: "Step-by-step install, generate, validate, run, and test for the private tunnel protocol.",
+    body: "Concepts, fields, and long-form notes for the private tunnel protocol.",
   },
   {
     href: "/generate/",
     label: "Generate",
     title: "Browser config pairs",
     body: "Create matching server/client JSON and URIs locally with Web Crypto keys.",
-  },
-  {
-    href: "/convert/",
-    label: "Convert",
-    title: "Xray → tcptun",
-    body: "Paste Xray JSON or share links and export tcptun client/server configs.",
   },
 ];
 
@@ -105,15 +105,12 @@ export default function Home() {
             inbounds, outbounds, and routes in strict JSON, then start TCP/UDP services together.
           </p>
           <div className="hero-actions">
-            <Link className="button primary" href="/download/">
-              Download {displayVersion}
-              <span className="button-arrow" aria-hidden="true">
-                ↓
-              </span>
+            <Link className="button primary" href="/guide/">
+              Start wizard
             </Link>
-            <a className="button secondary" href={npmLinks.package} target="_blank" rel="noreferrer">
-              Install via npm
-            </a>
+            <Link className="button secondary" href="/download/">
+              Download {displayVersion}
+            </Link>
             <Link className="button ghost" href="/generate/">
               Generate config
             </Link>
