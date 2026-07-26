@@ -19,6 +19,7 @@ import {
   installCommand,
   npmLinks,
   outboundTypes,
+  releaseHighlights,
   releaseVersion,
   topologyExample,
   tunnelProtocols,
@@ -45,8 +46,8 @@ const capabilities = [
   },
   {
     label: "Network",
-    title: "TCP / UDP / mux / QUIC",
-    body: "Native QUIC carries both streams and DATAGRAMs, with fragmentation recovery, adaptive FEC, and multi-connection pools.",
+    title: "Adaptive carriers and resumable TCP",
+    body: "Reality auto prefers QUIC and falls back to TCP; opt-in logical streams can resume across carrier replacement with bounded replay buffers.",
   },
   {
     label: "Reverse",
@@ -184,6 +185,34 @@ export default function Home() {
             <CopyButton value={terminalSnippet} label="Copy" className="copy-button-ghost" />
           </div>
           <pre className="terminal-body"><code>{terminalSnippet}</code></pre>
+        </div>
+      </section>
+
+      <section className="section" id="release">
+        <div className="section-heading row-heading">
+          <div>
+            <p className="eyebrow">What&apos;s new · {displayVersion}</p>
+            <h2>Carrier continuity, bounded recovery, quieter Android.</h2>
+            <p>
+              v0.2.3 adds automatic QUIC-first REALITY transport and opt-in resumable TCP
+              streams, then hardens lifecycle and diagnostics across the runtime and Android app.
+            </p>
+          </div>
+          <a className="button secondary" href="#config-native">
+            Explore v0.2.3 config
+          </a>
+        </div>
+        <div className="capability-grid">
+          {releaseHighlights.map((item, index) => (
+            <article className="capability-card" key={item.title} data-tone={index % 3}>
+              <div className="capability-meta">
+                <span className="capability-label">{item.label}</span>
+                <span className="capability-index">{String(index + 1).padStart(2, "0")}</span>
+              </div>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
+          ))}
         </div>
       </section>
 

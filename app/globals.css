@@ -3439,6 +3439,26 @@ html[data-theme="dark"] .platform-mark.android {
   border-bottom: 1px solid rgb(255 255 255 / 0.07);
 }
 
+.converter-result-warnings {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-top: 1px solid rgba(217, 119, 6, 0.24);
+  border-bottom: 1px solid rgba(217, 119, 6, 0.24);
+  background: rgba(255, 247, 237, 0.72);
+  color: #854d0e;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.converter-result-warnings ul {
+  margin: 0.35rem 0;
+  padding-left: 1.2rem;
+}
+
+.converter-result-warnings p {
+  margin: 0;
+}
+
 .converter-summary {
   margin: 0;
   padding: 14px 16px 0;

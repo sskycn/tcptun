@@ -27,6 +27,7 @@ type ConvertResult = {
   content: string;
   filename: string;
   summary: string;
+  warnings: string[];
   qrCodes: string[];
   qrPayloads: string[];
 };
@@ -99,6 +100,7 @@ export default function UriConverter() {
         content: uriText,
         filename: uriText.startsWith("T3:") || uriText.startsWith("T2:") ? "client.profile" : "client.uri",
         summary: `Recognized ${converted.count} share endpoints from ${files.length} QR codes`,
+        warnings: [],
         qrCodes: [],
         qrPayloads: [],
       });
@@ -133,7 +135,8 @@ export default function UriConverter() {
         setResult({
           content: converted.uriText,
           filename: "client.uri",
-          summary: `${converted.summary}, and generated ${qrCodes.length} QR codes`,
+          summary: `${converted.summary}, and generated ${qrCodes.length} T3 QR codes`,
+          warnings: converted.profileWarnings,
           qrCodes,
           qrPayloads: profiles,
         });
@@ -144,6 +147,7 @@ export default function UriConverter() {
           content: converted.configJson,
           filename: client ? "client.json" : converted.count === 1 ? "outbound.json" : "outbounds.json",
           summary: converted.summary,
+          warnings: [],
           qrCodes: [],
           qrPayloads: [],
         });
@@ -156,6 +160,7 @@ export default function UriConverter() {
           content: profiles.join("\n"),
           filename: "client.profile",
           summary: `Generated ${qrCodes.length} T3 QR codes from ${shares.length} share endpoints`,
+          warnings: [],
           qrCodes,
           qrPayloads: profiles,
         });
@@ -338,6 +343,7 @@ export default function UriConverter() {
           {mode === "qrcode" ? (
             <ul className="converter-notes">
               <li>New QR codes use the denser T3 Base45 profile</li>
+              <li>T3 preserves v0.2.3 reality-tcp; resumable mux requires sharing complete JSON</li>
               <li>Upload recognition accepts T3, legacy T2, and plain URIs</li>
               <li>Each URI becomes its own 512 × 512 PNG</li>
               <li>Recognition and generation run entirely in the browser</li>
@@ -384,6 +390,16 @@ export default function UriConverter() {
               >
                 <code>{result.content}</code>
               </pre>
+
+              {result.warnings.length ? (
+                <div className="converter-result-warnings" role="status">
+                  <strong>QR export skipped for:</strong>
+                  <ul>
+                    {result.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+                  </ul>
+                  <p>The standard URI above is still complete. Share full JSON when every resumable field must be preserved.</p>
+                </div>
+              ) : null}
 
               {result.qrCodes.length ? (
                 <div className="uri-qr-panel">
@@ -448,7 +464,7 @@ export default function UriConverter() {
               </p>
               <ul>
                 <li>Supports Native / VLESS / VMess / Trojan</li>
-                <li>Preserves raw / ws / h2 / h3, TLS / REALITY, and mux parameters</li>
+                <li>Preserves raw / ws / h2 / h3, TLS / REALITY / reality-tcp, and URI-safe mux parameters</li>
                 <li>Supports IPv4, IPv6, and domain endpoints</li>
               </ul>
             </div>

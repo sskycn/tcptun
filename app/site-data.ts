@@ -12,6 +12,29 @@ export const installCommand = "curl -fsSL https://tcptun.com/install.sh | sh";
 
 export const pinnedInstallCommand = `curl -fsSL https://tcptun.com/install.sh | TCPTUN_VERSION=${releaseVersion} sh`;
 
+export const releaseHighlights = [
+  {
+    label: "Transport",
+    title: "QUIC-first REALITY auto mode",
+    body: "native + raw + group mux + reality now listens on TCP and UDP together, prefers QUIC, falls back to Reality TCP, and probes to restore QUIC after recovery.",
+  },
+  {
+    label: "Continuity",
+    title: "Resumable logical streams",
+    body: "Opt-in native TCP streams can survive a physical carrier replacement and continue across automatic QUIC/TCP switching with bounded replay buffers and recovery timeouts.",
+  },
+  {
+    label: "Runtime",
+    title: "Hardened lifecycle",
+    body: "Shutdown, partial startup, callbacks, malformed peers, resource budgets, QUIC/uQUIC, uTLS, reverse publishing, and mux ownership now fail closed with bounded cleanup.",
+  },
+  {
+    label: "Android",
+    title: "Event-driven health and diagnostics",
+    body: "The Android client adds live remote-endpoint diagnostics, bounded health wakes, resumable mux controls, safer profile mutation, and route-local-proxy rules with near-zero idle polling.",
+  },
+] as const;
+
 export const faqItems = [
   {
     question: "Can I use Xray config files directly?",
@@ -49,7 +72,12 @@ export const faqItems = [
   {
     question: "When should I enable mux or QUIC?",
     answer:
-      "With many short connections and matching versions on both ends, prefer mux: {}. Native QUIC requires native + raw + mux.mode=quic; the security layer can be TLS or reality-quic. The CLI can generate the latter with tcptun config native --quic.",
+      "With many short connections and matching versions on both ends, prefer mux: {}. In v0.2.3, native + raw + group mux + reality automatically prefers QUIC and falls back to Reality TCP. Use reality-tcp to force TCP, or mux.mode=quic with reality-quic to force QUIC without fallback.",
+  },
+  {
+    question: "How do resumable streams work?",
+    answer:
+      "Set mux.resume=true on both native endpoints using raw + group mux + reality auto mode. A TCP logical stream can reattach after its physical QUIC/TCP carrier fails. It does not cover UDP, reverse publish, forced reality-tcp/reality-quic, or cross-process failover; keep it off during rolling upgrades until both peers run v0.2.3 or newer.",
   },
   {
     question: "Can REALITY be used together with TLS?",
@@ -78,7 +106,7 @@ export const faqItems = [
   {
     question: "What happens when no config file is provided?",
     answer:
-      "tcptun first reserves 127.0.0.1:1080, then scans private IPv4 LAN peers for an available SOCKS5:1080. After the first successful handshake it starts a mixed proxy. --retry keeps the listener while continuing to retry.",
+      "tcptun never searches the current directory for server.json, client.json, or config.json. Without --config it reserves 127.0.0.1:1080, scans private IPv4 LAN peers for SOCKS5:1080, then starts a mixed proxy after the first successful handshake. --retry keeps the listener and retries discovery; it cannot be combined with --config.",
   },
   {
     question: "How do I load-balance and switch among outbounds?",
@@ -160,10 +188,10 @@ export const tunnelProtocols = [
     name: "native",
     credential: "Token",
     interoperability: "tcptun ↔ tcptun",
-    generatedSecurity: "raw + REALITY; QUIC uses reality-quic",
+    generatedSecurity: "REALITY auto / reality-tcp / reality-quic",
     mux: "Recommended when both ends match",
     command: "tcptun config native --server proxy.example.com --port 9443",
-    description: "Private low-overhead protocol. Prefer raw + mux for throughput; --quic uses raw + reality-quic + mux.mode=quic. Supports reverse publish/expose.",
+    description: "Private low-overhead protocol. raw + group mux + reality automatically prefers QUIC and falls back to TCP; resumable streams can preserve eligible TCP flows across carrier replacement.",
   },
   {
     name: "vless",
@@ -206,7 +234,7 @@ export const nativeGuideIntro = {
     },
     {
       title: "When to use it",
-      body: "Use native when both ends run tcptun and you want low overhead, optional mux, native QUIC, REALITY / reality-quic, or reverse publish of services behind NAT.",
+      body: "Use native when both ends run tcptun and you want low overhead, mux, automatic QUIC/TCP REALITY, resumable TCP streams, forced QUIC, or reverse publish of services behind NAT.",
     },
     {
       title: "What you configure",
@@ -234,11 +262,11 @@ export const nativeGuideConcepts = [
   },
   {
     title: "Security",
-    body: "Optional. Use security.type=reality on raw TCP, or reality-quic with mux.mode=quic. TLS needs cert/key on the server. Do not stack reality with tls.",
+    body: "With native + raw + group mux, security.type=reality is QUIC-first with TCP fallback. reality-tcp forces TCP; reality-quic + mux.mode=quic forces QUIC. TLS needs cert/key on the server.",
   },
   {
     title: "Mux & QUIC",
-    body: "Presence of mux enables multiplexing (\"mux\": {} is enough). mux.mode=quic switches to a UDP/QUIC pool and requires native + raw plus tls or reality-quic.",
+    body: "Presence of mux enables multiplexing. Group mode can use automatic Reality carriers and optional resumable TCP streams; mux.mode=quic is the separate forced QUIC pool.",
   },
 ] as const;
 
@@ -529,7 +557,7 @@ export const nativeFieldGroups = [
       { key: "address", side: "both", detail: "host:port string array; outbounds may list multiple candidate entry points." },
       { key: "network", side: "both", detail: "tcp / udp, combinable." },
       { key: "transport", side: "both", detail: "Only type / path (raw / ws / h2 / h3)." },
-      { key: "security", side: "both", detail: "tls, reality, or reality-quic; all security parameters live here." },
+      { key: "security", side: "both", detail: "tls, reality auto, forced reality-tcp, or forced reality-quic; all security parameters live here." },
       { key: "mux", side: "both", detail: "Presence enables mux; {} uses defaults. Pool parameters are mainly on the client." },
     ],
   },
@@ -553,6 +581,9 @@ export const nativeFieldGroups = [
       { key: "mux.max_streams_per_session", side: "client", detail: "Per-connection stream cap, 1–4096." },
       { key: "mux.warm_spares", side: "client", detail: "Warm idle connections; must be less than max_sessions." },
       { key: "mux.udp_mode", side: "client", detail: "QUIC only: reliable / auto / datagram." },
+      { key: "mux.resume", side: "both", detail: "v0.2.3: preserve eligible native TCP logical streams across Reality auto carrier replacement." },
+      { key: "mux.resume_timeout", side: "both", detail: "Recovery window: default 15s; explicit 100ms–5m." },
+      { key: "mux.resume_buffer_size", side: "both", detail: "Per-direction replay buffer: default 4 MiB; explicit 64 KiB–64 MiB." },
       { key: "mux.*_receive_window", side: "both", detail: "QUIC receive windows; stream max 16 MiB, connection max 64 MiB." },
     ],
   },
@@ -568,8 +599,12 @@ export const nativeMuxNotes = [
     body: "Reuses physical connections. Unreachable targets are not reported as success to the local proxy early.",
   },
   {
-    title: "Failure fallback",
-    body: "Failed sessions are replaced and retried; persistent failure falls back to standalone tunnel connections.",
+    title: "Reality auto carriers",
+    body: "native + raw + group mux + reality prefers QUIC, falls back to Reality TCP with bounded backoff, then probes to restore QUIC preference.",
+  },
+  {
+    title: "Resumable streams",
+    body: "mux.resume keeps eligible native TCP logical streams alive while an automatic Reality carrier is replaced. Enable matching settings on both peers.",
   },
   {
     title: "QUIC",
@@ -636,7 +671,7 @@ export const nativeWorkflowCommands = [
 export const configModelNotes = [
   {
     title: "Structure",
-    body: "Top-level fields are only log, inbounds, outbounds, route, and dns. Unknown fields are rejected.",
+    body: "Top-level fields include log, resources, inbounds, outbounds, route, and dns. Unknown fields are rejected; resources.resumable_buffer_budget controls the shared replay-buffer budget.",
   },
   {
     title: "Address",
@@ -775,6 +810,76 @@ export const nativeRealityClientExample = `{
   "route": { "default_outbound": "proxy", "rules": [] }
 }`;
 
+/** Native v0.2.3 automatic Reality carriers with resumable TCP logical streams. */
+export const nativeResumableServerExample = `{
+  "log": { "level": "info" },
+  "resources": { "resumable_buffer_budget": 1073741824 },
+  "inbounds": [
+    {
+      "tag": "server",
+      "type": "native",
+      "address": ["0.0.0.0:9443"],
+      "network": ["tcp", "udp"],
+      "users": [{ "id": "change-me" }],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality",
+        "private_key": "REPLACE_WITH_SERVER_PRIVATE_KEY",
+        "server_names": ["example.com"],
+        "short_ids": ["abcd1234"],
+        "dest": "example.com:443",
+        "max_time_diff": "30s"
+      },
+      "mux": {
+        "mode": "group",
+        "resume": true,
+        "resume_timeout": "15s",
+        "resume_buffer_size": 4194304
+      }
+    }
+  ],
+  "outbounds": [{ "tag": "direct", "type": "direct" }],
+  "route": { "default_outbound": "direct", "rules": [] }
+}`;
+
+export const nativeResumableClientExample = `{
+  "log": { "level": "info" },
+  "resources": { "resumable_buffer_budget": 1073741824 },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "native",
+      "address": ["proxy.example.com:9443"],
+      "token": "change-me",
+      "network": ["tcp", "udp"],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "abcd1234",
+        "spider_x": "/"
+      },
+      "mux": {
+        "mode": "group",
+        "resume": true,
+        "resume_timeout": "15s",
+        "resume_buffer_size": 4194304
+      }
+    }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] }
+}`;
+
 export const nativeUseCases = [
   {
     id: "basic",
@@ -818,6 +923,27 @@ export const nativeUseCases = [
     clientCode: nativeRealityClientExample,
     serverHint: "server-native-reality.json",
     clientHint: "client-native-reality.json",
+  },
+  {
+    id: "resumable",
+    title: "Resumable Reality auto",
+    summary: "v0.2.3 keeps eligible TCP logical streams alive while the physical carrier switches between QUIC and Reality TCP.",
+    when: "Long-lived TCP flows should tolerate a temporary UDP/TCP path change without redialing the target connection.",
+    steps: [
+      "Run v0.2.3 or newer on both ends before enabling resume.",
+      "Use native + raw + security.type=reality + group mux on both endpoints.",
+      "Set matching resume timeout and buffer size values.",
+      "Keep the address pinned to one server process; cross-instance resume is unsupported.",
+    ],
+    commands: [
+      "tcptun config check --config server-resumable.json",
+      "tcptun --config server-resumable.json",
+      "tcptun --config client-resumable.json",
+    ],
+    serverCode: nativeResumableServerExample,
+    clientCode: nativeResumableClientExample,
+    serverHint: "server-native-resumable.json",
+    clientHint: "client-native-resumable.json",
   },
   {
     id: "quic",
@@ -1201,6 +1327,27 @@ export const protocolUseCases = [
     clientCode: nativeQuicClientExample,
     serverHint: "server-native-quic.json",
     clientHint: "client-native-quic.json",
+  },
+  {
+    id: "native-resumable",
+    protocol: "native",
+    title: "native · resumable auto",
+    summary: "v0.2.3 automatic QUIC/TCP Reality carriers with resumable TCP logical streams.",
+    when: "Long-lived TCP flows should survive a physical carrier replacement on one server process.",
+    steps: [
+      "Use v0.2.3+ on both ends and keep one unique server address.",
+      "Set native + raw + reality + group mux on both endpoints.",
+      "Enable mux.resume with matching timeout and buffer size values.",
+    ],
+    commands: [
+      "tcptun config check --config server-native-resumable.json",
+      "tcptun --config server-native-resumable.json",
+      "tcptun --config client-native-resumable.json",
+    ],
+    serverCode: nativeResumableServerExample,
+    clientCode: nativeResumableClientExample,
+    serverHint: "server-native-resumable.json",
+    clientHint: "client-native-resumable.json",
   },
   {
     id: "native-reverse",

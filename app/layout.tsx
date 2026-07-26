@@ -34,7 +34,7 @@ const themeInitScript = `
 
 export const metadata: Metadata = {
   title: `tcptun v${releaseVersion} · Config-driven proxy runtime`,
-  description: `tcptun is a multi-inbound, multi-outbound proxy runtime. It supports native, VLESS, VMess, Trojan, REALITY, native + raw + reality-quic, mux, native QUIC, reverse publish, balance, and rule-based routing.`,
+  description: `tcptun is a multi-inbound, multi-outbound proxy runtime with Native, VLESS, VMess, Trojan, QUIC-first REALITY auto carriers, resumable TCP streams, mux, reverse publish, balance, and rule-based routing.`,
   icons: {
     icon: "/tcptun-logo.png",
     apple: "/tcptun-logo.png",

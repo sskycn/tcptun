@@ -58,8 +58,9 @@ export default function ConfigGenerator() {
           <p className="eyebrow">Generate</p>
           <h2>Generate paired configs in the browser.</h2>
           <p>
-            Server/client logic matches <code>tcptun config</code>: normal mode uses raw + REALITY;
-            Native QUIC mode uses reality-quic + QUIC mux. Keys are generated locally and never uploaded.
+            Builds v0.2.3 server/client pairs: normal mode uses raw + REALITY; Native auto mode
+            adds group mux for QUIC-first/TCP fallback, with optional resumable TCP streams.
+            Forced QUIC uses reality-quic + QUIC mux. Keys stay local.
           </p>
         </div>
         <div className="chip-row">
@@ -89,6 +90,8 @@ export default function ConfigGenerator() {
                         ...previous,
                         protocol: item.id as TunnelProtocol,
                         quic: item.id === "native" ? previous.quic : false,
+                        autoReality: item.id === "native" ? previous.autoReality : false,
+                        resume: item.id === "native" ? previous.resume : false,
                       }))
                     }
                   />
@@ -174,14 +177,52 @@ export default function ConfigGenerator() {
           </div>
 
           {form.protocol === "native" ? (
-            <label className="generator-check">
-              <input
-                type="checkbox"
-                checked={Boolean(form.quic)}
-                onChange={(event) => update("quic", event.target.checked)}
-              />
-              <span>Generate Native QUIC config (same as <code>--quic</code>)</span>
-            </label>
+            <>
+              <label className="generator-check">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.autoReality)}
+                  disabled={Boolean(form.quic)}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      autoReality: event.target.checked,
+                      resume: event.target.checked ? previous.resume : false,
+                    }))
+                  }
+                />
+                <span>
+                  v0.2.3 Reality auto carriers — QUIC-first with TCP fallback via group mux
+                </span>
+              </label>
+              {form.autoReality && !form.quic ? (
+                <label className="generator-check">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.resume)}
+                    onChange={(event) => update("resume", event.target.checked)}
+                  />
+                  <span>
+                    Resume eligible TCP streams across carrier replacement
+                  </span>
+                </label>
+              ) : null}
+              <label className="generator-check">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.quic)}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      quic: event.target.checked,
+                      autoReality: event.target.checked ? false : true,
+                      resume: event.target.checked ? false : previous.resume,
+                    }))
+                  }
+                />
+                <span>Force Native QUIC only (same as <code>--quic</code>, no TCP fallback)</span>
+              </label>
+            </>
           ) : null}
 
           <div className="generator-actions">
@@ -252,7 +293,7 @@ export default function ConfigGenerator() {
 
               <div className="generator-cli">
                 <div className="generator-cli-heading">
-                  <span>Equivalent CLI</span>
+                  <span>CLI starting point</span>
                   <CopyButton value={result.cliCommand} label="Copy" className="copy-button-ghost" />
                 </div>
                 <pre>
@@ -296,7 +337,9 @@ export default function ConfigGenerator() {
                 <li>Generates an X25519 key pair and short id</li>
                 <li>Creates token / UUID / password by protocol</li>
                 <li>vless enables Vision flow by default</li>
-                <li>Native can optionally emit reality-quic + QUIC mux</li>
+                <li>Native defaults to v0.2.3 automatic QUIC/TCP Reality carriers</li>
+                <li>Resumable TCP streams add matching bounded settings to both peers</li>
+                <li>Forced QUIC emits reality-quic + mux.mode=quic</li>
               </ul>
             </div>
           )}

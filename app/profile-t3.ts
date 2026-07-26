@@ -6,6 +6,7 @@ const BASE45 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
 const PROTOCOLS = ["native", "vless", "vmess", "trojan"] as const;
 const TRANSPORTS = ["raw", "ws", "h2", "h3"] as const;
 const SECURITIES = ["", "tls", "reality", "reality-quic"] as const;
+const T3_SECURITIES = [...SECURITIES, "reality-tcp"] as const;
 const SUFFIXES = [".com", ".net", ".org", ".cn", ".io", ".dev"] as const;
 const DEFAULT_PATH = "/proxy";
 const DEFAULT_FINGERPRINT = "chrome";
@@ -123,7 +124,8 @@ function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): Com
   if (security && !sni) throw new Error("T3 security endpoints must set server_name explicitly");
 
   const flowSource = outbound.flow?.trim() || "";
-  const flowExplicitEmpty = protocol === "vless" && security === "reality" && flowSource === "";
+  const flowExplicitEmpty =
+    protocol === "vless" && (security === "reality" || security === "reality-tcp") && flowSource === "";
   const mux = normalizeMux(outbound.mux);
 
   return {
@@ -161,7 +163,7 @@ function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): Com
 function normalizeSecurity(value: string | undefined): string {
   const security = (value || "").trim().toLowerCase();
   if (security === "none") return "";
-  if (!SECURITIES.includes(security as (typeof SECURITIES)[number])) {
+  if (!T3_SECURITIES.includes(security as (typeof T3_SECURITIES)[number])) {
     throw new Error(`T3 does not support security ${value || ""}`);
   }
   return security;
@@ -185,7 +187,12 @@ function validateSecurity(config: TcptunSecurity, security: string) {
   const hasRealityFields = Boolean(
     config.fingerprint || config.public_key || config.short_id || config.spider_x,
   );
-  if (security !== "reality" && security !== "reality-quic" && hasRealityFields) {
+  if (
+    security !== "reality" &&
+    security !== "reality-tcp" &&
+    security !== "reality-quic" &&
+    hasRealityFields
+  ) {
     throw new Error("T3 REALITY fields require REALITY security");
   }
   if (security === "reality-quic" && config.spider_x) {
@@ -200,6 +207,9 @@ function normalizeMux(value: TcptunMux | null | undefined) {
       initialStreamWindow: 0, maxStreamWindow: 0, initialConnectionWindow: 0,
       maxConnectionWindow: 0,
     };
+  }
+  if (value.resume || hasDuration(value.resume_timeout) || value.resume_buffer_size) {
+    throw new Error("T3 cannot represent resumable mux settings; share the complete JSON config instead");
   }
   const mode = (value.mode || "").trim().toLowerCase();
   if (mode && mode !== "group" && mode !== "quic") {
@@ -243,7 +253,8 @@ function normalizeMux(value: TcptunMux | null | undefined) {
 function encodeCompactProfile(profile: CompactProfile): Uint8Array {
   const protocolCode = PROTOCOLS.indexOf(profile.protocol as (typeof PROTOCOLS)[number]);
   const transportCode = TRANSPORTS.indexOf(profile.transport as (typeof TRANSPORTS)[number]);
-  const securityCode = SECURITIES.indexOf(profile.security as (typeof SECURITIES)[number]);
+  const securityHeader = profile.security === "reality-tcp" ? "reality" : profile.security;
+  const securityCode = SECURITIES.indexOf(securityHeader as (typeof SECURITIES)[number]);
   const muxModeCode = profile.muxMode === "group" ? 1 : profile.muxMode === "quic" ? 2 : 0;
   const hasPath = profile.transport !== "raw" && profile.path !== DEFAULT_PATH;
   const hasCustomSNI = profile.sni !== "" && profile.sni !== profile.host;
@@ -251,14 +262,23 @@ function encodeCompactProfile(profile: CompactProfile): Uint8Array {
   const hasCustomName = name !== profile.host;
   const hasCustomFlow =
     profile.flow !== "" &&
-    !(profile.protocol === "vless" && profile.security === "reality" && profile.flow === DEFAULT_VLESS_FLOW);
-  const isReality = profile.security === "reality" || profile.security === "reality-quic";
+    !(
+      profile.protocol === "vless" &&
+      (profile.security === "reality" || profile.security === "reality-tcp") &&
+      profile.flow === DEFAULT_VLESS_FLOW
+    );
+  const isReality =
+    profile.security === "reality" ||
+    profile.security === "reality-tcp" ||
+    profile.security === "reality-quic";
   const publicKey = isReality ? profile.publicKey : "";
   const shortID = isReality ? profile.shortID : "";
   const hasCustomFingerprint =
     isReality && profile.fingerprint !== "" && profile.fingerprint.toLowerCase() !== DEFAULT_FINGERPRINT;
   const hasCustomSpiderX =
-    profile.security === "reality" && profile.spiderX !== "" && profile.spiderX !== DEFAULT_SPIDER_X;
+    (profile.security === "reality" || profile.security === "reality-tcp") &&
+    profile.spiderX !== "" &&
+    profile.spiderX !== DEFAULT_SPIDER_X;
 
   let header0 = protocolCode | (transportCode << 2) | (securityCode << 4);
   if (profile.tlsInsecure) header0 |= 0x40;
@@ -273,6 +293,7 @@ function encodeCompactProfile(profile: CompactProfile): Uint8Array {
   if (profile.maxStreamWindow > 0) extensions |= 1 << 6;
   if (profile.initialConnectionWindow > 0) extensions |= 1 << 7;
   if (profile.maxConnectionWindow > 0) extensions |= 1 << 8;
+  if (profile.security === "reality-tcp") extensions |= 1 << 9;
   if (extensions) extensions |= profile.networkCode;
 
   let header1 = (extensions ? 3 : profile.networkCode) | (muxModeCode << 3);
@@ -324,12 +345,12 @@ function decodeCompactProfile(data: Uint8Array, t3: boolean): CompactProfile {
   const header2 = reader.byte();
   const protocol = PROTOCOLS[header0 & 0x03];
   const transport = TRANSPORTS[(header0 >> 2) & 0x03];
-  const security = SECURITIES[(header0 >> 4) & 0x03];
+  let security: string = SECURITIES[(header0 >> 4) & 0x03];
   let networkCode = header1 & 0x03;
   let extensions = 0;
   if (networkCode === 3 && t3) {
     extensions = reader.varUInt();
-    if (!extensions || (extensions & ~0x1ff) !== 0 || (extensions & 0x03) === 3 || (extensions & ~0x03) === 0) {
+    if (!extensions || (extensions & ~0x3ff) !== 0 || (extensions & 0x03) === 3 || (extensions & ~0x03) === 0) {
       throw new Error("Unsupported T3 extension flags");
     }
     networkCode = extensions & 0x03;
@@ -340,7 +361,15 @@ function decodeCompactProfile(data: Uint8Array, t3: boolean): CompactProfile {
   const muxModeBits = (header1 >> 3) & 0x03;
   if (muxModeBits === 3) throw new Error(`Unsupported ${t3 ? "T3" : "T2"} mux mode`);
   const muxMode = muxModeBits === 1 ? "group" : muxModeBits === 2 ? "quic" : "";
-  if (t3 && (extensions & (1 << 4)) && (protocol !== "vless" || security !== "reality" || (header2 & 1))) {
+  if (t3 && (extensions & (1 << 9))) {
+    if (security !== "reality") throw new Error("T3 Reality TCP override requires reality security");
+    security = "reality-tcp";
+  }
+  if (
+    t3 &&
+    (extensions & (1 << 4)) &&
+    (protocol !== "vless" || (security !== "reality" && security !== "reality-tcp") || (header2 & 1))
+  ) {
     throw new Error("Invalid T3 explicit empty flow marker");
   }
   if (t3 && (extensions & 0x1ec) && (!(header0 & 0x80) || muxMode !== "quic")) {
@@ -355,16 +384,21 @@ function decodeCompactProfile(data: Uint8Array, t3: boolean): CompactProfile {
   const sni = header1 & 0x40 ? reader.string() : security ? host : "";
   const flow = header2 & 1
     ? reader.string()
-    : protocol === "vless" && security === "reality" && !(extensions & (1 << 4))
+    : protocol === "vless" &&
+        (security === "reality" || security === "reality-tcp") &&
+        !(extensions & (1 << 4))
       ? DEFAULT_VLESS_FLOW
       : "";
   const publicKey = header2 & 0x02 ? reader.realityKey() : "";
   const shortID = header2 & 0x04 ? reader.shortID() : "";
   const fingerprint =
-    security === "reality" || security === "reality-quic"
+    security === "reality" || security === "reality-tcp" || security === "reality-quic"
       ? header2 & 0x08 ? reader.string() : DEFAULT_FINGERPRINT
       : "";
-  const spiderX = security === "reality" ? (header2 & 0x10 ? reader.string() : DEFAULT_SPIDER_X) : "";
+  const spiderX =
+    security === "reality" || security === "reality-tcp"
+      ? header2 & 0x10 ? reader.string() : DEFAULT_SPIDER_X
+      : "";
   const muxMaxSessions = header2 & 0x20 ? reader.varUInt() : 0;
   const muxMaxStreamsPerSession = header2 & 0x40 ? reader.varUInt() : 0;
   const muxWarmSpare = header2 & 0x80 ? reader.varUInt() : 0;
@@ -411,7 +445,11 @@ function outboundFromProfile(profile: CompactProfile, tag: string): TcptunOutbou
       server_name: profile.sni,
       ...(profile.tlsInsecure ? { insecure: true } : {}),
     };
-  } else if (profile.security === "reality" || profile.security === "reality-quic") {
+  } else if (
+    profile.security === "reality" ||
+    profile.security === "reality-tcp" ||
+    profile.security === "reality-quic"
+  ) {
     outbound.security = {
       type: profile.security,
       server_name: profile.sni,

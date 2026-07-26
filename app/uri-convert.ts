@@ -7,6 +7,7 @@ export type UriExportScope = "outbounds" | "inbounds";
 export type UriExportResult = {
   uriText: string;
   profileText: string;
+  profileWarnings: string[];
   count: number;
   summary: string;
 };
@@ -48,6 +49,9 @@ export type TcptunSecurity = {
 export type TcptunMux = {
   mode?: string;
   udp_mode?: string;
+  resume?: boolean;
+  resume_timeout?: string | number;
+  resume_buffer_size?: number;
   max_sessions?: number;
   max_streams_per_session?: number;
   warm_spares?: number;
@@ -120,6 +124,9 @@ const NATIVE_URI_PARAMETERS = new Set([
   "mux_max_sessions",
   "mux_max_streams_per_session",
   "mux_warm_spares",
+  "mux_resume",
+  "mux_resume_timeout",
+  "mux_resume_buffer_size",
   "insecure",
 ]);
 
@@ -147,14 +154,22 @@ export async function configToUris(
     const displayName = endpoints.length === 1 ? name : `${name}-${outbound.tag}`;
     return buildOutboundUri(outbound, displayName);
   });
-  const profiles = endpoints.map((outbound) => {
+  const profiles: string[] = [];
+  const profileWarnings: string[] = [];
+  endpoints.forEach((outbound) => {
     const displayName = endpoints.length === 1 ? name : `${name}-${outbound.tag}`;
-    return encodeT3(outbound, displayName);
+    try {
+      profiles.push(encodeT3(outbound, displayName));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "cannot be represented as T3";
+      profileWarnings.push(`${displayName}: ${message}`);
+    }
   });
 
   return {
     uriText: uris.join("\n"),
     profileText: profiles.join("\n"),
+    profileWarnings,
     count: uris.length,
     summary: `Generated URIs from ${uris.length} ${scope === "inbounds" ? "inbound addresses" : "outbound addresses"}`,
   };
@@ -252,6 +267,13 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
         ? { tcptun_mux_max_streams_per_session: mux.max_streams_per_session }
         : {}),
       ...(positiveInteger(mux.warm_spares) ? { tcptun_mux_warm_spares: mux.warm_spares } : {}),
+      ...(mux.resume ? { tcptun_mux_resume: true } : {}),
+      ...(hasDuration(mux.resume_timeout)
+        ? { tcptun_mux_resume_timeout: String(mux.resume_timeout) }
+        : {}),
+      ...(positiveInteger(mux.resume_buffer_size)
+        ? { tcptun_mux_resume_buffer_size: mux.resume_buffer_size }
+        : {}),
       ...(outbound.network?.length ? { tcptun_network: outbound.network.join(",") } : {}),
       ...(outbound.flow ? { tcptun_flow: outbound.flow } : {}),
     };
@@ -274,7 +296,11 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   if (security.type === "tls") {
     query.set("security", "tls");
     if (security.server_name) query.set("sni", security.server_name);
-  } else if (security.type === "reality" || security.type === "reality-quic") {
+  } else if (
+    security.type === "reality" ||
+    security.type === "reality-tcp" ||
+    security.type === "reality-quic"
+  ) {
     query.set("security", security.type);
     query.set("sni", security.server_name || "");
     query.set("fp", security.fingerprint || "");
@@ -292,6 +318,11 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
     query.set("mux_max_streams_per_session", String(mux.max_streams_per_session));
   }
   if (positiveInteger(mux.warm_spares)) query.set("mux_warm_spares", String(mux.warm_spares));
+  if (mux.resume) query.set("mux_resume", "true");
+  if (hasDuration(mux.resume_timeout)) query.set("mux_resume_timeout", String(mux.resume_timeout));
+  if (positiveInteger(mux.resume_buffer_size)) {
+    query.set("mux_resume_buffer_size", String(mux.resume_buffer_size));
+  }
 
   const host = server.includes(":") ? `[${server}]` : server;
   const fragment = name ? `#${encodeURIComponent(name)}` : "";
@@ -358,6 +389,9 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   setOptionalInteger(muxConfig, "max_sessions", query.get("mux_max_sessions"));
   setOptionalInteger(muxConfig, "max_streams_per_session", query.get("mux_max_streams_per_session"));
   setOptionalInteger(muxConfig, "warm_spares", query.get("mux_warm_spares"));
+  setOptionalBoolean(muxConfig, "resume", query.get("mux_resume"));
+  setOptionalText(muxConfig, "resume_timeout", query.get("mux_resume_timeout"));
+  setOptionalInteger(muxConfig, "resume_buffer_size", query.get("mux_resume_buffer_size"));
   const hasMuxFields = Object.keys(muxConfig).length > 0;
   if (mux === true || (mux === undefined && hasMuxFields)) {
     outbound.mux = muxConfig;
@@ -376,14 +410,20 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
       ...(sni ? { server_name: sni } : {}),
       ...(insecure ? { insecure: true } : {}),
     };
-  } else if (securityType === "reality" || securityType === "reality-quic") {
+  } else if (
+    securityType === "reality" ||
+    securityType === "reality-tcp" ||
+    securityType === "reality-quic"
+  ) {
     outbound.security = {
       type: securityType,
       server_name: sni,
       fingerprint: query.get("fp") || "",
       public_key: query.get("pbk") || "",
       short_id: query.get("sid") || "",
-      ...(securityType === "reality" ? { spider_x: query.get("spx") || "" } : {}),
+      ...(securityType === "reality" || securityType === "reality-tcp"
+        ? { spider_x: query.get("spx") || "" }
+        : {}),
       ...(insecure ? { insecure: true } : {}),
     };
   } else if (securityType !== "none" && securityType !== "") {
@@ -432,6 +472,11 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
   setSourceInteger(muxConfig, "max_sessions", source.tcptun_mux_max_sessions);
   setSourceInteger(muxConfig, "max_streams_per_session", source.tcptun_mux_max_streams_per_session);
   setSourceInteger(muxConfig, "warm_spares", source.tcptun_mux_warm_spares);
+  setSourceBoolean(muxConfig, "resume", source.tcptun_mux_resume);
+  if (source.tcptun_mux_resume_timeout) {
+    muxConfig.resume_timeout = String(source.tcptun_mux_resume_timeout);
+  }
+  setSourceInteger(muxConfig, "resume_buffer_size", source.tcptun_mux_resume_buffer_size);
   const muxEnabled = optionalSourceBoolean(source.tcptun_mux, "tcptun_mux");
   if (muxEnabled === true || (muxEnabled === undefined && Object.keys(muxConfig).length > 0)) {
     outbound.mux = muxConfig;
@@ -538,7 +583,11 @@ async function outboundFromInbound(
 
   const security = inbound.security || {};
   const securityType = (security.type || "").toLowerCase();
-  if (securityType === "reality" || securityType === "reality-quic") {
+  if (
+    securityType === "reality" ||
+    securityType === "reality-tcp" ||
+    securityType === "reality-quic"
+  ) {
     if (!security.private_key) throw new Error(`inbound ${inbound.tag} is missing REALITY private_key`);
     if (!security.server_names?.length) throw new Error(`inbound ${inbound.tag} is missing REALITY server_names`);
     outbound.security = {
@@ -547,7 +596,7 @@ async function outboundFromInbound(
       fingerprint: "chrome",
       public_key: x25519PublicKey(security.private_key),
       short_id: security.short_ids?.[0] || "",
-      ...(securityType === "reality" ? { spider_x: "/" } : {}),
+      ...(securityType === "reality" || securityType === "reality-tcp" ? { spider_x: "/" } : {}),
     };
   } else if (securityType === "tls") {
     outbound.security = {
@@ -604,7 +653,7 @@ function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtoco
   if (security.cert || security.key) {
     throw new Error(`outbound ${outbound.tag} certificate or key files cannot be written into a URI`);
   }
-  if (security.type && !["none", "tls", "reality", "reality-quic", ""].includes(security.type)) {
+  if (security.type && !["none", "tls", "reality", "reality-tcp", "reality-quic", ""].includes(security.type)) {
     throw new Error(`outbound ${outbound.tag} security.type=${security.type} cannot be written into a URI`);
   }
   if (
@@ -777,6 +826,10 @@ function positiveInteger(value: number | undefined): value is number {
   return Number.isInteger(value) && Number(value) > 0;
 }
 
+function hasDuration(value: string | number | undefined): boolean {
+  return typeof value === "number" ? value !== 0 : Boolean(value?.trim());
+}
+
 function parseNetworkList(value: string): string[] {
   const items = value.split(",").map((item) => item.trim().toLowerCase());
   if (items.some((item) => !item)) throw new Error("URI network contains empty values");
@@ -805,6 +858,11 @@ function setOptionalText<T extends object, K extends keyof T>(target: T, key: K,
   if (value) target[key] = value as T[K];
 }
 
+function setOptionalBoolean<T extends object, K extends keyof T>(target: T, key: K, value: string | null) {
+  if (value === null || value === "") return;
+  target[key] = optionalBoolean(value, String(key)) as T[K];
+}
+
 function setOptionalInteger<T extends object, K extends keyof T>(target: T, key: K, value: string | null) {
   if (value === null || value === "") return;
   const parsed = Number(value);
@@ -817,6 +875,10 @@ function setSourceInteger<T extends object, K extends keyof T>(target: T, key: K
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`VMess URI ${String(key)} must be a non-negative integer`);
   target[key] = parsed as T[K];
+}
+
+function setSourceBoolean<T extends object, K extends keyof T>(target: T, key: K, value: unknown) {
+  if (optionalSourceBoolean(value, String(key)) === true) target[key] = true as T[K];
 }
 
 function uniqueProxyTag(index: number): string {

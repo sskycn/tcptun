@@ -17,13 +17,17 @@ export default function CookieBanner() {
   const detailsId = useId();
 
   useEffect(() => {
+    let shouldShow = false;
     try {
       if (window.localStorage.getItem(storageKey) !== "accepted") {
-        setVisible(true);
+        shouldShow = true;
       }
     } catch {
-      setVisible(true);
+      shouldShow = true;
     }
+    const revealTimer = window.setTimeout(() => {
+      if (shouldShow) setVisible(true);
+    }, 0);
 
     function onOpen() {
       setDetailsOpen(true);
@@ -31,7 +35,10 @@ export default function CookieBanner() {
     }
 
     window.addEventListener(cookieBannerOpenEvent, onOpen);
-    return () => window.removeEventListener(cookieBannerOpenEvent, onOpen);
+    return () => {
+      window.clearTimeout(revealTimer);
+      window.removeEventListener(cookieBannerOpenEvent, onOpen);
+    };
   }, []);
 
   function accept() {

@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 
 const links = [
+  { href: "#release", id: "release", label: "v0.2.3" },
   { href: "#architecture", id: "architecture", label: "Architecture" },
   { href: "#config", id: "config", label: "Config" },
   { href: "#generate", id: "generate", label: "Generate" },

@@ -12,6 +12,8 @@ export type GenerateConfigInput = {
   serverName: string;
   dest: string;
   quic?: boolean;
+  autoReality?: boolean;
+  resume?: boolean;
 };
 
 export type GeneratedConfigs = {
@@ -39,6 +41,8 @@ export function defaultGenerateInput(): GenerateConfigInput {
     serverName: "example.com",
     dest: "",
     quic: false,
+    autoReality: true,
+    resume: false,
   };
 }
 
@@ -57,6 +61,10 @@ export function validateGenerateInput(input: GenerateConfigInput): string | null
   }
   if (!input.serverName.trim()) return "REALITY server name is required";
   if (input.quic && input.protocol !== "native") return "QUIC config generation supports only the native protocol";
+  if (input.autoReality && input.protocol !== "native") return "Automatic Reality carriers support only the native protocol";
+  if (input.resume && (!input.autoReality || input.quic || input.protocol !== "native")) {
+    return "Resumable streams require native automatic Reality carriers";
+  }
   return null;
 }
 
@@ -95,6 +103,13 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
   };
   if (quic) {
     serverInbound.mux = { mode: "quic", max_streams_per_session: 128 };
+  } else if (protocol === "native" && input.autoReality) {
+    serverInbound.mux = {
+      mode: "group",
+      ...(input.resume
+        ? { resume: true, resume_timeout: "15s", resume_buffer_size: 4 * 1024 * 1024 }
+        : {}),
+    };
   }
 
   const serverConfig = {
@@ -127,6 +142,13 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
       max_sessions: 4,
       max_streams_per_session: 128,
       warm_spares: 1,
+    };
+  } else if (protocol === "native" && input.autoReality) {
+    clientOutbound.mux = {
+      mode: "group",
+      ...(input.resume
+        ? { resume: true, resume_timeout: "15s", resume_buffer_size: 4 * 1024 * 1024 }
+        : {}),
     };
   }
 
