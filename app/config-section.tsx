@@ -225,7 +225,7 @@ export default function ConfigSection() {
           <a className="chip-link" href="#reality">
             REALITY
           </a>
-          <a className="chip-link" href="#generate">
+          <a className="chip-link" href="/generate/">
             Generate
           </a>
           <a className="chip-link" href="#protocol-compare">

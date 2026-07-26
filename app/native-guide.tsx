@@ -52,13 +52,13 @@ export default function NativeGuide() {
             <a className="chip-link" href="#native-tutorial">
               Tutorial
             </a>
-            <a className="chip-link" href="#protocol-examples">
+            <a className="chip-link" href="/examples/">
               All examples
             </a>
-            <a className="chip-link" href="#generate">
+            <a className="chip-link" href="/generate/">
               Generate
             </a>
-            <a className="chip-link" href="#config-native">
+            <a className="chip-link" href="/config/#config-native">
               Config fields
             </a>
           </div>
@@ -176,13 +176,13 @@ export default function NativeGuide() {
             </p>
           </div>
           <div className="chip-row">
-            <a className="chip-link" href="#generate">
+            <a className="chip-link" href="/generate/">
               Generator
             </a>
-            <a className="chip-link" href="#convert">
+            <a className="chip-link" href="/convert/">
               Xray convert
             </a>
-            <a className="chip-link" href="#protocol-compare">
+            <a className="chip-link" href="/config/#protocol-compare">
               Compare
             </a>
           </div>
@@ -256,14 +256,14 @@ export default function NativeGuide() {
               <CopyButton value={commandsText} label="Copy" className="copy-button-on-dark" />
             </div>
             <div className="native-usecase-links">
-              <a className="chip-link" href="#generate">
+              <a className="chip-link" href="/generate/">
                 Open generator
               </a>
-              <a className="chip-link" href="#protocol-compare">
+              <a className="chip-link" href="/config/#protocol-compare">
                 Compare protocols
               </a>
               {activeCase.protocol === "native" ? (
-                <a className="chip-link" href="#config-native">
+                <a className="chip-link" href="/config/#config-native">
                   Native fields
                 </a>
               ) : null}

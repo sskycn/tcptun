@@ -1334,6 +1334,206 @@ export const trojanTlsClientExample = `{
   "dns": {}
 }`;
 
+
+export const nativeRealityTcpServerExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "server",
+      "type": "native",
+      "address": ["0.0.0.0:9443"],
+      "network": ["tcp", "udp"],
+      "users": [{ "id": "change-me" }],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality-tcp",
+        "private_key": "REPLACE_WITH_SERVER_PRIVATE_KEY",
+        "server_names": ["example.com"],
+        "short_ids": ["abcd1234"],
+        "dest": "example.com:443",
+        "max_time_diff": "30s"
+      },
+      "mux": { "mode": "group" }
+    }
+  ],
+  "outbounds": [{ "tag": "direct", "type": "direct" }],
+  "route": { "default_outbound": "direct", "rules": [] }
+}`;
+
+export const nativeRealityTcpClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "native",
+      "address": ["proxy.example.com:9443"],
+      "token": "change-me",
+      "network": ["tcp", "udp"],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality-tcp",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "abcd1234",
+        "spider_x": "/"
+      },
+      "mux": { "mode": "group" }
+    }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] }
+}`;
+
+export const nativeMultiAddressClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "native",
+      "address": [
+        "edge-a.example.com:9443",
+        "edge-b.example.com:9443",
+        "203.0.113.10:9443"
+      ],
+      "token": "change-me",
+      "network": ["tcp", "udp"],
+      "transport": { "type": "raw" },
+      "security": {
+        "type": "reality",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "abcd1234",
+        "spider_x": "/"
+      },
+      "mux": { "mode": "group" }
+    }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] }
+}`;
+
+export const balanceFailoverExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "edge-a",
+      "type": "native",
+      "address": ["edge-a.example.com:9443"],
+      "token": "change-me",
+      "transport": { "type": "raw" },
+      "mux": { "mode": "group" },
+      "security": {
+        "type": "reality",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "abcd1234",
+        "spider_x": "/"
+      }
+    },
+    {
+      "tag": "edge-b",
+      "type": "native",
+      "address": ["edge-b.example.com:9443"],
+      "token": "change-me",
+      "transport": { "type": "raw" },
+      "mux": { "mode": "group" },
+      "security": {
+        "type": "reality",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "abcd1234",
+        "spider_x": "/"
+      }
+    },
+    {
+      "tag": "pool",
+      "type": "balance",
+      "members": [
+        { "outbound": "edge-a", "weight": 2 },
+        { "outbound": "edge-b", "weight": 1 }
+      ],
+      "affinity_ttl": "5m"
+    },
+    { "tag": "direct", "type": "direct" }
+  ],
+  "route": {
+    "default_outbound": "pool",
+    "rules": [
+      {
+        "domain": ["geosite:private"],
+        "outbound": "direct"
+      }
+    ]
+  }
+}`;
+
+export const routeSplitExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "native",
+      "address": ["proxy.example.com:9443"],
+      "token": "change-me",
+      "transport": { "type": "raw" },
+      "mux": { "mode": "group" },
+      "security": {
+        "type": "reality",
+        "server_name": "example.com",
+        "fingerprint": "chrome",
+        "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
+        "short_id": "abcd1234",
+        "spider_x": "/"
+      }
+    },
+    { "tag": "direct", "type": "direct" },
+    { "tag": "block", "type": "blackhole" }
+  ],
+  "route": {
+    "default_outbound": "proxy",
+    "rules": [
+      { "domain": ["ads.example"], "outbound": "block" },
+      { "ip": ["geoip:private"], "outbound": "direct" },
+      { "domain": ["geosite:cn"], "outbound": "direct" }
+    ]
+  }
+}`;
+
+
 export const protocolUseCases = [
   {
     id: "native-basic",
@@ -1507,6 +1707,88 @@ export const protocolUseCases = [
     clientCode: trojanTlsClientExample,
     serverHint: "server-trojan-tls.json",
     clientHint: "client-trojan-tls.json",
+  },
+  {
+    id: "native-reality-tcp",
+    protocol: "native",
+    title: "native · reality-tcp forced",
+    summary: "Force Reality over TCP only when UDP is intentionally unavailable.",
+    when: "Corporate networks or paths that drop UDP/QUIC but still allow TCP Reality.",
+    steps: [
+      "Set security.type=reality-tcp on both ends with matching keys.",
+      "Keep transport raw and group mux if you still want mux pooling.",
+      "Do not expect QUIC fallback or automatic dual carriers.",
+    ],
+    commands: [
+      "tcptun config check --config server-native-reality-tcp.json",
+      "tcptun --config server-native-reality-tcp.json",
+      "tcptun --config client-native-reality-tcp.json",
+    ],
+    serverCode: nativeRealityTcpServerExample,
+    clientCode: nativeRealityTcpClientExample,
+    serverHint: "server-native-reality-tcp.json",
+    clientHint: "client-native-reality-tcp.json",
+  },
+  {
+    id: "native-multi-address",
+    protocol: "native",
+    title: "native · multi-address race",
+    summary: "One outbound with several host:port candidates racing handshakes for the same logical service.",
+    when: "Anycast/DNS or dual-homed edges share credentials and should compete, not load-balance as separate nodes.",
+    steps: [
+      "List multiple addresses on one native outbound.",
+      "Keep identical token, transport, and security for every candidate.",
+      "Use balance members instead when nodes are independent services.",
+    ],
+    commands: [
+      "tcptun config check --config client-native-multi-address.json",
+      "tcptun --config client-native-multi-address.json",
+    ],
+    serverCode: nativeRealityServerExample,
+    clientCode: nativeMultiAddressClientExample,
+    serverHint: "server-native-reality-auto.json",
+    clientHint: "client-native-multi-address.json",
+  },
+  {
+    id: "balance-failover",
+    protocol: "native",
+    title: "balance · weighted edges",
+    summary: "Independent native edges under a balance outbound with weights and affinity.",
+    when: "You operate more than one complete proxy service and want weighted selection / failover.",
+    steps: [
+      "Declare each edge as its own native outbound.",
+      "Group them under type=balance with weights and affinity_ttl.",
+      "Route default_outbound to the balance tag.",
+    ],
+    commands: [
+      "tcptun config check --config client-balance.json",
+      "tcptun --config client-balance.json",
+    ],
+    serverCode: nativeRealityServerExample,
+    clientCode: balanceFailoverExample,
+    serverHint: "server-native-reality-auto.json",
+    clientHint: "client-balance.json",
+  },
+  {
+    id: "route-split",
+    protocol: "native",
+    title: "route · split + blackhole",
+    summary: "Send private/geoip direct, block ads, default everything else through native Reality auto.",
+    when: "You need domain/IP based routing without a second client process.",
+    steps: [
+      "Keep proxy and direct (and optional blackhole) outbounds.",
+      "Order rules carefully; first match wins.",
+      "Validate with config check before starting.",
+    ],
+    commands: [
+      "tcptun config check --config client-route-split.json",
+      "tcptun --config client-route-split.json",
+      "curl -x socks5h://127.0.0.1:1080 https://example.com -I",
+    ],
+    serverCode: nativeRealityServerExample,
+    clientCode: routeSplitExample,
+    serverHint: "server-native-reality-auto.json",
+    clientHint: "client-route-split.json",
   },
 ] as const;
 

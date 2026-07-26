@@ -143,6 +143,100 @@ main {
 
 /* ---------- ambient background ---------- */
 
+.site-shell {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.site-content {
+  flex: 1 1 auto;
+}
+
+.page-hero {
+  width: min(var(--content-width), calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 56px 0 20px;
+}
+
+.page-hero-copy {
+  max-width: 720px;
+}
+
+.page-hero h1 {
+  margin: 0 0 14px;
+  font-size: clamp(34px, 5vw, 48px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+}
+
+.page-hero-actions {
+  margin-top: 22px;
+}
+
+.home-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.home-link-card {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  min-height: 180px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--surface-elevated) 94%, var(--primary-soft)),
+      var(--surface)
+    );
+  padding: 20px 20px 22px;
+  box-shadow: 0 12px 32px rgb(var(--shadow) / 0.05);
+  transition:
+    transform 220ms var(--ease-out),
+    border-color 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out);
+}
+
+.home-link-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+  box-shadow: 0 18px 40px rgb(var(--shadow) / 0.1);
+}
+
+.home-link-index {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  color: var(--muted);
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.home-link-card h3 {
+  margin: 8px 0 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+.home-link-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.protocol-page-chips {
+  margin-bottom: 18px;
+}
+
 .page-bg {
   position: fixed;
   inset: 0;
@@ -4107,8 +4201,14 @@ button:focus-visible {
   }
 
   .disclaimer-grid,
-  .native-tutorial-grid {
+  .native-tutorial-grid,
+  .home-link-grid {
     grid-template-columns: 1fr;
+  }
+
+  .page-hero {
+    width: min(100% - 28px, var(--content-width));
+    padding-top: 40px;
   }
 
   .cookie-banner-inner {
