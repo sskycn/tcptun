@@ -8,6 +8,7 @@
 #   ./scripts/publish-pages-assets.sh --version v0.2.0 --only android
 #   ./scripts/publish-pages-assets.sh --version v0.2.0 --skip-build
 #   ./scripts/publish-pages-assets.sh --version v0.2.0 --update-site-data
+#   ./scripts/publish-pages-assets.sh --version v0.2.0 --prune-old
 #
 # After this script:
 #   git add public/releases app/site-data.ts
@@ -27,12 +28,13 @@ ONLY="both" # both | go | android
 SKIP_BUILD=0
 UPDATE_SITE_DATA=0
 SET_LATEST=1
+PRUNE_OLD=0
 
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'publish-pages-assets: %s\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -73,6 +75,124 @@ file_size() {
   fi
 }
 
+read_property() {
+  local key="$1"
+  local file="$2"
+  sed -n "s/^${key}=//p" "$file" | tail -n 1
+}
+
+android_sdk_dir() {
+  local local_properties="$KOTLIN_DIR/local.properties"
+  if [[ -n "${ANDROID_HOME:-}" ]]; then
+    printf '%s\n' "$ANDROID_HOME"
+  elif [[ -n "${ANDROID_SDK_ROOT:-}" ]]; then
+    printf '%s\n' "$ANDROID_SDK_ROOT"
+  elif [[ -f "$local_properties" ]]; then
+    read_property sdk.dir "$local_properties"
+  fi
+}
+
+latest_build_tool() {
+  local tool="$1"
+  local sdk_dir
+  sdk_dir="$(android_sdk_dir)"
+  [[ -n "$sdk_dir" && -d "$sdk_dir/build-tools" ]] || die "Android SDK build-tools not found"
+  find "$sdk_dir/build-tools" -mindepth 2 -maxdepth 2 -type f -name "$tool" -print | sort | tail -n 1
+}
+
+signing_value() {
+  local property_name="$1"
+  local environment_name="$2"
+  local signing_properties="$KOTLIN_DIR/signing.properties"
+  local value="${!environment_name:-}"
+  if [[ -z "$value" && -f "$signing_properties" ]]; then
+    value="$(read_property "$property_name" "$signing_properties")"
+  fi
+  printf '%s\n' "$value"
+}
+
+build_split_apks() {
+  local source_apk="$1"
+  local zipalign apksigner store_file store_password key_alias key_password work_dir
+  zipalign="$(latest_build_tool zipalign)"
+  apksigner="$(latest_build_tool apksigner)"
+  [[ -x "$zipalign" ]] || die "zipalign not found"
+  [[ -x "$apksigner" ]] || die "apksigner not found"
+  need_cmd zip
+  need_cmd unzip
+
+  store_file="$(signing_value storeFile TCPTUN_RELEASE_STORE_FILE)"
+  store_password="$(signing_value storePassword TCPTUN_RELEASE_STORE_PASSWORD)"
+  key_alias="$(signing_value keyAlias TCPTUN_RELEASE_KEY_ALIAS)"
+  key_password="$(signing_value keyPassword TCPTUN_RELEASE_KEY_PASSWORD)"
+  [[ -n "$store_file" && -n "$store_password" && -n "$key_alias" && -n "$key_password" ]] ||
+    die "Android signing missing (signing.properties or TCPTUN_RELEASE_*)"
+  [[ "$store_file" == /* ]] || store_file="$KOTLIN_DIR/$store_file"
+  [[ -f "$store_file" ]] || die "Android keystore not found: $store_file"
+
+  work_dir="$(mktemp -d "${TMPDIR:-/tmp}/tcptun-apk.XXXXXX")"
+  trap 'rm -rf "$work_dir"' RETURN
+
+  local label keep_abi output_name unsigned_apk aligned_apk present_abis
+  local -a remove_patterns
+  while IFS=: read -r label keep_abi; do
+    case "$keep_abi" in
+      arm64-v8a) remove_patterns=('lib/armeabi-v7a/*' 'lib/x86_64/*') ;;
+      armeabi-v7a) remove_patterns=('lib/arm64-v8a/*' 'lib/x86_64/*') ;;
+      x86_64) remove_patterns=('lib/arm64-v8a/*' 'lib/armeabi-v7a/*') ;;
+      *) die "unsupported Android ABI: $keep_abi" ;;
+    esac
+    unsigned_apk="$work_dir/$label-unsigned.apk"
+    aligned_apk="$work_dir/$label-aligned.apk"
+    output_name="tcptun-android-${label}-v${VERSION}.apk"
+    cp "$source_apk" "$unsigned_apk"
+    zip -q -d "$unsigned_apk" "${remove_patterns[@]}"
+    "$zipalign" -f -P 16 4 "$unsigned_apk" "$aligned_apk"
+    TCPTUN_APK_STORE_PASSWORD="$store_password" TCPTUN_APK_KEY_PASSWORD="$key_password" \
+      "$apksigner" sign \
+        --ks "$store_file" \
+        --ks-key-alias "$key_alias" \
+        --ks-pass env:TCPTUN_APK_STORE_PASSWORD \
+        --key-pass env:TCPTUN_APK_KEY_PASSWORD \
+        --v4-signing-enabled false \
+        --out "$OUT_DIR/$output_name" \
+        "$aligned_apk"
+    "$apksigner" verify --verbose "$OUT_DIR/$output_name" >/dev/null
+    present_abis="$(unzip -Z1 "$OUT_DIR/$output_name" | sed -n 's|^lib/\([^/]*\)/.*|\1|p' | sort -u)"
+    [[ "$present_abis" == "$keep_abi" ]] || die "$output_name contains unexpected ABIs: $present_abis"
+  done <<'EOF'
+arm64:arm64-v8a
+armv7:armeabi-v7a
+x86_64:x86_64
+EOF
+
+  rm -rf "$work_dir"
+  trap - RETURN
+}
+
+prune_old_releases() {
+  local release_dir base
+  shopt -s nullglob
+  for release_dir in "$SITE_ROOT"/public/releases/*; do
+    [[ -d "$release_dir" ]] || continue
+    base="$(basename "$release_dir")"
+    [[ "$base" == "latest" || "$base" == "$VERSION" ]] && continue
+    if [[ "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][A-Za-z0-9.-]+)?$ ]]; then
+      log "Removing old release → public/releases/$base/"
+      rm -rf "$release_dir"
+    fi
+  done
+  shopt -u nullglob
+}
+
+check_github_file_sizes() {
+  local file size limit=$((100 * 1024 * 1024))
+  while IFS= read -r -d '' file; do
+    size="$(file_size "$file")"
+    (( size <= limit )) || die "$(basename "$file") is $size bytes; GitHub rejects files over 100 MiB"
+  done < <(find "$SITE_ROOT/public/releases" -type f -print0)
+}
+
 write_sha256sums() {
   local dir="$1"
   (
@@ -95,6 +215,7 @@ while [[ $# -gt 0 ]]; do
     --skip-build) SKIP_BUILD=1; shift ;;
     --update-site-data) UPDATE_SITE_DATA=1; shift ;;
     --no-latest) SET_LATEST=0; shift ;;
+    --prune-old) PRUNE_OLD=1; shift ;;
     --go-dir) GO_DIR="${2:-}"; shift 2 ;;
     --kotlin-dir) KOTLIN_DIR="${2:-}"; shift 2 ;;
     *) die "unknown argument: $1" ;;
@@ -168,10 +289,12 @@ if [[ "$do_android" -eq 1 ]]; then
   fi
   [[ -f "$apk_src" ]] || die "APK not found: $apk_src"
 
-  apk_name="tcptun-${VERSION}.apk"
-  log "Copying $apk_name"
-  cp "$apk_src" "$OUT_DIR/$apk_name"
+  log "Creating signed per-ABI APKs"
+  rm -f "$OUT_DIR"/*.apk "$OUT_DIR"/*.apk.idsig
+  build_split_apks "$apk_src"
 fi
+
+[[ "$PRUNE_OLD" -eq 1 ]] && prune_old_releases
 
 log "Writing SHA256SUMS"
 write_sha256sums "$OUT_DIR"
@@ -181,12 +304,8 @@ if [[ "$SET_LATEST" -eq 1 ]]; then
   log "Updating public/releases/latest → $VERSION"
   rm -rf "$latest"
   mkdir -p "$latest"
-  # copy files; for "latest" also alias versioned apk name
+  # Copy the complete current release into the stable latest path.
   cp -R "$OUT_DIR"/. "$latest"/
-  # stable latest apk name
-  if [[ -f "$OUT_DIR/tcptun-${VERSION}.apk" ]]; then
-    cp "$OUT_DIR/tcptun-${VERSION}.apk" "$latest/tcptun-latest.apk"
-  fi
   # pointer file for humans / scripts
   printf '%s\n' "$VERSION" >"$SITE_ROOT/public/releases/latest/VERSION"
 fi
@@ -205,7 +324,14 @@ if [[ "$UPDATE_SITE_DATA" -eq 1 ]]; then
     fi
   fi
 
-  # sizes for known go binaries
+  # Android filenames include the release version.
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    sed -i '' -E 's/(tcptun-android-(arm64|armv7|x86_64)-v)[^"]+(\.apk)/\1'"${VERSION}"'\3/g' "$site_data"
+  else
+    sed -i -E 's/(tcptun-android-(arm64|armv7|x86_64)-v)[^"]+(\.apk)/\1'"${VERSION}"'\3/g' "$site_data"
+  fi
+
+  # Sizes for known release binaries.
   update_size_line() {
     local filename="$1"
     local size="$2"
@@ -221,13 +347,14 @@ if [[ "$UPDATE_SITE_DATA" -eq 1 ]]; then
   shopt -s nullglob
   for bin in "$OUT_DIR"/tcptun-*; do
     base="$(basename "$bin")"
-    [[ "$base" == *.apk ]] && continue
     [[ "$base" == SHA256SUMS ]] && continue
     size="$(file_size "$bin")"
     update_size_line "$base" "$size" "$site_data" || true
   done
   shopt -u nullglob
 fi
+
+check_github_file_sizes
 
 log "Assets ready under public/releases/$VERSION/"
 ls -lh "$OUT_DIR" | sed '1d' || true

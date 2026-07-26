@@ -1,4 +1,4 @@
-export const releaseVersion = "0.2.2";
+export const releaseVersion = "0.2.3";
 
 export const npmLinks = {
   package: "https://www.npmjs.com/package/tcptun",
@@ -130,16 +130,16 @@ export const cookieNotice = {
 } as const;
 
 export const binaryDownloads = [
-  binary("tcptun-android-arm64-v0.2.2.apk", "android", "Android", "arm64", "ARM64", 51714794),
-  binary("tcptun-android-armv7-v0.2.2.apk", "android", "Android", "armv7", "ARMv7", 48436568),
-  binary("tcptun-android-x86_64-v0.2.2.apk", "android", "Android", "amd64", "x86_64", 54532843),
-  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 17646464),
-  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 16417634),
-  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 17113250),
-  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 15794338),
-  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 16122018),
-  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 17600512),
-  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 16049152),
+  binary("tcptun-android-arm64-v0.2.3.apk", "android", "Android", "arm64", "ARM64", 54927617),
+  binary("tcptun-android-armv7-v0.2.3.apk", "android", "Android", "armv7", "ARMv7", 51581195),
+  binary("tcptun-android-x86_64-v0.2.3.apk", "android", "Android", "amd64", "x86_64", 57958642),
+  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 19798208),
+  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 18416978),
+  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 19226786),
+  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 17825954),
+  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 18088098),
+  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 19740160),
+  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 17999360),
 ] as const;
 
 export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;

@@ -33,6 +33,9 @@ Run from the website repo root (defaults to sibling `../tcptun-go` and `../tcptu
 
 # Skip build when dist / APKs already exist
 ./scripts/publish-pages-assets.sh --version v0.2.2 --skip-build
+
+# Remove older version directories after publishing this version
+./scripts/publish-pages-assets.sh --version v0.2.2 --skip-build --prune-old
 ```
 
 Then commit and push. The Pages workflow builds and deploys (`public/` is copied into `out/`):
