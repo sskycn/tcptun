@@ -10,6 +10,8 @@ import {
   nativeMuxNotes,
   nativeQuicClientExample,
   nativeQuicServerExample,
+  nativeRealityAutoLayers,
+  nativeRealityAutoNotes,
   nativeRealityClientExample,
   nativeRealityServerExample,
   nativeResumableClientExample,
@@ -42,16 +44,16 @@ const nativeExampleTabs = [
     code: nativeClientExample,
   },
   {
-    id: "quic-server",
-    label: "Server QUIC",
-    hint: "server-native-quic.json",
-    code: nativeQuicServerExample,
+    id: "reality-auto-server",
+    label: "Server reality auto",
+    hint: "server-native-reality-auto.json",
+    code: nativeRealityServerExample,
   },
   {
-    id: "quic-client",
-    label: "Client QUIC",
-    hint: "client-native-quic.json",
-    code: nativeQuicClientExample,
+    id: "reality-auto-client",
+    label: "Client reality auto",
+    hint: "client-native-reality-auto.json",
+    code: nativeRealityClientExample,
   },
   {
     id: "resumable-server",
@@ -64,6 +66,18 @@ const nativeExampleTabs = [
     label: "Client resumable",
     hint: "client-native-resumable.json",
     code: nativeResumableClientExample,
+  },
+  {
+    id: "quic-server",
+    label: "Server forced QUIC",
+    hint: "server-native-quic.json",
+    code: nativeQuicServerExample,
+  },
+  {
+    id: "quic-client",
+    label: "Client forced QUIC",
+    hint: "client-native-quic.json",
+    code: nativeQuicClientExample,
   },
   {
     id: "reverse-server",
@@ -94,14 +108,14 @@ const realityExampleTabs = [
   },
   {
     id: "native-server",
-    label: "Native server",
-    hint: "native + REALITY server",
+    label: "Native auto server",
+    hint: "native + raw + reality auto",
     code: nativeRealityServerExample,
   },
   {
     id: "native-client",
-    label: "Native client",
-    hint: "native + REALITY client",
+    label: "Native auto client",
+    hint: "native + raw + reality auto",
     code: nativeRealityClientExample,
   },
 ] as const;
@@ -220,16 +234,42 @@ export default function ConfigSection() {
         </div>
       </div>
 
-      <div className="mux-panel" id="native-carriers">
-        <div className="section-subheading">
-          <p className="eyebrow">v0.2.3 carriers</p>
-          <h3>Automatic QUIC-first, or force one carrier.</h3>
-          <p>
-            Automatic mode requires <code>native + raw + group mux + reality</code>. Without mux,
-            ordinary native / VLESS / VMess / Trojan REALITY remains TCP-only.
-          </p>
+      <div className="native-reality-quic" id="native-carriers">
+        <div className="native-reality-quic-heading">
+          <div>
+            <p className="eyebrow">v0.2.3 · native + raw + reality</p>
+            <h3>
+              <code>native + raw + reality + group mux</code>
+            </h3>
+            <p>
+              This is the recommended automatic stack in v0.2.3: one listen address, dual Reality
+              carriers, QUIC preferred, TCP fallback, and optional resumable TCP streams. Without{" "}
+              <code>mux</code>, ordinary native / VLESS / VMess / Trojan REALITY remains TCP-only.
+            </p>
+          </div>
+          <div className="native-reality-quic-fit">
+            <span>Default path</span>
+            <strong>QUIC-first Reality auto</strong>
+            <p>Force TCP with reality-tcp, or force QUIC with reality-quic + mux.mode=quic.</p>
+          </div>
         </div>
-        <div className="mux-grid">
+
+        <div className="native-reality-quic-stack" aria-label="Native Reality auto stack">
+          {nativeRealityAutoLayers.map((layer, index) => (
+            <div className="native-reality-quic-layer-wrap" key={layer.label}>
+              <article className="native-reality-quic-layer">
+                <span>{layer.label}</span>
+                <code>{layer.value}</code>
+                <p>{layer.body}</p>
+              </article>
+              {index < nativeRealityAutoLayers.length - 1 ? (
+                <span className="native-reality-quic-plus" aria-hidden="true">+</span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+
+        <div className="mux-grid" style={{ marginTop: 16 }}>
           {nativeCarrierModes.map((item) => (
             <article key={item.label}>
               <h4>{item.label}</h4>
@@ -237,6 +277,34 @@ export default function ConfigSection() {
               <p>{item.body}</p>
             </article>
           ))}
+        </div>
+
+        <div className="highlight-grid" style={{ marginTop: 16 }}>
+          {nativeRealityAutoNotes.map((item) => (
+            <article key={item.title}>
+              <h4>{item.title}</h4>
+              <p>{item.body}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="native-reality-quic-footer">
+          <div>
+            <strong>Generate the automatic pair</strong>
+            <p>
+              CLI and the browser generator emit this stack by default for native:{" "}
+              <code>security.type=reality</code> plus group mux. Enable resumable streams with{" "}
+              <code>mux.resume=true</code> on both ends.
+            </p>
+          </div>
+          <div className="native-reality-quic-command">
+            <pre><code>tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443</code></pre>
+            <CopyButton
+              value="tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443"
+              label="Copy"
+              className="copy-button-on-dark"
+            />
+          </div>
         </div>
       </div>
 

@@ -14,24 +14,75 @@ export const pinnedInstallCommand = `curl -fsSL https://tcptun.com/install.sh | 
 
 export const releaseHighlights = [
   {
-    label: "Transport",
-    title: "QUIC-first REALITY auto mode",
-    body: "native + raw + group mux + reality now listens on TCP and UDP together, prefers QUIC, falls back to Reality TCP, and probes to restore QUIC after recovery.",
+    label: "native + raw + reality",
+    title: "QUIC-first automatic carriers",
+    body: "With group mux, security.type=reality binds TCP and UDP on one address, dials Reality QUIC first, falls back to Reality TCP with backoff, and probes to restore QUIC preference after recovery.",
+  },
+  {
+    label: "Carrier control",
+    title: "Force TCP or force QUIC",
+    body: "Use reality-tcp for deterministic TCP-only Reality, or reality-quic with mux.mode=quic for a dedicated QUIC pool without fallback. Without mux, Reality stays TCP-only as before.",
   },
   {
     label: "Continuity",
-    title: "Resumable logical streams",
-    body: "Opt-in native TCP streams can survive a physical carrier replacement and continue across automatic QUIC/TCP switching with bounded replay buffers and recovery timeouts.",
+    title: "Resumable TCP logical streams",
+    body: "Opt-in mux.resume keeps an eligible TCP logical stream alive while its physical QUIC/TCP attachment is replaced, with bounded replay buffers, recovery timeouts, and a runtime-wide buffer budget.",
   },
   {
-    label: "Runtime",
-    title: "Hardened lifecycle",
-    body: "Shutdown, partial startup, callbacks, malformed peers, resource budgets, QUIC/uQUIC, uTLS, reverse publishing, and mux ownership now fail closed with bounded cleanup.",
+    label: "Runtime & Android",
+    title: "Fail-closed lifecycle and quieter diagnostics",
+    body: "Shutdown, partial startup, resource budgets, reverse publish, and mux ownership fail closed. Android adds endpoint diagnostics, bounded health wakes, and near-zero idle polling.",
+  },
+] as const;
+
+/** Detailed v0.2.3 native + raw + reality capability notes. */
+export const nativeRealityAutoNotes = [
+  {
+    title: "Required stack",
+    body: "Automatic dual carriers need all of: type=native, transport.type=raw, mux present (group mode), and security.type=reality. Missing mux keeps ordinary TCP-only Reality.",
   },
   {
-    label: "Android",
-    title: "Event-driven health and diagnostics",
-    body: "The Android client adds live remote-endpoint diagnostics, bounded health wakes, resumable mux controls, safer profile mutation, and route-local-proxy rules with near-zero idle polling.",
+    title: "One address, two sockets",
+    body: "The inbound binds TCP and UDP to the same host:port. Clients race the same address over both carriers without a second listen entry.",
+  },
+  {
+    title: "QUIC first, TCP fallback",
+    body: "Outbounds prefer the Reality QUIC carrier. When UDP is blocked or unhealthy, they fall back to Reality TCP with jittered exponential backoff, then probe to restore QUIC preference.",
+  },
+  {
+    title: "Shared camouflage",
+    body: "Both carriers share the same REALITY keys, short IDs, SNI, and dest. The camouflage destination should support HTTPS over TCP and HTTP/3 over UDP.",
+  },
+  {
+    title: "Scope of selection",
+    body: "TCP streams, UDP relay, and reverse carriers follow the same automatic carrier policy when the stack is Reality-auto.",
+  },
+  {
+    title: "Escape hatches",
+    body: "security.type=reality-tcp forces TCP only. security.type=reality-quic with mux.mode=quic forces the dedicated QUIC pool and never falls back to TCP.",
+  },
+] as const;
+
+export const nativeRealityAutoLayers = [
+  {
+    label: "Protocol",
+    value: "native",
+    body: "Token auth, TCP/UDP tunnel semantics, reverse publish, and resumable logical streams.",
+  },
+  {
+    label: "Transport",
+    value: "raw",
+    body: "Required base transport for automatic dual carriers. Do not stack ws / h2 / h3 in this mode.",
+  },
+  {
+    label: "Security",
+    value: "reality",
+    body: "v0.2.3 automatic mode: QUIC-first Reality with TCP fallback on one address (not the forced reality-quic stack).",
+  },
+  {
+    label: "Multiplexing",
+    value: "mux (group)",
+    body: "Group mux enables the dual-carrier path. Optional mux.resume preserves eligible TCP flows across carrier replacement.",
   },
 ] as const;
 
@@ -70,14 +121,19 @@ export const faqItems = [
     answer: "Server users[].id and client token must match. Use tcptun config native to generate a paired config.",
   },
   {
+    question: "What is native + raw + reality in v0.2.3?",
+    answer:
+      "It is the automatic dual-carrier stack: type=native, transport raw, group mux, and security.type=reality. The server binds TCP and UDP on one address; the client prefers Reality QUIC, falls back to Reality TCP with backoff, and probes to restore QUIC. Camouflage keys/SNI/dest are shared by both carriers. Without mux, Reality stays TCP-only.",
+  },
+  {
     question: "When should I enable mux or QUIC?",
     answer:
-      "With many short connections and matching versions on both ends, prefer mux: {}. In v0.2.3, native + raw + group mux + reality automatically prefers QUIC and falls back to Reality TCP. Use reality-tcp to force TCP, or mux.mode=quic with reality-quic to force QUIC without fallback.",
+      "For many short connections, prefer mux: {}. In v0.2.3, native + raw + group mux + reality automatically prefers QUIC and falls back to Reality TCP. Use reality-tcp to force TCP, or mux.mode=quic with reality-quic to force QUIC without fallback.",
   },
   {
     question: "How do resumable streams work?",
     answer:
-      "Set mux.resume=true on both native endpoints using raw + group mux + reality auto mode. A TCP logical stream can reattach after its physical QUIC/TCP carrier fails. It does not cover UDP, reverse publish, forced reality-tcp/reality-quic, or cross-process failover; keep it off during rolling upgrades until both peers run v0.2.3 or newer.",
+      "Set mux.resume=true on both native endpoints using the Reality-auto stack (raw + group mux + security.type=reality). A TCP logical stream can reattach after its physical QUIC/TCP carrier fails. It does not cover UDP, reverse publish, forced reality-tcp/reality-quic, or cross-process failover; keep it off during rolling upgrades until both peers run v0.2.3 or newer.",
   },
   {
     question: "Can REALITY be used together with TLS?",
@@ -261,12 +317,12 @@ export const nativeGuideConcepts = [
     body: "raw is the default and best for throughput. ws / h2 / h3 are available when you need path-based fronting; QUIC mode requires raw.",
   },
   {
-    title: "Security",
-    body: "With native + raw + group mux, security.type=reality is QUIC-first with TCP fallback. reality-tcp forces TCP; reality-quic + mux.mode=quic forces QUIC. TLS needs cert/key on the server.",
+    title: "Security (v0.2.3)",
+    body: "With native + raw + group mux, security.type=reality is the automatic dual-carrier mode: QUIC first, Reality TCP fallback, shared keys/SNI/dest. reality-tcp forces TCP; reality-quic + mux.mode=quic forces QUIC without fallback. TLS still needs cert/key on the server.",
   },
   {
-    title: "Mux & QUIC",
-    body: "Presence of mux enables multiplexing. Group mode can use automatic Reality carriers and optional resumable TCP streams; mux.mode=quic is the separate forced QUIC pool.",
+    title: "Mux & resume",
+    body: "Presence of mux enables multiplexing. Group mode unlocks automatic Reality carriers and optional mux.resume for TCP continuity; mux.mode=quic is the separate forced QUIC pool (not the auto path).",
   },
 ] as const;
 
@@ -531,20 +587,20 @@ export const nativeConfigHighlights = [
     body: "address is a host:port array. Multiple addresses race as candidate entry points for the same service; they are not balance.",
   },
   {
+    title: "v0.2.3 Reality auto",
+    body: "native + raw + group mux + security.type=reality prefers QUIC, falls back to TCP, and shares one camouflage identity on both carriers.",
+  },
+  {
+    title: "Resumable TCP",
+    body: "mux.resume=true on both Reality-auto peers can preserve an eligible TCP logical stream across carrier replacement (v0.2.3+).",
+  },
+  {
     title: "Throughput",
-    body: "Prefer native + raw + mux. TLS / REALITY / ws / h2 / h3 are more flexible but cost more.",
+    body: "Prefer native + raw + mux. Forced TLS / REALITY / ws / h2 / h3 add flexibility but cost more.",
   },
   {
     title: "Reverse publish",
-    body: "Server publish + client expose can hang NAT-side TCP/UDP services on edge listeners.",
-  },
-  {
-    title: "Version",
-    body: "mux is a private protocol and both ends must match; drop the mux field first during rolling upgrades.",
-  },
-  {
-    title: "Generate",
-    body: "tcptun config native generates paired server / client configs; export URIs separately with tcptun uri export.",
+    body: "Server publish + client expose can hang NAT-side TCP/UDP services on edge listeners (requires mux).",
   },
 ] as const;
 
@@ -752,7 +808,11 @@ export const vlessRealityClientExample = `{
   "dns": {}
 }`;
 
-/** Native + REALITY pair shape produced by config generator (mux off by default). */
+/**
+ * Native v0.2.3 automatic Reality carriers:
+ * native + raw + group mux + security.type=reality
+ * (QUIC-first with TCP fallback on one address).
+ */
 export const nativeRealityServerExample = `{
   "log": { "level": "info" },
   "inbounds": [
@@ -770,7 +830,8 @@ export const nativeRealityServerExample = `{
         "short_ids": ["abcd1234"],
         "dest": "example.com:443",
         "max_time_diff": "30s"
-      }
+      },
+      "mux": { "mode": "group" }
     }
   ],
   "outbounds": [
@@ -804,6 +865,12 @@ export const nativeRealityClientExample = `{
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
+      },
+      "mux": {
+        "mode": "group",
+        "max_sessions": 4,
+        "max_streams_per_session": 16,
+        "warm_spares": 1
       }
     }
   ],
@@ -905,14 +972,14 @@ export const nativeUseCases = [
   },
   {
     id: "reality",
-    title: "Hardened path (raw + REALITY)",
-    summary: "Adds REALITY on raw TCP so the handshake can blend with a camouflage site without deploying your own cert.",
-    when: "You need stronger outer camouflage on a public TCP port while staying on native.",
+    title: "native + raw + reality (auto)",
+    summary: "v0.2.3 automatic dual carriers: Reality QUIC first, Reality TCP fallback, shared keys on one address.",
+    when: "Both ends run tcptun v0.2.3+ and you want QUIC when available without managing a second port or certs.",
     steps: [
-      "Generate with --server-name and --dest pointing at a legitimate site you intend to mimic.",
-      "Keep private_key on the server and public_key on the client paired.",
-      "Keep short_id / short_ids and server_name consistent on both ends.",
-      "transport must remain raw; do not combine with ws/h2/h3 or tls.",
+      "Use type=native, transport raw, mux group mode, and security.type=reality on both ends.",
+      "Generate with --server-name and --dest; dest should support HTTPS (TCP) and HTTP/3 (UDP).",
+      "Pair private_key / public_key and keep short_id / server_name consistent.",
+      "Open both TCP and UDP on the listen port; without mux, Reality stays TCP-only.",
     ],
     commands: [
       "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
@@ -921,8 +988,8 @@ export const nativeUseCases = [
     ],
     serverCode: nativeRealityServerExample,
     clientCode: nativeRealityClientExample,
-    serverHint: "server-native-reality.json",
-    clientHint: "client-native-reality.json",
+    serverHint: "server-native-reality-auto.json",
+    clientHint: "client-native-reality-auto.json",
   },
   {
     id: "resumable",
@@ -1010,8 +1077,12 @@ export const realityRules = [
     body: "Server private_key pairs with client public_key; short_id must match on both ends.",
   },
   {
-    title: "QUIC variant",
-    body: "reality-quic is only for native + raw + QUIC mux, reuses REALITY key fields, and does not use spider_x.",
+    title: "native auto (v0.2.3)",
+    body: "On native + raw + group mux, security.type=reality enables dual carriers: QUIC-first with TCP fallback. Without mux, Reality stays TCP-only.",
+  },
+  {
+    title: "Forced modes",
+    body: "reality-tcp forces TCP only. reality-quic with mux.mode=quic forces the dedicated QUIC pool (no TCP fallback) and does not use spider_x.",
   },
 ] as const;
 
@@ -1289,23 +1360,25 @@ export const protocolUseCases = [
   {
     id: "native-reality",
     protocol: "native",
-    title: "native · REALITY",
-    summary: "native over raw with REALITY camouflage.",
-    when: "Public TCP edge with REALITY keys instead of your own cert.",
+    title: "native · raw + reality auto",
+    summary: "v0.2.3 stack: native + raw + group mux + reality. QUIC-first with TCP fallback on one address.",
+    when: "Both ends run tcptun v0.2.3+ and you want automatic dual carriers without certs or a second port.",
     steps: [
-      "Generate with --server-name and --dest.",
-      "Pair private_key / public_key and short ids.",
-      "Keep transport raw.",
+      "Generate with --server-name and --dest (HTTPS + HTTP/3 capable camouflage).",
+      "Ensure mux group mode is present so automatic carriers activate.",
+      "Pair private_key / public_key and short ids; open TCP and UDP on the listen port.",
+      "Optional: set mux.resume=true on both peers for resumable TCP streams.",
     ],
     commands: [
       "tcptun config native --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
+      "tcptun config check --config server.json",
       "tcptun --config server.json",
       "tcptun --config client.json",
     ],
     serverCode: nativeRealityServerExample,
     clientCode: nativeRealityClientExample,
-    serverHint: "server-native-reality.json",
-    clientHint: "client-native-reality.json",
+    serverHint: "server-native-reality-auto.json",
+    clientHint: "client-native-reality-auto.json",
   },
   {
     id: "native-quic",

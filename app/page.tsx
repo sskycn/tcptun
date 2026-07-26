@@ -194,12 +194,13 @@ export default function Home() {
             <p className="eyebrow">What&apos;s new · {displayVersion}</p>
             <h2>Carrier continuity, bounded recovery, quieter Android.</h2>
             <p>
-              v0.2.3 adds automatic QUIC-first REALITY transport and opt-in resumable TCP
-              streams, then hardens lifecycle and diagnostics across the runtime and Android app.
+              v0.2.3 centers on <code>native + raw + reality</code> automatic dual carriers
+              (QUIC-first, TCP fallback), optional resumable TCP streams, and tighter lifecycle
+              across the runtime and Android app.
             </p>
           </div>
-          <a className="button secondary" href="#config-native">
-            Explore v0.2.3 config
+          <a className="button secondary" href="#native-carriers">
+            Explore native + raw + reality
           </a>
         </div>
         <div className="capability-grid">
