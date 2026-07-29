@@ -1038,21 +1038,62 @@ main {
 }
 
 .lan-peer-list li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   border-radius: 12px;
   background: var(--surface);
-  padding: 10px 12px;
   color: var(--text);
   font-size: 13.5px;
+  overflow: hidden;
 }
 
-.lan-peer-list li.is-self {
+.lan-peer-list li.is-selected {
   border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
   background: color-mix(in srgb, var(--primary-soft) 50%, var(--surface));
+}
+
+.lan-peer-list li button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 11px 12px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lan-peer-list li button:hover {
+  background: color-mix(in srgb, var(--primary-soft) 38%, transparent);
+}
+
+.lan-peer-name {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lan-peer-name strong,
+.lan-peer-name code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lan-unread {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  padding: 0 6px;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .lan-peer-list code {
@@ -1066,6 +1107,33 @@ main {
   border-radius: 50%;
   background: var(--primary);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.lan-identity-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--line));
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--primary-soft) 35%, var(--surface));
+  padding: 12px;
+}
+
+.lan-identity-card > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.lan-identity-card code {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.lan-identity-card .button {
+  justify-self: start;
 }
 
 .page-bg {

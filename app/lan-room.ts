@@ -5,6 +5,7 @@ export type ChatMessage = {
   kind: "chat" | "system" | "config" | "file";
   from: string;
   fromId?: string;
+  peerId?: string;
   text: string;
   ts: number;
   fileName?: string;
@@ -27,6 +28,7 @@ export type RoomPeer = {
   id: string;
   name: string;
   self?: boolean;
+  connected?: boolean;
 };
 
 type WireMessage =
@@ -133,6 +135,15 @@ export class LanRoom {
     return this.room;
   }
 
+  setDisplayName(displayName: string) {
+    this.localName = displayName.trim() || "User";
+    if (!this.localId) return;
+    this.peerNames.set(this.localId, this.localName);
+    this.broadcastWire({ v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
+    if (this.isHost) this.broadcastPeerList();
+    this.emitPeers();
+  }
+
   async join(room: string, displayName: string): Promise<void> {
     this.leave();
     this.closed = false;
@@ -142,7 +153,7 @@ export class LanRoom {
     this.connections.clear();
 
     const hostId = roomHostId(this.room);
-    this.handlers.onStatus(`Joining room “${this.room}”…`);
+    this.handlers.onStatus("Looking for online users…");
 
     // Same-origin multi-tab discovery
     this.broadcast = new BroadcastChannel(BC_PREFIX + hostId);
@@ -196,18 +207,19 @@ export class LanRoom {
 
   listPeers(): RoomPeer[] {
     const peers: RoomPeer[] = [
-      { id: this.localId || "local", name: `${this.localName} (you)`, self: true },
+      { id: this.localId || "local", name: `${this.localName} (you)`, self: true, connected: true },
     ];
     for (const [id, name] of this.peerNames) {
       if (id === this.localId) continue;
-      peers.push({ id, name });
+      peers.push({ id, name, connected: this.connections.get(id)?.open === true });
     }
     return peers;
   }
 
-  sendChat(text: string) {
+  sendChat(peerId: string, text: string) {
     const clean = text.trim();
     if (!clean) return;
+    const conn = this.connectionFor(peerId);
     const msg: WireMessage = {
       v: 1,
       t: "chat",
@@ -217,23 +229,25 @@ export class LanRoom {
       name: this.localName,
       fromId: this.localId,
     };
-    this.broadcastWire(msg);
+    this.send(conn, msg);
     this.handlers.onMessage({
       id: msg.id,
       kind: "chat",
       from: this.localName,
       fromId: this.localId,
+      peerId,
       text: clean,
       ts: msg.ts,
     });
   }
 
-  sendConfig(fileName: string, content: string) {
+  sendConfig(peerId: string, fileName: string, content: string) {
     const name = fileName.trim() || "config.json";
     if (!content.trim()) throw new Error("Config content is empty.");
     if (new TextEncoder().encode(content).length > MAX_LAN_FILE_BYTES) {
       throw new Error("Config is too large to send.");
     }
+    const conn = this.connectionFor(peerId);
     const msg: WireMessage = {
       v: 1,
       t: "config",
@@ -244,23 +258,24 @@ export class LanRoom {
       from: this.localName,
       fromId: this.localId,
     };
-    this.broadcastWire(msg);
+    this.send(conn, msg);
     this.handlers.onMessage({
       id: msg.id,
       kind: "config",
       from: this.localName,
       fromId: this.localId,
+      peerId,
       text: `Shared config ${name}`,
       ts: msg.ts,
       fileName: name,
     });
   }
 
-  async sendFile(file: File) {
+  async sendFile(peerId: string, file: File) {
     if (file.size > MAX_LAN_FILE_BYTES) {
       throw new Error(`File exceeds ${Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB limit.`);
     }
-    if (this.connections.size === 0) throw new Error("No peers connected yet.");
+    const conn = this.connectionFor(peerId);
 
     const id = uid();
     const buffer = await file.arrayBuffer();
@@ -275,9 +290,10 @@ export class LanRoom {
       received: 0,
       total: file.size,
       done: false,
+      peerId,
     });
 
-    this.broadcastWire({
+    this.send(conn, {
       v: 1,
       t: "file-start",
       id,
@@ -291,7 +307,7 @@ export class LanRoom {
     });
 
     for (let index = 0; index < chunks.length; index++) {
-      this.broadcastWire({ v: 1, t: "file-chunk", id, index, data: chunks[index] });
+      this.send(conn, { v: 1, t: "file-chunk", id, index, data: chunks[index] });
       this.handlers.onTransfer({
         id,
         name: file.name,
@@ -299,12 +315,13 @@ export class LanRoom {
         received: Math.min(file.size, Math.floor(((index + 1) / chunks.length) * file.size)),
         total: file.size,
         done: false,
+        peerId,
       });
       // Yield so UI can paint progress.
       if (index % 4 === 0) await new Promise((r) => window.setTimeout(r, 0));
     }
 
-    this.broadcastWire({ v: 1, t: "file-end", id });
+    this.send(conn, { v: 1, t: "file-end", id });
     this.handlers.onTransfer({
       id,
       name: file.name,
@@ -312,12 +329,14 @@ export class LanRoom {
       received: file.size,
       total: file.size,
       done: true,
+      peerId,
     });
     this.handlers.onMessage({
       id,
       kind: "file",
       from: this.localName,
       fromId: this.localId,
+      peerId,
       text: `Sent file ${file.name}`,
       ts: Date.now(),
       fileName: file.name,
@@ -359,7 +378,7 @@ export class LanRoom {
         this.isHost = true;
         this.peerNames.set(id, this.localName);
         this.handlers.onJoined({ peerId: id, isHost: true, room: this.room });
-        this.handlers.onStatus(`Room host online. Waiting for peers in “${this.room}”…`);
+        this.handlers.onStatus("You are online. Waiting for other users…");
         this.emitPeers();
         this.bindHost(hostPeer);
         this.broadcast?.postMessage({ v: 1, t: "bc-announce", id, name: this.localName });
@@ -369,7 +388,7 @@ export class LanRoom {
       hostPeer.on("error", (err) => {
         const type = String((err as { type?: string }).type || "");
         if (type === "unavailable-id" || type === "network" || type === "server-error") {
-          failToGuest(type === "unavailable-id" ? "Room host already exists." : "Host claim failed.");
+          failToGuest(type === "unavailable-id" ? "Discovery service found." : "Connecting to discovery service.");
           return;
         }
         if (!settled) {
@@ -400,7 +419,7 @@ export class LanRoom {
         this.isHost = false;
         this.peerNames.set(id, this.localName);
         this.handlers.onJoined({ peerId: id, isHost: false, room: this.room });
-        this.handlers.onStatus(`Joined as ${id}. Connecting to room host…`);
+        this.handlers.onStatus(`Your key is ready. Finding online users…`);
         this.emitPeers();
 
         peer.on("connection", (conn) => this.acceptConnection(conn));
@@ -409,7 +428,7 @@ export class LanRoom {
         this.wireConnection(conn, hostId, true);
 
         conn.on("open", () => {
-          this.handlers.onStatus(`Connected to room. Peers will appear automatically.`);
+          this.handlers.onStatus("Online users will appear automatically.");
           resolve();
         });
 
@@ -430,7 +449,7 @@ export class LanRoom {
   private scheduleReconnect(hostId: string) {
     if (this.closed || this.isHost) return;
     if (this.reconnectTimer !== null) return;
-    this.handlers.onStatus("Room host unreachable. Retrying…");
+    this.handlers.onStatus("Discovery service is reconnecting…");
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       if (this.closed || !this.peer || this.isHost) return;
@@ -492,6 +511,7 @@ export class LanRoom {
         id: uid(),
         kind: "system",
         from: "system",
+        peerId,
         text: `Peer left (${peerId.slice(0, 8)}…).`,
         ts: Date.now(),
       });
@@ -513,6 +533,7 @@ export class LanRoom {
         id: uid(),
         kind: "system",
         from: "system",
+        peerId: msg.id || viaPeerId,
         text: `${msg.name || "Peer"} is online.`,
         ts: Date.now(),
       });
@@ -532,13 +553,12 @@ export class LanRoom {
     }
 
     if (msg.t === "chat") {
-      // Host relays to other peers for full-room broadcast if needed.
-      if (this.isHost) this.relayExcept(msg, msg.fromId || viaPeerId);
       this.handlers.onMessage({
         id: msg.id,
         kind: "chat",
         from: msg.name || "Peer",
         fromId: msg.fromId,
+        peerId: msg.fromId || viaPeerId,
         text: msg.text,
         ts: msg.ts || Date.now(),
       });
@@ -546,7 +566,6 @@ export class LanRoom {
     }
 
     if (msg.t === "config") {
-      if (this.isHost) this.relayExcept(msg, msg.fromId || viaPeerId);
       const blob = new Blob([msg.content], { type: "application/json;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       this.handlers.onMessage({
@@ -554,6 +573,7 @@ export class LanRoom {
         kind: "config",
         from: msg.from || "Peer",
         fromId: msg.fromId,
+        peerId: msg.fromId || viaPeerId,
         text: `Received config ${msg.name}`,
         ts: msg.ts || Date.now(),
         fileName: msg.name,
@@ -563,7 +583,6 @@ export class LanRoom {
     }
 
     if (msg.t === "file-start") {
-      if (this.isHost) this.relayExcept(msg, msg.fromId || viaPeerId);
       this.incoming.set(msg.id, {
         name: msg.name,
         size: msg.size,
@@ -586,7 +605,6 @@ export class LanRoom {
     }
 
     if (msg.t === "file-chunk") {
-      if (this.isHost) this.relayExcept(msg, viaPeerId);
       const entry = this.incoming.get(msg.id);
       if (!entry) return;
       entry.parts.set(msg.index, msg.data);
@@ -603,7 +621,6 @@ export class LanRoom {
     }
 
     if (msg.t === "file-end") {
-      if (this.isHost) this.relayExcept(msg, viaPeerId);
       const entry = this.incoming.get(msg.id);
       if (!entry) return;
       try {
@@ -633,6 +650,7 @@ export class LanRoom {
           kind: "file",
           from: entry.from,
           fromId: entry.fromId,
+          peerId: entry.fromId,
           text: `Received file ${entry.name}`,
           ts: Date.now(),
           fileName: entry.name,
@@ -670,18 +688,11 @@ export class LanRoom {
     peers.push({ id: this.localId, name: this.localName });
     const unique = new Map(peers.map((p) => [p.id, p]));
     const list = Array.from(unique.values());
-    this.broadcastWire({ v: 1, t: "peers", peers: list }, /* include self map */ false);
+    this.broadcastWire({ v: 1, t: "peers", peers: list });
   }
 
-  private broadcastWire(msg: WireMessage, _unused = true) {
+  private broadcastWire(msg: WireMessage) {
     for (const conn of this.connections.values()) {
-      if (conn.open) this.send(conn, msg);
-    }
-  }
-
-  private relayExcept(msg: WireMessage, exceptPeerId: string) {
-    for (const [id, conn] of this.connections) {
-      if (id === exceptPeerId) continue;
       if (conn.open) this.send(conn, msg);
     }
   }
@@ -692,6 +703,12 @@ export class LanRoom {
     } catch {
       // ignore broken channel
     }
+  }
+
+  private connectionFor(peerId: string): DataConnection {
+    const conn = this.connections.get(peerId);
+    if (!conn?.open) throw new Error("This user is no longer online.");
+    return conn;
   }
 
   private emitPeers() {

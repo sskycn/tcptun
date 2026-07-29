@@ -9,118 +9,156 @@ import {
   type TransferProgress,
 } from "./lan-room";
 
+const DISCOVERY_CHANNEL = "tcptun-direct-users-v1";
+
 function formatBytes(size: number): string {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function defaultRoomName(): string {
-  // Shared default so LAN users find each other without coordinating a code.
-  // Users can still set a private room name for isolation.
-  return "tcptun-lan";
-}
-
 function defaultDisplayName(): string {
-  const n = Math.floor(100 + Math.random() * 900);
-  return `User-${n}`;
+  return `User-${Math.floor(100 + Math.random() * 900)}`;
 }
 
 export default function LanShare() {
-  const [room, setRoom] = useState(defaultRoomName);
   const [localName, setLocalName] = useState(defaultDisplayName);
   const [joined, setJoined] = useState(false);
-  const [isHost, setIsHost] = useState(false);
   const [peerId, setPeerId] = useState("");
-  const [status, setStatus] = useState("Pick a room name and join to discover nearby peers.");
+  const [selectedPeerId, setSelectedPeerId] = useState("");
+  const [status, setStatus] = useState("Starting automatic user discovery…");
   const [error, setError] = useState<string | null>(null);
   const [peers, setPeers] = useState<RoomPeer[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [unread, setUnread] = useState<Record<string, number>>({});
   const [draft, setDraft] = useState("");
   const [transfers, setTransfers] = useState<TransferProgress[]>([]);
   const [configName, setConfigName] = useState("client.json");
   const [configBody, setConfigBody] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [discoveryKey, setDiscoveryKey] = useState(0);
 
   const roomRef = useRef<LanRoom | null>(null);
+  const selectedPeerRef = useRef("");
+  const localNameRef = useRef(localName);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const others = useMemo(() => peers.filter((p) => !p.self), [peers]);
-  const online = joined && (others.length > 0 || isHost);
+  const contacts = useMemo(
+    () => peers.filter((peer) => !peer.self && peer.connected),
+    [peers],
+  );
+  const selectedPeer = contacts.find((peer) => peer.id === selectedPeerId);
+  const conversation = useMemo(
+    () => messages.filter((message) => message.peerId === selectedPeerId),
+    [messages, selectedPeerId],
+  );
+  const transferList = useMemo(
+    () => transfers.filter((item) => item.peerId === selectedPeerId),
+    [transfers, selectedPeerId],
+  );
+
+  useEffect(() => {
+    selectedPeerRef.current = selectedPeerId;
+  }, [selectedPeerId]);
+
+  useEffect(() => {
+    localNameRef.current = localName;
+  }, [localName]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, transfers]);
+  }, [conversation, transferList]);
 
   useEffect(() => {
-    return () => {
-      roomRef.current?.leave();
-      roomRef.current = null;
-    };
-  }, []);
-
-  function upsertTransfer(progress: TransferProgress) {
-    setTransfers((prev) => {
-      const next = prev.filter((item) => item.id !== progress.id);
-      next.push(progress);
-      return next.slice(-12);
+    let active = true;
+    const lan = new LanRoom({
+      onStatus: (next) => active && setStatus(next),
+      onPeers: (next) => active && setPeers(next),
+      onMessage: (message) => {
+        if (!active) return;
+        setMessages((prev) => [...prev, message]);
+        if (message.peerId && message.peerId !== selectedPeerRef.current && message.kind !== "system") {
+          setUnread((prev) => ({ ...prev, [message.peerId!]: (prev[message.peerId!] || 0) + 1 }));
+        }
+      },
+      onTransfer: (progress) => {
+        if (!active) return;
+        setTransfers((prev) => {
+          const next = prev.filter((item) => item.id !== progress.id);
+          next.push(progress);
+          return next.slice(-12);
+        });
+      },
+      onError: (next) => active && setError(next),
+      onJoined: (info) => {
+        if (!active) return;
+        setJoined(true);
+        setPeerId(info.peerId);
+      },
     });
+
+    roomRef.current = lan;
+    void lan.join(DISCOVERY_CHANNEL, localNameRef.current).catch((err) => {
+      if (!active) return;
+      setError(err instanceof Error ? err.message : "Failed to start user discovery.");
+      setStatus("Discovery is offline. Retry to reconnect.");
+    });
+
+    return () => {
+      active = false;
+      lan.leave();
+      if (roomRef.current === lan) roomRef.current = null;
+    };
+  }, [discoveryKey]);
+
+  function selectContact(id: string) {
+    setSelectedPeerId(id);
+    setUnread((prev) => ({ ...prev, [id]: 0 }));
+    setError(null);
   }
 
-  async function handleJoin() {
-    setBusy(true);
+  function restartDiscovery() {
+    setJoined(false);
+    setPeerId("");
+    setPeers([]);
+    setSelectedPeerId("");
     setError(null);
+    setStatus("Restarting user discovery…");
+    setDiscoveryKey((key) => key + 1);
+  }
+
+  function applyAlias() {
+    const alias = localName.trim() || defaultDisplayName();
+    setLocalName(alias);
+    roomRef.current?.setDisplayName(alias);
+    setStatus(`Alias updated to ${alias}.`);
+  }
+
+  async function copyKey() {
+    if (!peerId) return;
     try {
-      const lan = new LanRoom({
-        onStatus: setStatus,
-        onPeers: setPeers,
-        onMessage: (message) => setMessages((prev) => [...prev, message]),
-        onTransfer: upsertTransfer,
-        onError: (err) => setError(err),
-        onJoined: (info) => {
-          setJoined(true);
-          setIsHost(info.isHost);
-          setPeerId(info.peerId);
-        },
-      });
-      roomRef.current?.leave();
-      roomRef.current = lan;
-      setMessages([]);
-      setTransfers([]);
-      await lan.join(room, localName);
-      setPeers(lan.listPeers());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to join room.");
-      setJoined(false);
-    } finally {
-      setBusy(false);
+      await navigator.clipboard.writeText(peerId);
+      setStatus("Your key was copied.");
+    } catch {
+      setError("Could not copy the key. Select it and copy manually.");
     }
   }
 
-  function handleLeave() {
-    roomRef.current?.leave();
-    roomRef.current = null;
-    setJoined(false);
-    setIsHost(false);
-    setPeerId("");
-    setPeers([]);
-    setStatus("Left room. Join again to rediscover peers.");
-  }
-
   function handleSendChat() {
+    if (!selectedPeerId) return;
     try {
-      roomRef.current?.sendChat(draft);
+      roomRef.current?.sendChat(selectedPeerId, draft);
       setDraft("");
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send chat.");
+      setError(err instanceof Error ? err.message : "Failed to send message.");
     }
   }
 
   function handleShareConfig() {
+    if (!selectedPeerId) return;
     try {
-      roomRef.current?.sendConfig(configName, configBody);
+      roomRef.current?.sendConfig(selectedPeerId, configName, configBody);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to share config.");
@@ -128,11 +166,11 @@ export default function LanShare() {
   }
 
   async function handleFiles(fileList: FileList | null) {
-    if (!fileList?.length || !roomRef.current) return;
+    if (!fileList?.length || !roomRef.current || !selectedPeerId) return;
     setError(null);
     for (const file of Array.from(fileList)) {
       try {
-        await roomRef.current.sendFile(file);
+        await roomRef.current.sendFile(selectedPeerId, file);
       } catch (err) {
         setError(err instanceof Error ? err.message : `Failed to send ${file.name}`);
         break;
@@ -141,100 +179,75 @@ export default function LanShare() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  const transferList = useMemo(
-    () =>
-      Object.values(
-        transfers.reduce<Record<string, TransferProgress>>((acc, item) => {
-          acc[item.id] = item;
-          return acc;
-        }, {}),
-      ),
-    [transfers],
-  );
-
   return (
     <section className="section lan-section" id="lan">
       <div className="lan-layout">
         <div className="lan-panel">
           <div className="lan-panel-heading">
             <div>
-              <p className="eyebrow">WebRTC · auto discovery</p>
-              <h2>Find room peers and chat instantly</h2>
+              <p className="eyebrow">WebRTC · direct messages</p>
+              <h2>Online users</h2>
               <p>
-                Join a shared room name. Devices that open this page with the same room are discovered
-                automatically over WebRTC — no host/guest code paste. Chat, share configs, and send
-                files peer-to-peer.
+                Your key is generated automatically. Online users appear here; choose one to start a
+                private peer-to-peer conversation.
               </p>
             </div>
             <div className="lan-status-pills">
-              <span className={joined ? "is-live" : undefined}>{joined ? "In room" : "Offline"}</span>
+              <span className={joined ? "is-live" : undefined}>{joined ? "Discoverable" : "Offline"}</span>
               <span>
-                {others.length} peer{others.length === 1 ? "" : "s"}
+                {contacts.length} user{contacts.length === 1 ? "" : "s"} online
               </span>
-              {isHost ? <span className="is-live">Room host</span> : null}
             </div>
           </div>
 
           <div className="lan-setup">
             <label className="guide-field">
-              <span>Display name</span>
+              <span>Your alias</span>
               <input
                 value={localName}
                 onChange={(event) => setLocalName(event.target.value)}
-                disabled={joined || busy}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") applyAlias();
+                }}
+                maxLength={40}
                 autoComplete="off"
               />
             </label>
-            <label className="guide-field">
-              <span>Room name</span>
-              <input
-                value={room}
-                onChange={(event) => setRoom(event.target.value)}
-                disabled={joined || busy}
-                placeholder="tcptun-lan"
-                autoComplete="off"
-              />
-            </label>
-            <p className="guide-field-hint">
-              Anyone who joins the same room name can see you. Default <code>tcptun-lan</code> is
-              public on this site — use a private name for your office/home group.
-            </p>
-
             <div className="lan-actions">
-              {!joined ? (
-                <button type="button" className="button primary" disabled={busy} onClick={() => void handleJoin()}>
-                  {busy ? "Joining…" : "Join room & discover"}
-                </button>
-              ) : (
-                <button type="button" className="button ghost" onClick={handleLeave}>
-                  Leave room
-                </button>
-              )}
+              <button type="button" className="button secondary" disabled={!joined} onClick={applyAlias}>
+                Save alias
+              </button>
+              <button type="button" className="button ghost" onClick={restartDiscovery}>
+                Retry discovery
+              </button>
             </div>
 
-            <div className="lan-meta-row">
-              <span className="lan-status-text">{status}</span>
-              {peerId ? (
-                <span>
-                  You: <code>{peerId.slice(0, 12)}…</code>
-                </span>
-              ) : null}
+            <div className="lan-identity-card">
+              <span>Your key</span>
+              <code>{peerId || "Generating…"}</code>
+              <button type="button" className="button ghost" disabled={!peerId} onClick={() => void copyKey()}>
+                Copy key
+              </button>
             </div>
+
+            <p className="lan-status-text">{status}</p>
 
             <div className="lan-peer-list">
-              <strong>Online in room</strong>
-              {peers.length === 0 ? (
-                <p className="guide-field-hint">No peers yet. Ask others to open /lan/ and join this room.</p>
+              <strong>Users available to chat</strong>
+              {contacts.length === 0 ? (
+                <p className="guide-field-hint">No other users are online yet. Keep this page open to stay visible.</p>
               ) : (
                 <ul>
-                  {peers.map((peer) => (
-                    <li key={peer.id} className={peer.self ? "is-self" : undefined}>
-                      <span className="lan-peer-dot" aria-hidden="true" />
-                      <span>
-                        {peer.name}
-                        {peer.self ? "" : ""}
-                      </span>
-                      <code>{peer.id.slice(0, 10)}…</code>
+                  {contacts.map((peer) => (
+                    <li key={peer.id} className={peer.id === selectedPeerId ? "is-selected" : undefined}>
+                      <button type="button" onClick={() => selectContact(peer.id)}>
+                        <span className="lan-peer-dot" aria-hidden="true" />
+                        <span className="lan-peer-name">
+                          <strong>{peer.name}</strong>
+                          <code>{peer.id.slice(0, 12)}…</code>
+                        </span>
+                        {unread[peer.id] ? <span className="lan-unread">{unread[peer.id]}</span> : null}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -242,9 +255,9 @@ export default function LanShare() {
             </div>
 
             <ul className="guide-wizard-bullets">
-              <li>Auto host election: first joiner hosts the room; others attach automatically.</li>
-              <li>Mesh links form between peers so chat works even when more than two people join.</li>
-              <li>Uses public PeerJS signaling only to introduce peers; chat/files go over WebRTC DataChannels.</li>
+              <li>No room name or invitation flow: users are discovered automatically.</li>
+              <li>Messages and files are sent only to the user you select.</li>
+              <li>PeerJS introduces users; content travels over WebRTC DataChannels.</li>
               <li>Max file size {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB per transfer.</li>
             </ul>
 
@@ -256,32 +269,29 @@ export default function LanShare() {
           </div>
         </div>
 
-        <div className={`lan-panel lan-chat-panel ${online ? "is-online" : ""}`}>
+        <div className={`lan-panel lan-chat-panel ${selectedPeer ? "is-online" : ""}`}>
           <div className="lan-chat-header">
             <div>
-              <strong>Room chat · {room || "—"}</strong>
+              <strong>{selectedPeer ? selectedPeer.name : "Select a user"}</strong>
               <p>
-                {joined
-                  ? others.length
-                    ? `Live with ${others.map((p) => p.name).join(", ")}`
-                    : "Waiting for other people to join this room…"
-                  : "Join a room to start chatting"}
+                {selectedPeer
+                  ? `Private chat · ${selectedPeer.id.slice(0, 16)}…`
+                  : "Choose an online user from the list to start chatting"}
               </p>
             </div>
           </div>
 
           <div className="lan-chat-log" aria-live="polite">
-            {messages.length === 0 ? (
-              <div className="lan-empty">
-                No messages yet. When peers appear on the left, messages and files are delivered
-                automatically over WebRTC.
-              </div>
+            {!selectedPeerId ? (
+              <div className="lan-empty">Select a user to open a one-to-one conversation.</div>
+            ) : conversation.length === 0 ? (
+              <div className="lan-empty">No messages yet. Say hello or send a config/file.</div>
             ) : (
-              messages.map((message) => (
+              conversation.map((message) => (
                 <article
                   key={message.id}
                   className={`lan-message lan-message-${message.kind} ${
-                    message.fromId && message.fromId === peerId ? "is-self" : ""
+                    message.fromId === peerId ? "is-self" : ""
                   }`}
                 >
                   <header>
@@ -290,11 +300,7 @@ export default function LanShare() {
                   </header>
                   <p>{message.text}</p>
                   {message.fileUrl && message.fileName ? (
-                    <a
-                      className="button secondary lan-download-link"
-                      href={message.fileUrl}
-                      download={message.fileName}
-                    >
+                    <a className="button secondary lan-download-link" href={message.fileUrl} download={message.fileName}>
                       Download {message.fileName}
                       {message.fileSize ? ` (${formatBytes(message.fileSize)})` : ""}
                     </a>
@@ -312,16 +318,8 @@ export default function LanShare() {
                 return (
                   <div key={`${item.id}-${item.direction}`} className="lan-transfer">
                     <div className="lan-transfer-meta">
-                      <span>
-                        {item.direction === "send" ? "Sending" : "Receiving"} {item.name}
-                      </span>
-                      <span>
-                        {item.error
-                          ? item.error
-                          : item.done
-                            ? "Done"
-                            : `${pct}% · ${formatBytes(item.received)}`}
-                      </span>
+                      <span>{item.direction === "send" ? "Sending" : "Receiving"} {item.name}</span>
+                      <span>{item.error ? item.error : item.done ? "Done" : `${pct}% · ${formatBytes(item.received)}`}</span>
                     </div>
                     <div className="lan-transfer-bar" aria-hidden="true">
                       <span style={{ width: `${item.error ? 100 : pct}%` }} data-error={item.error ? "1" : "0"} />
@@ -343,30 +341,20 @@ export default function LanShare() {
                     handleSendChat();
                   }
                 }}
-                placeholder={joined ? "Message the room…" : "Join a room first"}
-                disabled={!joined}
+                placeholder={selectedPeer ? `Message ${selectedPeer.name}…` : "Select a user first"}
+                disabled={!selectedPeer}
               />
-              <button
-                type="button"
-                className="button primary"
-                disabled={!joined || !draft.trim()}
-                onClick={handleSendChat}
-              >
+              <button type="button" className="button primary" disabled={!selectedPeer || !draft.trim()} onClick={handleSendChat}>
                 Send
               </button>
             </div>
 
             <div className="lan-tools">
               <div className="lan-tool-card">
-                <strong>Share config</strong>
+                <strong>Send config</strong>
                 <label className="guide-field">
                   <span>File name</span>
-                  <input
-                    value={configName}
-                    onChange={(event) => setConfigName(event.target.value)}
-                    disabled={!joined}
-                    autoComplete="off"
-                  />
+                  <input value={configName} onChange={(event) => setConfigName(event.target.value)} disabled={!selectedPeer} autoComplete="off" />
                 </label>
                 <label className="guide-field">
                   <span>JSON / URI content</span>
@@ -376,32 +364,20 @@ export default function LanShare() {
                     onChange={(event) => setConfigBody(event.target.value)}
                     placeholder="Paste server.json / client.json / client.uri"
                     spellCheck={false}
-                    disabled={!joined}
+                    disabled={!selectedPeer}
                   />
                 </label>
-                <button
-                  type="button"
-                  className="button secondary"
-                  disabled={!joined || !configBody.trim()}
-                  onClick={handleShareConfig}
-                >
-                  Share config to room
+                <button type="button" className="button secondary" disabled={!selectedPeer || !configBody.trim()} onClick={handleShareConfig}>
+                  Send to {selectedPeer?.name || "user"}
                 </button>
               </div>
 
               <div className="lan-tool-card">
                 <strong>Send file</strong>
                 <p className="guide-field-hint">
-                  Broadcast any file up to {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB to peers
-                  currently in the room.
+                  Send files up to {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB directly to the selected user.
                 </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  disabled={!joined || others.length === 0}
-                  onChange={(event) => void handleFiles(event.target.files)}
-                />
+                <input ref={fileInputRef} type="file" multiple disabled={!selectedPeer} onChange={(event) => void handleFiles(event.target.files)} />
               </div>
             </div>
           </div>
