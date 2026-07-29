@@ -1,4 +1,4 @@
-import Peer, { type DataConnection, type PeerError } from "peerjs";
+import Peer, { type DataConnection } from "peerjs";
 
 export type ChatMessage = {
   id: string;
@@ -366,7 +366,7 @@ export class LanRoom {
         resolve();
       });
 
-      hostPeer.on("error", (err: PeerError) => {
+      hostPeer.on("error", (err) => {
         const type = String((err as { type?: string }).type || "");
         if (type === "unavailable-id" || type === "network" || type === "server-error") {
           failToGuest(type === "unavailable-id" ? "Room host already exists." : "Host claim failed.");
@@ -420,7 +420,7 @@ export class LanRoom {
         });
       });
 
-      peer.on("error", (err: PeerError) => {
+      peer.on("error", (err) => {
         this.handlers.onError(err.message || "Peer connection error");
         if (!this.localId) reject(err instanceof Error ? err : new Error(String(err)));
       });
