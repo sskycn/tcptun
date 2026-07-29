@@ -727,6 +727,347 @@ main {
   cursor: pointer;
 }
 
+/* ---------- LAN WebRTC share ---------- */
+
+.lan-section {
+  padding-top: 8px;
+}
+
+.lan-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.lan-panel {
+  display: grid;
+  gap: 16px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 96%, var(--primary-soft)),
+      var(--surface)
+    );
+  padding: 20px;
+  box-shadow: 0 12px 32px rgb(var(--shadow) / 0.05);
+  min-width: 0;
+}
+
+.lan-panel-heading {
+  display: grid;
+  gap: 12px;
+}
+
+.lan-panel-heading h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.lan-panel-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.lan-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lan-status-pills span {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 5px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lan-status-pills span.is-live {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 70%, var(--surface));
+  color: var(--cyan-text);
+}
+
+.lan-setup,
+.lan-signaling {
+  display: grid;
+  gap: 14px;
+}
+
+.lan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lan-code-block,
+.lan-tool-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: 14px;
+}
+
+.lan-code-heading,
+.lan-meta-row,
+.lan-transfer-meta,
+.lan-compose-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lan-meta-row {
+  justify-content: flex-start;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.lan-status-text {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.lan-code-input {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  padding: 10px 12px;
+  color: var(--text);
+  font: 12px/1.5 var(--font-jetbrains), ui-monospace, monospace;
+}
+
+.lan-config-input {
+  min-height: 140px;
+}
+
+.lan-candidates ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lan-chat-panel {
+  min-height: 680px;
+  grid-template-rows: auto minmax(240px, 1fr) auto auto;
+}
+
+.lan-chat-panel.is-online {
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+}
+
+.lan-chat-header strong {
+  display: block;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.lan-chat-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.lan-chat-log {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 260px;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--surface-soft) 70%, var(--surface));
+  padding: 12px;
+}
+
+.lan-empty {
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+  padding: 18px 8px;
+}
+
+.lan-message {
+  display: grid;
+  gap: 6px;
+  max-width: 92%;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 10px 12px;
+}
+
+.lan-message.is-self {
+  justify-self: end;
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface));
+}
+
+.lan-message-system {
+  justify-self: center;
+  max-width: 100%;
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.lan-message header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.lan-message p {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lan-download-link {
+  justify-self: start;
+}
+
+.lan-transfers {
+  display: grid;
+  gap: 8px;
+}
+
+.lan-transfer {
+  display: grid;
+  gap: 6px;
+}
+
+.lan-transfer-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lan-transfer-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.lan-transfer-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.lan-transfer-bar span[data-error="1"] {
+  background: var(--accent);
+}
+
+.lan-compose {
+  display: grid;
+  gap: 12px;
+}
+
+.lan-compose-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  padding: 0 12px;
+  color: var(--text);
+  font: inherit;
+}
+
+.lan-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lan-tool-card strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.lan-peer-list {
+  display: grid;
+  gap: 10px;
+}
+
+.lan-peer-list strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.lan-peer-list ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lan-peer-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.lan-peer-list li.is-self {
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 50%, var(--surface));
+}
+
+.lan-peer-list code {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lan-peer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
 .page-bg {
   position: fixed;
   inset: 0;
@@ -4707,8 +5048,14 @@ button:focus-visible {
 
   .guide-wizard-main,
   .guide-choice-grid,
-  .guide-review-list > div {
+  .guide-review-list > div,
+  .lan-layout,
+  .lan-tools {
     grid-template-columns: 1fr;
+  }
+
+  .lan-chat-panel {
+    min-height: 0;
   }
 
   .cookie-banner-inner {

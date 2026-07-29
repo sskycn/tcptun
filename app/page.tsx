@@ -62,10 +62,10 @@ const featureLinks = [
     body: "Concepts, fields, and long-form notes for the private tunnel protocol.",
   },
   {
-    href: "/generate/",
-    label: "Generate",
-    title: "Browser config pairs",
-    body: "Create matching server/client JSON and URIs locally with Web Crypto keys.",
+    href: "/lan/",
+    label: "LAN",
+    title: "WebRTC chat & files",
+    body: "Share configs and files peer-to-peer on the same network with a one-time host/guest code exchange.",
   },
 ];
 
