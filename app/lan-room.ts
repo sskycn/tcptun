@@ -115,9 +115,11 @@ const SOFT_ONLINE_GRACE_MS = 45_000;
 /** If an open channel has no traffic for this long, force redial. */
 const STALE_CHANNEL_MS = 28_000;
 /** Half-open DataChannel: abandon and redial so a stuck STUN gather cannot pin the dial. */
-const DIAL_OPEN_TIMEOUT_MS = 10_000;
+const DIAL_OPEN_TIMEOUT_MS = 14_000;
 /** If no peer channel opens while STUN/TURN is configured, fall back to host-only ICE. */
-const LAN_ICE_FALLBACK_MS = 12_000;
+const LAN_ICE_FALLBACK_MS = 18_000;
+/** Soft-online window while dialing so peers appear in the list before open. */
+const DIALING_SOFT_ONLINE_MS = 30_000;
 
 export type LanRoomHandlers = {
   onStatus: (status: string) => void;
@@ -270,37 +272,9 @@ export class LanRoom {
     this.connections.clear();
 
     const hostId = roomHostId(this.room);
-
-    // Probe STUN before PeerJS starts — drop URLs that never produce srflx so
-    // dead public STUN cannot stall LAN host-candidate discovery.
-    if (this.iceConfig.stunUrls.length > 0) {
-      this.handlers.onStatus("Checking STUN servers…");
-      try {
-        const { config: liveIce, failedStun } = await sanitizeIceConfigWithLiveStun(this.iceConfig);
-        if (this.closed) return;
-        this.iceConfig = liveIce;
-        if (failedStun.length > 0 && liveIce.stunUrls.length > 0) {
-          this.handlers.onStatus(
-            this.statusForMode(
-              `Dropped ${failedStun.length} unreachable STUN; using ${liveIce.stunUrls.length}…`,
-            ),
-          );
-        } else if (failedStun.length > 0 && liveIce.stunUrls.length === 0) {
-          // All STUN dead → pure LAN host ICE (TURN still applied if configured).
-          this.handlers.onStatus(this.statusForMode("STUN unreachable; local network ICE…"));
-        } else {
-          this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
-        }
-      } catch {
-        if (this.closed) return;
-        // Probe failure must not block join — keep configured list.
-        this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
-      }
-    } else {
-      this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
-    }
-
-    if (this.closed) return;
+    // Join PeerJS immediately — do NOT block on STUN probes (that delayed discovery
+    // and could empty iceServers on false negatives, breaking find-peers).
+    this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
 
     // Local same-origin discovery (other tabs / windows on this machine).
     // Complements PeerJS room discovery for multi-device LAN.
@@ -313,6 +287,8 @@ export class LanRoom {
       if (!id || id === this.localId) return;
       const name = sanitizeDisplayName(data.name, "Peer");
       this.peerNames.set(id, name);
+      // Show in contact list while DataChannel is still negotiating.
+      this.enterSoftOnline(id, SOFT_ONLINE_GRACE_MS);
       this.emitPeers();
       // Dial announced peer over PeerJS when we are online (LAN / mesh).
       if (this.peer && this.localId) {
@@ -322,10 +298,41 @@ export class LanRoom {
     };
 
     await this.claimOrJoinHost(hostId);
+    if (this.closed) return;
     this.startLocalAnnounce();
     this.bindPresenceLifecycle();
     this.startHeartbeat();
     this.armLanIceFallback();
+
+    // Background STUN health check — never blocks discovery. Only drops dead STUN
+    // after join if we still have zero live channels and STUN appears fully dead.
+    if (hasRemoteIce(this.iceConfig) && !this.iceForceLanOnly) {
+      void this.backgroundRefineStun();
+    }
+  }
+
+  /** Non-blocking STUN check after PeerJS is already up. */
+  private async backgroundRefineStun() {
+    try {
+      const { config: liveIce, failedStun } = await sanitizeIceConfigWithLiveStun(this.iceConfig);
+      if (this.closed || this.iceForceLanOnly) return;
+      // If every STUN failed and we still have no open channels, switch to host-only ICE once.
+      if (failedStun.length > 0 && liveIce.stunUrls.length === 0) {
+        for (const conn of this.connections.values()) {
+          if (conn.open) return; // already connected — leave ICE as-is
+        }
+        // Keep TURN if any; only clear STUN.
+        this.iceConfig = { ...this.iceConfig, stunUrls: [] };
+        if (!hasRemoteIce(this.iceConfig)) {
+          await this.maybeSwitchToLanOnlyIce();
+        }
+      } else if (liveIce.stunUrls.length > 0 && liveIce.stunUrls.length < this.iceConfig.stunUrls.length) {
+        // Drop only the dead STUN URLs for future peer rebuilds; don't tear down live mesh.
+        this.iceConfig = { ...this.iceConfig, stunUrls: liveIce.stunUrls };
+      }
+    } catch {
+      // ignore — discovery already running
+    }
   }
 
   private startLocalAnnounce() {
@@ -1075,8 +1082,9 @@ export class LanRoom {
           return;
         }
 
-        // Remember the discovery host as a visible peer immediately.
+        // Remember the discovery host as a visible peer immediately (show while dialing).
         this.rememberPeer(hostId, "User");
+        this.enterSoftOnline(hostId, DIALING_SOFT_ONLINE_MS);
         this.dialPeer(hostId, true);
         // Keep retrying host until the channel opens (host may still be starting).
         this.scheduleReconnect(hostId, true);
@@ -1157,31 +1165,44 @@ export class LanRoom {
   }
 
   private acceptConnection(conn: DataConnection) {
-    const remoteId = sanitizePeerId(conn.peer) || conn.peer;
+    const remoteId = sanitizePeerId(conn.peer);
+    if (!remoteId || remoteId === this.localId) {
+      try {
+        conn.close();
+      } catch {
+        // ignore
+      }
+      return;
+    }
     this.rememberPeer(remoteId, this.peerNames.get(remoteId) || "User");
+    this.enterSoftOnline(remoteId, DIALING_SOFT_ONLINE_MS);
     this.wireConnection(conn, remoteId, false);
   }
 
   /** Open (or re-open) a reliable data connection to peerId. */
   private dialPeer(peerId: string, outgoing: boolean) {
-    if (!this.peer || !peerId || peerId === this.localId) return;
-    const existing = this.connections.get(peerId);
+    const target = sanitizePeerId(peerId);
+    if (!this.peer || !target || target === this.localId) return;
+    const existing = this.connections.get(target);
     if (existing?.open) return;
+    // Show in online list while ICE/DataChannel negotiates.
+    this.enterSoftOnline(target, DIALING_SOFT_ONLINE_MS);
     // Drop a stuck half-open dial before opening another.
     if (existing && !existing.open) {
-      this.clearDialOpenTimer(peerId);
+      this.clearDialOpenTimer(target);
       try {
         existing.close();
       } catch {
         // ignore
       }
-      if (this.connections.get(peerId) === existing) {
-        this.connections.delete(peerId);
+      if (this.connections.get(target) === existing) {
+        this.connections.delete(target);
       }
     }
     try {
-      const conn = this.peer.connect(peerId, { reliable: true, serialization: "json" });
-      this.wireConnection(conn, peerId, outgoing);
+      // reliable:true uses SCTP ordered mode; serialization json matches wire format.
+      const conn = this.peer.connect(target, { reliable: true, serialization: "json" });
+      this.wireConnection(conn, target, outgoing);
     } catch {
       // ignore dial failures; scheduleReconnect will retry
       this.armLanIceFallback();
@@ -1659,13 +1680,12 @@ export class LanRoom {
   }
 
   private ensureMeshConnection(peerId: string) {
-    if (!this.peer || !peerId || peerId === this.localId) return;
-    if (this.connections.get(peerId)?.open) return;
-    // Only one side dials to avoid glare: higher id initiates.
-    // Exception: anyone may dial the discovery host.
-    const hostId = roomHostId(this.room);
-    if (peerId !== hostId && this.localId < peerId) return;
-    this.dialPeer(peerId, true);
+    const target = sanitizePeerId(peerId);
+    if (!this.peer || !target || target === this.localId) return;
+    if (this.connections.get(target)?.open) return;
+    // Both sides may dial: LAN discovery is more reliable under NAT/glare than
+    // a strict "higher id only" rule (half-open collisions are dropped in wireConnection).
+    this.dialPeer(target, true);
   }
 
   private broadcastPeerList() {
