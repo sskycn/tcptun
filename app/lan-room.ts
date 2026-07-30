@@ -1,5 +1,13 @@
 import Peer, { type DataConnection } from "peerjs";
 import {
+  EMPTY_ICE_CONFIG,
+  iceMode,
+  iceModeHint,
+  iceModeLabel,
+  peerRtcConfig,
+  type LanIceConfig,
+} from "./lan-ice";
+import {
   MAX_CHAT_TEXT_CHARS,
   assertSendableChat,
   isFiniteTimestamp,
@@ -10,6 +18,7 @@ import {
 } from "./lan-security";
 
 export { MAX_CHAT_TEXT_CHARS };
+export type { LanIceConfig };
 
 export type ChatMessage = {
   id: string;
@@ -73,6 +82,16 @@ export type LanRoomHandlers = {
   onTransfer: (progress: TransferProgress) => void;
   onError: (error: string) => void;
   onJoined: (info: { peerId: string; isHost: boolean; room: string }) => void;
+  /** Called when a preferred peer id was rejected and a new one was minted. */
+  onIdentityRotated?: (peerId: string) => void;
+};
+
+export type LanJoinOptions = {
+  room: string;
+  displayName: string;
+  iceConfig?: LanIceConfig;
+  /** Stable PeerJS id for guest / personal identity (persisted by the UI). */
+  preferredPeerId?: string;
 };
 
 function uid(): string {
@@ -116,6 +135,8 @@ export class LanRoom {
   private peerNames = new Map<string, string>();
   private broadcast: BroadcastChannel | null = null;
   private closed = false;
+  private iceConfig: LanIceConfig = { ...EMPTY_ICE_CONFIG };
+  private preferredPeerId = "";
   private incoming = new Map<
     string,
     {
@@ -132,6 +153,15 @@ export class LanRoom {
 
   constructor(handlers: LanRoomHandlers) {
     this.handlers = handlers;
+  }
+
+  private statusForMode(base: string): string {
+    const mode = iceMode(this.iceConfig);
+    const label = iceModeLabel(mode);
+    if (mode === "lan-only") {
+      return `${base} Mode: ${label} — ${iceModeHint(mode)}`;
+    }
+    return `${base} ICE: ${label}.`;
   }
 
   get peerId(): string {
@@ -155,16 +185,27 @@ export class LanRoom {
     this.emitPeers();
   }
 
-  async join(room: string, displayName: string): Promise<void> {
+  async join(
+    roomOrOptions: string | LanJoinOptions,
+    displayName?: string,
+    iceConfig?: LanIceConfig,
+  ): Promise<void> {
+    const options: LanJoinOptions =
+      typeof roomOrOptions === "string"
+        ? { room: roomOrOptions, displayName: displayName || "User", iceConfig, preferredPeerId: undefined }
+        : roomOrOptions;
+
     this.leave();
     this.closed = false;
-    this.room = room.trim().slice(0, 64) || "tcptun-lan";
-    this.localName = sanitizeDisplayName(displayName, "User");
+    this.room = options.room.trim().slice(0, 64) || "tcptun-lan";
+    this.localName = sanitizeDisplayName(options.displayName, "User");
+    this.iceConfig = options.iceConfig ? { ...options.iceConfig } : { ...EMPTY_ICE_CONFIG };
+    this.preferredPeerId = sanitizePeerId(options.preferredPeerId) || "";
     this.peerNames.clear();
     this.connections.clear();
 
     const hostId = roomHostId(this.room);
-    this.handlers.onStatus("Looking for online users…");
+    this.handlers.onStatus(this.statusForMode("Looking for online users…"));
 
     // Same-origin multi-tab discovery
     this.broadcast = new BroadcastChannel(BC_PREFIX + hostId);
@@ -173,8 +214,7 @@ export class LanRoom {
       const data = event.data as WireMessage | { v: 1; t: "bc-announce"; id: string; name: string };
       if (!data || typeof data !== "object") return;
       if ("t" in data && data.t === "bc-announce" && data.id && data.id !== this.localId) {
-        // Another tab in this browser — ask PeerJS mesh isn't needed; we still use PeerJS for real peers.
-        // Optionally show as system presence only if we later add local-only mode.
+        // Another tab in this browser — PeerJS mesh handles real peers.
         return;
       }
     };
@@ -365,12 +405,7 @@ export class LanRoom {
     await new Promise<void>((resolve, reject) => {
       const hostPeer = new Peer(hostId, {
         debug: 0,
-        config: {
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-          ],
-        },
+        config: peerRtcConfig(this.iceConfig),
       });
 
       let settled = false;
@@ -395,7 +430,7 @@ export class LanRoom {
         this.isHost = true;
         this.peerNames.set(id, this.localName);
         this.handlers.onJoined({ peerId: id, isHost: true, room: this.room });
-        this.handlers.onStatus("You are online. Waiting for other users…");
+        this.handlers.onStatus(this.statusForMode("You are online. Waiting for other users…"));
         this.emitPeers();
         this.bindHost(hostPeer);
         this.broadcast?.postMessage({ v: 1, t: "bc-announce", id, name: this.localName });
@@ -418,34 +453,47 @@ export class LanRoom {
     });
   }
 
-  private async joinAsGuest(hostId: string): Promise<void> {
+  private async joinAsGuest(hostId: string, preferredId?: string, attempt = 0): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      const peer = new Peer({
-        debug: 0,
-        config: {
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-          ],
-        },
-      });
+      // Reuse a stable peer id so reloads look like the same user to others.
+      const wantId = preferredId || this.preferredPeerId || undefined;
+      const peer = wantId
+        ? new Peer(wantId, {
+            debug: 0,
+            config: peerRtcConfig(this.iceConfig),
+          })
+        : new Peer({
+            debug: 0,
+            config: peerRtcConfig(this.iceConfig),
+          });
+
+      let settled = false;
 
       peer.on("open", (id) => {
+        if (settled) return;
+        settled = true;
         this.peer = peer;
         this.localId = id;
         this.isHost = false;
+        this.preferredPeerId = id;
         this.peerNames.set(id, this.localName);
         this.handlers.onJoined({ peerId: id, isHost: false, room: this.room });
-        this.handlers.onStatus(`Your key is ready. Finding online users…`);
+        this.handlers.onStatus(this.statusForMode("Your key is ready. Finding online users…"));
         this.emitPeers();
 
         peer.on("connection", (conn) => this.acceptConnection(conn));
+
+        // Never dial yourself if preferred id somehow collides with host.
+        if (id === hostId) {
+          resolve();
+          return;
+        }
 
         const conn = peer.connect(hostId, { reliable: true });
         this.wireConnection(conn, hostId, true);
 
         conn.on("open", () => {
-          this.handlers.onStatus("Online users will appear automatically.");
+          this.handlers.onStatus(this.statusForMode("Online users will appear automatically."));
           resolve();
         });
 
@@ -457,8 +505,33 @@ export class LanRoom {
       });
 
       peer.on("error", (err) => {
+        const type = String((err as { type?: string }).type || "");
+        // Stale tab may still hold our id — mint a new stable id once.
+        if (type === "unavailable-id" && attempt < 2) {
+          if (settled) return;
+          settled = true;
+          try {
+            peer.destroy();
+          } catch {
+            // ignore
+          }
+          const fresh =
+            typeof globalThis.crypto?.randomUUID === "function"
+              ? `tcptu${globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`
+              : `tcptu${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+          this.preferredPeerId = fresh;
+          this.handlers.onIdentityRotated?.(fresh);
+          this.handlers.onStatus("Previous session still online. Using a new stable key…");
+          void this.joinAsGuest(hostId, fresh, attempt + 1)
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
         this.handlers.onError(err.message || "Peer connection error");
-        if (!this.localId) reject(err instanceof Error ? err : new Error(String(err)));
+        if (!this.localId && !settled) {
+          settled = true;
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
       });
     });
   }

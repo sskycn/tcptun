@@ -851,6 +851,85 @@ main {
   line-height: 1.45;
 }
 
+.wx-ice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wx-ice-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.wx-ice-badge.is-lan {
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  color: var(--text);
+}
+
+.wx-ice-badge.is-wan {
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 70%, var(--surface));
+  color: var(--cyan-text);
+}
+
+.wx-ice-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  padding: 12px;
+}
+
+.wx-ice-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.wx-ice-hint strong {
+  color: var(--text);
+}
+
+.wx-ice-textarea {
+  min-height: 72px !important;
+  font-size: 11.5px !important;
+}
+
+.wx-ice-creds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.wx-ice-creds input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  padding: 0 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.wx-ice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .wx-contact-list {
   overflow: auto;
   min-height: 0;
@@ -886,6 +965,20 @@ main {
 
 .wx-contact.is-selected {
   background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface));
+}
+
+.wx-contact.is-offline {
+  opacity: 0.78;
+}
+
+.wx-contact.is-offline .wx-avatar {
+  filter: grayscale(0.45);
+}
+
+.wx-history-note {
+  opacity: 0.8;
+  font-size: 12px !important;
+  font-style: italic;
 }
 
 .wx-contact-body {
@@ -5546,6 +5639,10 @@ button:focus-visible {
   }
 
   .wx-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .wx-ice-creds {
     grid-template-columns: 1fr;
   }
 
