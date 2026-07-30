@@ -727,240 +727,374 @@ main {
   cursor: pointer;
 }
 
-/* ---------- LAN WebRTC share ---------- */
+/* ---------- LAN chat (WeChat-style shell) ---------- */
 
 .lan-section {
   padding-top: 8px;
 }
 
-.lan-layout {
+.wx-shell {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.lan-panel {
-  display: grid;
-  gap: 16px;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  min-height: min(72vh, 780px);
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
   border-radius: var(--radius);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-elevated) 96%, var(--primary-soft)),
-      var(--surface)
-    );
-  padding: 20px;
-  box-shadow: 0 12px 32px rgb(var(--shadow) / 0.05);
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgb(var(--shadow) / 0.06);
+  overflow: hidden;
+}
+
+.wx-sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  border-right: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-soft) 75%, var(--surface));
+}
+
+.wx-sidebar-header {
+  display: grid;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 90%, var(--primary-soft));
+}
+
+.wx-me {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.wx-me-copy {
+  display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
-.lan-panel-heading {
-  display: grid;
-  gap: 12px;
+.wx-me-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
 }
 
-.lan-panel-heading h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-
-.lan-panel-heading p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.lan-status-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.lan-status-pills span {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: 999px;
-  background: var(--surface);
-  padding: 5px 10px;
+.wx-me-copy span {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
 }
 
-.lan-status-pills span.is-live {
-  border-color: color-mix(in srgb, var(--primary) 40%, var(--line));
-  background: color-mix(in srgb, var(--primary-soft) 70%, var(--surface));
+.wx-me-copy span.is-live {
   color: var(--cyan-text);
 }
 
-.lan-setup,
-.lan-signaling {
-  display: grid;
-  gap: 14px;
+.wx-avatar {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 70%, #3a7), color-mix(in srgb, var(--primary) 40%, #1a4));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  user-select: none;
 }
 
-.lan-actions {
+.wx-avatar-self {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 70%, #c60), color-mix(in srgb, var(--primary) 50%, #284));
+}
+
+.wx-avatar-sm {
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
+}
+
+.wx-alias-row,
+.wx-key-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.lan-code-block,
-.lan-tool-card {
-  display: grid;
-  gap: 10px;
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: var(--radius-small);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  padding: 14px;
-}
-
-.lan-code-heading,
-.lan-meta-row,
-.lan-transfer-meta,
-.lan-compose-row {
-  display: flex;
-  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
 }
 
-.lan-meta-row {
-  justify-content: flex-start;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.lan-status-text {
-  color: var(--text);
-  font-weight: 650;
-}
-
-.lan-code-input {
-  width: 100%;
-  min-height: 110px;
-  resize: vertical;
+.wx-alias-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
   border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
   border-radius: var(--radius-xs);
   background: var(--surface);
-  padding: 10px 12px;
+  padding: 0 10px;
   color: var(--text);
-  font: 12px/1.5 var(--font-jetbrains), ui-monospace, monospace;
+  font: inherit;
+  font-size: 13px;
 }
 
-.lan-config-input {
-  min-height: 140px;
+.wx-key-row code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
 }
 
-.lan-candidates ul {
+.wx-status-line {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.wx-contact-list {
+  overflow: auto;
+  min-height: 0;
+}
+
+.wx-contact-empty {
+  padding: 28px 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.wx-contact {
   display: grid;
-  gap: 6px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  background: transparent;
+  padding: 12px 14px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-contact:hover {
+  background: color-mix(in srgb, var(--primary-soft) 30%, transparent);
+}
+
+.wx-contact.is-selected {
+  background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface));
+}
+
+.wx-contact-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wx-contact-top,
+.wx-contact-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wx-contact-top strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.wx-contact-top time {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.wx-contact-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.wx-unread {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #fa5151;
+  padding: 0 5px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.wx-chat {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  min-width: 0;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-soft) 88%, #dce3ea),
+      color-mix(in srgb, var(--surface) 92%, #e8edf2)
+    );
+}
+
+html.dark .wx-chat {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-soft) 90%, #1a222c),
+      var(--surface)
+    );
+}
+
+.wx-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+  padding: 10px 16px;
+}
+
+.wx-chat-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wx-chat-title strong {
+  font-size: 16px;
+}
+
+.wx-chat-title span {
   color: var(--muted);
   font-size: 12px;
 }
 
-.lan-chat-panel {
-  min-height: 680px;
-  grid-template-rows: auto minmax(240px, 1fr) auto auto;
-}
-
-.lan-chat-panel.is-online {
-  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
-}
-
-.lan-chat-header strong {
-  display: block;
-  color: var(--text);
-  font-size: 16px;
-}
-
-.lan-chat-header p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.lan-chat-log {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-  min-height: 260px;
-  max-height: 420px;
+.wx-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
   overflow: auto;
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: var(--radius-small);
-  background: color-mix(in srgb, var(--surface-soft) 70%, var(--surface));
-  padding: 12px;
+  padding: 16px 14px 12px;
 }
 
-.lan-empty {
+.wx-empty {
+  margin: auto;
+  max-width: 320px;
+  padding: 24px 12px;
   color: var(--muted);
-  font-size: 13.5px;
-  line-height: 1.6;
-  padding: 18px 8px;
+  text-align: center;
 }
 
-.lan-message {
+.wx-empty p {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.wx-empty span {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.wx-system {
+  align-self: center;
+  max-width: 90%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  padding: 4px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.wx-bubble-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  max-width: 100%;
+}
+
+.wx-bubble-row.is-self {
+  justify-content: flex-end;
+}
+
+.wx-bubble-row.is-peer {
+  justify-content: flex-start;
+}
+
+.wx-bubble {
   display: grid;
   gap: 6px;
-  max-width: 92%;
-  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
-  border-radius: 14px;
-  background: var(--surface);
-  padding: 10px 12px;
-}
-
-.lan-message.is-self {
-  justify-self: end;
-  border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
-  background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface));
-}
-
-.lan-message-system {
-  justify-self: center;
-  max-width: 100%;
-  background: transparent;
-  border-style: dashed;
-  color: var(--muted);
-}
-
-.lan-message header {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.lan-message p {
-  margin: 0;
+  max-width: min(72%, 520px);
+  border-radius: 6px;
+  background: var(--surface-elevated);
+  padding: 10px 12px 6px;
+  box-shadow: 0 1px 2px rgb(var(--shadow) / 0.06);
   color: var(--text);
   font-size: 14px;
   line-height: 1.55;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.wx-bubble-row.is-self .wx-bubble {
+  background: color-mix(in srgb, #95ec69 82%, var(--surface));
+  color: #111;
+}
+
+html.dark .wx-bubble-row.is-self .wx-bubble {
+  background: color-mix(in srgb, #3f6f2a 70%, var(--surface));
+  color: var(--text);
+}
+
+.wx-bubble-name {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.wx-bubble-time {
+  justify-self: end;
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+  font-size: 10.5px;
+}
+
+.wx-plain {
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .lan-download-link {
   justify-self: start;
+  font-size: 12px !important;
+  min-height: 32px !important;
+  padding: 0 10px !important;
 }
 
-.lan-transfers {
+.wx-transfers {
   display: grid;
   gap: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: 8px 14px;
 }
 
 .lan-transfer {
@@ -969,6 +1103,9 @@ main {
 }
 
 .lan-transfer-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -991,27 +1128,22 @@ main {
   background: var(--accent);
 }
 
-.lan-compose {
-  display: grid;
-  gap: 12px;
-}
-
-.lan-compose-row input {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-  border-radius: var(--radius-xs);
-  background: var(--surface);
-  padding: 0 12px;
-  color: var(--text);
-  font: inherit;
-}
-
-.lan-tools {
+.wx-tools {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: var(--surface);
+  padding: 12px 14px;
+}
+
+.lan-tool-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--surface-soft) 70%, var(--surface));
+  padding: 12px;
 }
 
 .lan-tool-card strong {
@@ -1019,121 +1151,257 @@ main {
   font-size: 13px;
 }
 
-.lan-peer-list {
-  display: grid;
-  gap: 10px;
-}
-
-.lan-peer-list strong {
-  color: var(--text);
-  font-size: 13px;
-}
-
-.lan-peer-list ul {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.lan-peer-list li {
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: 12px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13.5px;
-  overflow: hidden;
-}
-
-.lan-peer-list li.is-selected {
-  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
-  background: color-mix(in srgb, var(--primary-soft) 50%, var(--surface));
-}
-
-.lan-peer-list li button {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
+.lan-code-input {
   width: 100%;
-  border: 0;
-  background: transparent;
-  padding: 11px 12px;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+  min-height: 90px;
+  resize: vertical;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  padding: 10px 12px;
+  color: var(--text);
+  font: 12px/1.5 var(--font-jetbrains), ui-monospace, monospace;
 }
 
-.lan-peer-list li button:hover {
-  background: color-mix(in srgb, var(--primary-soft) 38%, transparent);
+.lan-config-input {
+  min-height: 110px;
 }
 
-.lan-peer-name {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
+.wx-compose {
+  border-top: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+  padding: 10px 14px 12px;
 }
 
-.lan-peer-name strong,
-.lan-peer-name code {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.wx-error {
+  margin: 0 0 8px;
 }
 
-.lan-unread {
-  display: inline-grid;
-  min-width: 20px;
-  height: 20px;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--accent);
-  padding: 0 6px;
-  color: white;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.lan-peer-list code {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.lan-peer-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
-}
-
-.lan-identity-card {
+.wx-compose-main {
   display: grid;
   gap: 8px;
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--line));
-  border-radius: var(--radius-small);
-  background: color-mix(in srgb, var(--primary-soft) 35%, var(--surface));
-  padding: 12px;
 }
 
-.lan-identity-card > span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 750;
-  text-transform: uppercase;
-}
-
-.lan-identity-card code {
-  overflow-wrap: anywhere;
+.wx-compose-main textarea {
+  width: 100%;
+  min-height: 56px;
+  max-height: 160px;
+  resize: vertical;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  padding: 10px 12px;
   color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wx-compose-main textarea:disabled {
+  opacity: 0.55;
+}
+
+.wx-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.wx-char-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Secure Markdown inside bubbles */
+.lan-md {
+  display: grid;
+  gap: 0.35em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lan-md > :first-child {
+  margin-top: 0;
+}
+
+.lan-md > :last-child {
+  margin-bottom: 0;
+}
+
+.lan-md p,
+.lan-md ul,
+.lan-md ol,
+.lan-md blockquote,
+.lan-md pre,
+.lan-md table {
+  margin: 0.35em 0;
+}
+
+.lan-md h1,
+.lan-md h2,
+.lan-md h3,
+.lan-md h4,
+.lan-md h5,
+.lan-md h6 {
+  margin: 0.45em 0 0.2em;
+  font-size: 1em;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.lan-md ul,
+.lan-md ol {
+  padding-left: 1.25em;
+}
+
+.lan-md li {
+  margin: 0.15em 0;
+}
+
+.lan-md blockquote {
+  border-left: 3px solid color-mix(in srgb, var(--line) 90%, transparent);
+  margin-left: 0;
+  padding-left: 0.75em;
+  color: color-mix(in srgb, currentColor 75%, transparent);
+}
+
+.lan-md a {
+  color: #576b95;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+
+html.dark .lan-md a {
+  color: #7eb0ff;
+}
+
+.lan-md-code-inline {
+  border-radius: 4px;
+  background: color-mix(in srgb, #000 8%, transparent);
+  padding: 0.1em 0.35em;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+.lan-md-pre,
+.lan-md pre {
+  overflow: auto;
+  max-width: 100%;
+  border-radius: 6px;
+  background: color-mix(in srgb, #000 10%, var(--surface));
+  padding: 10px 12px;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-size: 12px;
   line-height: 1.5;
 }
 
-.lan-identity-card .button {
-  justify-self: start;
+html.dark .lan-md-pre,
+html.dark .lan-md pre {
+  background: color-mix(in srgb, #000 35%, var(--surface));
+}
+
+.lan-md-code-block {
+  font-family: inherit;
+  font-size: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+.lan-md-table-wrap {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.lan-md table {
+  border-collapse: collapse;
+  width: max-content;
+  max-width: 100%;
+  font-size: 12.5px;
+}
+
+.lan-md th,
+.lan-md td {
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  padding: 4px 8px;
+}
+
+.lan-md th {
+  background: color-mix(in srgb, var(--line) 25%, transparent);
+  font-weight: 700;
+}
+
+.lan-md-img {
+  display: block;
+  max-width: min(100%, 280px);
+  max-height: 220px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.lan-md-img-reveal {
+  display: inline-flex;
+  max-width: 100%;
+  border: 1px dashed color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  padding: 8px 10px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lan-md-img-blocked,
+.lan-md-link-blocked {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lan-md-task-checkbox {
+  margin-right: 0.4em;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+/* highlight.js token colors (theme-agnostic, no external CSS) */
+.lan-md .hljs-comment,
+.lan-md .hljs-quote {
+  color: #6a737d;
+}
+.lan-md .hljs-keyword,
+.lan-md .hljs-selector-tag,
+.lan-md .hljs-literal {
+  color: #d73a49;
+}
+.lan-md .hljs-string,
+.lan-md .hljs-attr {
+  color: #032f62;
+}
+.lan-md .hljs-number,
+.lan-md .hljs-built_in {
+  color: #005cc5;
+}
+.lan-md .hljs-title,
+.lan-md .hljs-section {
+  color: #6f42c1;
+}
+html.dark .lan-md .hljs-comment {
+  color: #8b949e;
+}
+html.dark .lan-md .hljs-keyword {
+  color: #ff7b72;
+}
+html.dark .lan-md .hljs-string {
+  color: #a5d6ff;
+}
+html.dark .lan-md .hljs-number {
+  color: #79c0ff;
+}
+html.dark .lan-md .hljs-title {
+  color: #d2a8ff;
 }
 
 .page-bg {
@@ -5129,13 +5397,27 @@ button:focus-visible {
   .guide-wizard-main,
   .guide-choice-grid,
   .guide-review-list > div,
-  .lan-layout,
-  .lan-tools {
+  .wx-shell {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .wx-sidebar {
+    max-height: 42vh;
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  }
+
+  .wx-chat {
+    min-height: 55vh;
+  }
+
+  .wx-tools {
     grid-template-columns: 1fr;
   }
 
-  .lan-chat-panel {
-    min-height: 0;
+  .wx-bubble {
+    max-width: 88%;
   }
 
   .cookie-banner-inner {

@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import LanMarkdown, { markdownPreview } from "./lan-markdown";
 import {
   LanRoom,
+  MAX_CHAT_TEXT_CHARS,
   MAX_LAN_FILE_BYTES,
   type ChatMessage,
   type RoomPeer,
   type TransferProgress,
 } from "./lan-room";
+import {
+  MAX_STORED_MESSAGES,
+  avatarInitials,
+  isSafeObjectUrl,
+  sanitizeDisplayName,
+  sanitizeFileName,
+} from "./lan-security";
 
 const DISCOVERY_CHANNEL = "tcptun-direct-users-v1";
 
@@ -20,6 +29,15 @@ function formatBytes(size: number): string {
 function defaultDisplayName(): string {
   return `User-${Math.floor(100 + Math.random() * 900)}`;
 }
+
+function formatClock(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+type ContactRow = RoomPeer & {
+  lastMessage?: ChatMessage;
+  unreadCount: number;
+};
 
 export default function LanShare() {
   const [localName, setLocalName] = useState(defaultDisplayName);
@@ -35,6 +53,7 @@ export default function LanShare() {
   const [transfers, setTransfers] = useState<TransferProgress[]>([]);
   const [configName, setConfigName] = useState("client.json");
   const [configBody, setConfigBody] = useState("");
+  const [showTools, setShowTools] = useState(false);
   const [discoveryKey, setDiscoveryKey] = useState(0);
 
   const roomRef = useRef<LanRoom | null>(null);
@@ -42,11 +61,28 @@ export default function LanShare() {
   const localNameRef = useRef(localName);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const composeRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const contacts = useMemo(
-    () => peers.filter((peer) => !peer.self && peer.connected),
-    [peers],
-  );
+  const contacts: ContactRow[] = useMemo(() => {
+    const online = peers.filter((peer) => !peer.self && peer.connected);
+    return online
+      .map((peer) => {
+        const peerMessages = messages.filter((m) => m.peerId === peer.id && m.kind !== "system");
+        const lastMessage = peerMessages[peerMessages.length - 1];
+        return {
+          ...peer,
+          lastMessage,
+          unreadCount: unread[peer.id] || 0,
+        };
+      })
+      .sort((a, b) => {
+        const at = a.lastMessage?.ts || 0;
+        const bt = b.lastMessage?.ts || 0;
+        if (at !== bt) return bt - at;
+        return a.name.localeCompare(b.name);
+      });
+  }, [peers, messages, unread]);
+
   const selectedPeer = contacts.find((peer) => peer.id === selectedPeerId);
   const conversation = useMemo(
     () => messages.filter((message) => message.peerId === selectedPeerId),
@@ -76,7 +112,10 @@ export default function LanShare() {
       onPeers: (next) => active && setPeers(next),
       onMessage: (message) => {
         if (!active) return;
-        setMessages((prev) => [...prev, message]);
+        setMessages((prev) => {
+          const next = [...prev, message];
+          return next.length > MAX_STORED_MESSAGES ? next.slice(-MAX_STORED_MESSAGES) : next;
+        });
         if (message.peerId && message.peerId !== selectedPeerRef.current && message.kind !== "system") {
           setUnread((prev) => ({ ...prev, [message.peerId!]: (prev[message.peerId!] || 0) + 1 }));
         }
@@ -115,6 +154,8 @@ export default function LanShare() {
     setSelectedPeerId(id);
     setUnread((prev) => ({ ...prev, [id]: 0 }));
     setError(null);
+    setShowTools(false);
+    window.setTimeout(() => composeRef.current?.focus(), 0);
   }
 
   function restartDiscovery() {
@@ -128,7 +169,7 @@ export default function LanShare() {
   }
 
   function applyAlias() {
-    const alias = localName.trim() || defaultDisplayName();
+    const alias = sanitizeDisplayName(localName, defaultDisplayName());
     setLocalName(alias);
     roomRef.current?.setDisplayName(alias);
     setStatus(`Alias updated to ${alias}.`);
@@ -159,7 +200,9 @@ export default function LanShare() {
     if (!selectedPeerId) return;
     try {
       roomRef.current?.sendConfig(selectedPeerId, configName, configBody);
+      setConfigBody("");
       setError(null);
+      setShowTools(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to share config.");
     }
@@ -177,32 +220,28 @@ export default function LanShare() {
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+    setShowTools(false);
   }
 
   return (
     <section className="section lan-section" id="lan">
-      <div className="lan-layout">
-        <div className="lan-panel">
-          <div className="lan-panel-heading">
-            <div>
-              <p className="eyebrow">WebRTC · direct messages</p>
-              <h2>Online users</h2>
-              <p>
-                Your key is generated automatically. Online users appear here; choose one to start a
-                private peer-to-peer conversation.
-              </p>
-            </div>
-            <div className="lan-status-pills">
-              <span className={joined ? "is-live" : undefined}>{joined ? "Discoverable" : "Offline"}</span>
-              <span>
-                {contacts.length} user{contacts.length === 1 ? "" : "s"} online
+      <div className="wx-shell" data-online={joined ? "1" : "0"}>
+        {/* —— Left: contacts (WeChat-style) —— */}
+        <aside className="wx-sidebar">
+          <header className="wx-sidebar-header">
+            <div className="wx-me">
+              <span className="wx-avatar wx-avatar-self" aria-hidden="true">
+                {avatarInitials(localName)}
               </span>
+              <div className="wx-me-copy">
+                <strong>{localName}</strong>
+                <span className={joined ? "is-live" : undefined}>
+                  {joined ? "Online" : "Connecting…"} · {contacts.length} contact
+                  {contacts.length === 1 ? "" : "s"}
+                </span>
+              </div>
             </div>
-          </div>
-
-          <div className="lan-setup">
-            <label className="guide-field">
-              <span>Your alias</span>
+            <div className="wx-alias-row">
               <input
                 value={localName}
                 onChange={(event) => setLocalName(event.target.value)}
@@ -211,115 +250,177 @@ export default function LanShare() {
                 }}
                 maxLength={40}
                 autoComplete="off"
+                aria-label="Your alias"
+                placeholder="Alias"
               />
-            </label>
-            <div className="lan-actions">
-              <button type="button" className="button secondary" disabled={!joined} onClick={applyAlias}>
-                Save alias
+              <button type="button" className="button ghost" disabled={!joined} onClick={applyAlias}>
+                Save
+              </button>
+            </div>
+            <div className="wx-key-row">
+              <code title={peerId || undefined}>{peerId ? `${peerId.slice(0, 14)}…` : "Generating key…"}</code>
+              <button type="button" className="button ghost" disabled={!peerId} onClick={() => void copyKey()}>
+                Copy
               </button>
               <button type="button" className="button ghost" onClick={restartDiscovery}>
-                Retry discovery
+                Retry
               </button>
             </div>
+            <p className="wx-status-line">{status}</p>
+          </header>
 
-            <div className="lan-identity-card">
-              <span>Your key</span>
-              <code>{peerId || "Generating…"}</code>
-              <button type="button" className="button ghost" disabled={!peerId} onClick={() => void copyKey()}>
-                Copy key
-              </button>
-            </div>
-
-            <p className="lan-status-text">{status}</p>
-
-            <div className="lan-peer-list">
-              <strong>Users available to chat</strong>
-              {contacts.length === 0 ? (
-                <p className="guide-field-hint">No other users are online yet. Keep this page open to stay visible.</p>
-              ) : (
-                <ul>
-                  {contacts.map((peer) => (
-                    <li key={peer.id} className={peer.id === selectedPeerId ? "is-selected" : undefined}>
-                      <button type="button" onClick={() => selectContact(peer.id)}>
-                        <span className="lan-peer-dot" aria-hidden="true" />
-                        <span className="lan-peer-name">
-                          <strong>{peer.name}</strong>
-                          <code>{peer.id.slice(0, 12)}…</code>
-                        </span>
-                        {unread[peer.id] ? <span className="lan-unread">{unread[peer.id]}</span> : null}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <ul className="guide-wizard-bullets">
-              <li>No room name or invitation flow: users are discovered automatically.</li>
-              <li>Messages and files are sent only to the user you select.</li>
-              <li>PeerJS introduces users; content travels over WebRTC DataChannels.</li>
-              <li>Max file size {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB per transfer.</li>
-            </ul>
-
-            {error ? (
-              <p className="generator-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className={`lan-panel lan-chat-panel ${selectedPeer ? "is-online" : ""}`}>
-          <div className="lan-chat-header">
-            <div>
-              <strong>{selectedPeer ? selectedPeer.name : "Select a user"}</strong>
-              <p>
-                {selectedPeer
-                  ? `Private chat · ${selectedPeer.id.slice(0, 16)}…`
-                  : "Choose an online user from the list to start chatting"}
-              </p>
-            </div>
-          </div>
-
-          <div className="lan-chat-log" aria-live="polite">
-            {!selectedPeerId ? (
-              <div className="lan-empty">Select a user to open a one-to-one conversation.</div>
-            ) : conversation.length === 0 ? (
-              <div className="lan-empty">No messages yet. Say hello or send a config/file.</div>
+          <div className="wx-contact-list" role="list">
+            {contacts.length === 0 ? (
+              <div className="wx-contact-empty">
+                No online users yet.
+                <br />
+                Keep this page open to stay discoverable.
+              </div>
             ) : (
-              conversation.map((message) => (
-                <article
-                  key={message.id}
-                  className={`lan-message lan-message-${message.kind} ${
-                    message.fromId === peerId ? "is-self" : ""
-                  }`}
+              contacts.map((peer) => {
+                const selected = peer.id === selectedPeerId;
+                const preview =
+                  peer.lastMessage?.kind === "chat"
+                    ? markdownPreview(peer.lastMessage.text)
+                    : peer.lastMessage
+                      ? peer.lastMessage.text
+                      : "No messages yet";
+                return (
+                  <button
+                    key={peer.id}
+                    type="button"
+                    role="listitem"
+                    className={`wx-contact ${selected ? "is-selected" : ""}`}
+                    onClick={() => selectContact(peer.id)}
+                  >
+                    <span className="wx-avatar" aria-hidden="true">
+                      {avatarInitials(peer.name)}
+                    </span>
+                    <span className="wx-contact-body">
+                      <span className="wx-contact-top">
+                        <strong>{peer.name}</strong>
+                        <time>
+                          {peer.lastMessage ? formatClock(peer.lastMessage.ts) : ""}
+                        </time>
+                      </span>
+                      <span className="wx-contact-bottom">
+                        <span className="wx-contact-preview">{preview}</span>
+                        {peer.unreadCount > 0 ? (
+                          <span className="wx-unread">{peer.unreadCount > 99 ? "99+" : peer.unreadCount}</span>
+                        ) : null}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </aside>
+
+        {/* —— Right: conversation —— */}
+        <div className={`wx-chat ${selectedPeer ? "is-active" : ""}`}>
+          <header className="wx-chat-header">
+            {selectedPeer ? (
+              <>
+                <div className="wx-chat-title">
+                  <strong>{selectedPeer.name}</strong>
+                  <span>Private · peer-to-peer · Markdown supported</span>
+                </div>
+                <button
+                  type="button"
+                  className="button ghost"
+                  onClick={() => setShowTools((v) => !v)}
+                  aria-expanded={showTools}
                 >
-                  <header>
-                    <span>{message.from}</span>
-                    <time>{new Date(message.ts).toLocaleTimeString()}</time>
-                  </header>
-                  <p>{message.text}</p>
-                  {message.fileUrl && message.fileName ? (
-                    <a className="button secondary lan-download-link" href={message.fileUrl} download={message.fileName}>
-                      Download {message.fileName}
-                      {message.fileSize ? ` (${formatBytes(message.fileSize)})` : ""}
-                    </a>
-                  ) : null}
-                </article>
-              ))
+                  {showTools ? "Hide tools" : "File / config"}
+                </button>
+              </>
+            ) : (
+              <div className="wx-chat-title">
+                <strong>Select a contact</strong>
+                <span>Pick someone on the left to start chatting</span>
+              </div>
+            )}
+          </header>
+
+          <div className="wx-chat-log" aria-live="polite">
+            {!selectedPeerId ? (
+              <div className="wx-empty">
+                <p>WeChat-style direct chat</p>
+                <span>Contacts on the left · conversation on the right. Messages support secure Markdown.</span>
+              </div>
+            ) : conversation.length === 0 ? (
+              <div className="wx-empty">
+                <p>Say hello to {selectedPeer?.name}</p>
+                <span>
+                  Markdown: **bold**, `code`, lists, tables. Links open safely; images need your click.
+                </span>
+              </div>
+            ) : (
+              conversation.map((message) => {
+                const mine = message.fromId === peerId;
+                if (message.kind === "system") {
+                  return (
+                    <div key={message.id} className="wx-system">
+                      {message.text}
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={message.id}
+                    className={`wx-bubble-row ${mine ? "is-self" : "is-peer"}`}
+                  >
+                    {!mine ? (
+                      <span className="wx-avatar wx-avatar-sm" aria-hidden="true">
+                        {avatarInitials(message.from)}
+                      </span>
+                    ) : null}
+                    <div className={`wx-bubble lan-message-${message.kind}`}>
+                      {!mine ? <div className="wx-bubble-name">{message.from}</div> : null}
+                      {message.kind === "chat" ? (
+                        <LanMarkdown source={message.text} />
+                      ) : (
+                        <p className="wx-plain">{message.text}</p>
+                      )}
+                      {message.fileUrl && message.fileName && isSafeObjectUrl(message.fileUrl) ? (
+                        <a
+                          className="button secondary lan-download-link"
+                          href={message.fileUrl}
+                          download={sanitizeFileName(message.fileName)}
+                          rel="noopener noreferrer"
+                        >
+                          Download {sanitizeFileName(message.fileName)}
+                          {message.fileSize ? ` (${formatBytes(message.fileSize)})` : ""}
+                        </a>
+                      ) : null}
+                      <time className="wx-bubble-time">{formatClock(message.ts)}</time>
+                    </div>
+                    {mine ? (
+                      <span className="wx-avatar wx-avatar-sm wx-avatar-self" aria-hidden="true">
+                        {avatarInitials(localName)}
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })
             )}
             <div ref={chatEndRef} />
           </div>
 
           {transferList.length > 0 ? (
-            <div className="lan-transfers">
+            <div className="wx-transfers">
               {transferList.map((item) => {
                 const pct = item.total ? Math.min(100, Math.round((item.received / item.total) * 100)) : 0;
                 return (
                   <div key={`${item.id}-${item.direction}`} className="lan-transfer">
                     <div className="lan-transfer-meta">
-                      <span>{item.direction === "send" ? "Sending" : "Receiving"} {item.name}</span>
-                      <span>{item.error ? item.error : item.done ? "Done" : `${pct}% · ${formatBytes(item.received)}`}</span>
+                      <span>
+                        {item.direction === "send" ? "Sending" : "Receiving"} {item.name}
+                      </span>
+                      <span>
+                        {item.error ? item.error : item.done ? "Done" : `${pct}% · ${formatBytes(item.received)}`}
+                      </span>
                     </div>
                     <div className="lan-transfer-bar" aria-hidden="true">
                       <span style={{ width: `${item.error ? 100 : pct}%` }} data-error={item.error ? "1" : "0"} />
@@ -330,31 +431,18 @@ export default function LanShare() {
             </div>
           ) : null}
 
-          <div className="lan-compose">
-            <div className="lan-compose-row">
-              <input
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    handleSendChat();
-                  }
-                }}
-                placeholder={selectedPeer ? `Message ${selectedPeer.name}…` : "Select a user first"}
-                disabled={!selectedPeer}
-              />
-              <button type="button" className="button primary" disabled={!selectedPeer || !draft.trim()} onClick={handleSendChat}>
-                Send
-              </button>
-            </div>
-
-            <div className="lan-tools">
+          {showTools && selectedPeer ? (
+            <div className="wx-tools">
               <div className="lan-tool-card">
                 <strong>Send config</strong>
                 <label className="guide-field">
                   <span>File name</span>
-                  <input value={configName} onChange={(event) => setConfigName(event.target.value)} disabled={!selectedPeer} autoComplete="off" />
+                  <input
+                    value={configName}
+                    onChange={(event) => setConfigName(event.target.value)}
+                    maxLength={180}
+                    autoComplete="off"
+                  />
                 </label>
                 <label className="guide-field">
                   <span>JSON / URI content</span>
@@ -364,23 +452,73 @@ export default function LanShare() {
                     onChange={(event) => setConfigBody(event.target.value)}
                     placeholder="Paste server.json / client.json / client.uri"
                     spellCheck={false}
-                    disabled={!selectedPeer}
                   />
                 </label>
-                <button type="button" className="button secondary" disabled={!selectedPeer || !configBody.trim()} onClick={handleShareConfig}>
-                  Send to {selectedPeer?.name || "user"}
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={!configBody.trim()}
+                  onClick={handleShareConfig}
+                >
+                  Send config to {selectedPeer.name}
                 </button>
               </div>
-
               <div className="lan-tool-card">
                 <strong>Send file</strong>
                 <p className="guide-field-hint">
-                  Send files up to {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB directly to the selected user.
+                  Up to {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB · stored as download only (not executed).
                 </p>
-                <input ref={fileInputRef} type="file" multiple disabled={!selectedPeer} onChange={(event) => void handleFiles(event.target.files)} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={(event) => void handleFiles(event.target.files)}
+                />
               </div>
             </div>
-          </div>
+          ) : null}
+
+          <footer className="wx-compose">
+            {error ? (
+              <p className="generator-error wx-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className="wx-compose-main">
+              <textarea
+                ref={composeRef}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value.slice(0, MAX_CHAT_TEXT_CHARS))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    handleSendChat();
+                  }
+                }}
+                placeholder={
+                  selectedPeer
+                    ? `Message ${selectedPeer.name}… (Markdown · Shift+Enter for newline)`
+                    : "Select a contact first"
+                }
+                disabled={!selectedPeer}
+                rows={2}
+                maxLength={MAX_CHAT_TEXT_CHARS}
+              />
+              <div className="wx-compose-actions">
+                <span className="wx-char-count">
+                  {draft.length}/{MAX_CHAT_TEXT_CHARS}
+                </span>
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={!selectedPeer || !draft.trim()}
+                  onClick={handleSendChat}
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </footer>
         </div>
       </div>
     </section>

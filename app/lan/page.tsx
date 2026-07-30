@@ -7,7 +7,7 @@ import { releaseVersion } from "../site-data";
 export const metadata: Metadata = {
   title: `Direct chat · tcptun v${releaseVersion}`,
   description:
-    "Automatically discover online users and start private one-to-one chats or file transfers over WebRTC.",
+    "WeChat-style LAN chat: contacts on the left, secure Markdown conversation on the right, over WebRTC.",
 };
 
 export default function LanPage() {
@@ -15,8 +15,8 @@ export default function LanPage() {
     <SiteChrome>
       <PageHero
         eyebrow="Direct chat"
-        title="See who is online. Start a private chat."
-        description="Your key is generated automatically and online users appear without a room name. Pick a user to chat, share configs, or transfer files directly over WebRTC DataChannels."
+        title="Contacts on the left. Chat on the right."
+        description="Discover online users automatically. Open a private peer-to-peer conversation with secure Markdown rendering, config sharing, and file transfer over WebRTC DataChannels."
         actions={[
           { href: "/generate/", label: "Generate config", variant: "secondary" },
           { href: "/guide/", label: "Setup wizard", variant: "ghost" },
