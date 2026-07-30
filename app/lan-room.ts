@@ -179,6 +179,8 @@ export class LanRoom {
    * chat identity remains `localId` (user key), never the host id.
    */
   private discoveryPeer: Peer | null = null;
+  /** Guest→hostId bootstrap DataChannel (peer list only — never E2E/chat). */
+  private discoveryBootstrap: DataConnection | null = null;
   private room = "";
   private localName = "User";
   /** Globally unique user key (PeerJS personal id). */
@@ -652,6 +654,12 @@ export class LanRoom {
     }
     this.peer = null;
     try {
+      this.discoveryBootstrap?.close();
+    } catch {
+      // ignore
+    }
+    this.discoveryBootstrap = null;
+    try {
       this.discoveryPeer?.destroy();
     } catch {
       // ignore
@@ -817,6 +825,12 @@ export class LanRoom {
     }
     this.connections.clear();
     this.e2eSessions.clear();
+    try {
+      this.discoveryBootstrap?.close();
+    } catch {
+      // ignore
+    }
+    this.discoveryBootstrap = null;
     try {
       this.peer?.destroy();
     } catch {
@@ -1025,10 +1039,9 @@ export class LanRoom {
         }
         this.discoveryPeer = null;
         this.isHost = false;
-        // Bootstrap: dial room discovery host for peer list / mesh.
+        // Bootstrap: discovery channel only (peer list → then mesh to user keys).
         if (this.localId && this.localId !== hostId) {
-          this.enterSoftOnline(hostId, DIALING_SOFT_ONLINE_MS);
-          this.dialPeer(hostId, true);
+          this.dialDiscovery(hostId);
           this.scheduleReconnect(hostId, true);
         }
         if (this.localId) {
@@ -1166,8 +1179,9 @@ export class LanRoom {
   }
 
   /**
-   * Discovery host only: accept bootstrap connections and fan out the user-key roster.
-   * Chat/E2E stays on the personal Peer (`this.peer` / `localId`).
+   * Discovery host only: peer-list bootstrap. Never run E2E here — that would
+   * pin `connections[guestKey]` to the hostId transport and block personal-mesh
+   * E2E (guest keeps seeing "Securing connection…").
    */
   private bindDiscoveryHost(hostPeer: Peer) {
     hostPeer.on("connection", (conn) => {
@@ -1180,10 +1194,40 @@ export class LanRoom {
         }
         return;
       }
-      // Also wire as a normal mesh path so the first hop can chat immediately.
       this.rememberPeer(remoteId, this.peerNames.get(remoteId) || "User");
       this.enterSoftOnline(remoteId, DIALING_SOFT_ONLINE_MS);
-      this.wireConnection(conn, remoteId, false);
+
+      const pushRoster = () => {
+        if (this.closed || !conn.open) return;
+        try {
+          // Advertise our user key (not the room host id) so the guest can mesh-chat.
+          this.send(conn, {
+            v: 1,
+            t: "hello",
+            id: this.localId,
+            name: this.localName,
+            room: this.room,
+          });
+          this.send(conn, { v: 1, t: "peers", peers: this.rosterForDiscovery() });
+        } catch {
+          // ignore
+        }
+        // Real encrypted chat on personal Peers (user key ↔ user key).
+        this.ensureMeshConnection(remoteId);
+        this.emitPeers();
+      };
+
+      if (conn.open) pushRoster();
+      else conn.on("open", pushRoster);
+
+      conn.on("data", (data) => {
+        try {
+          const msg = (typeof data === "string" ? JSON.parse(data) : data) as WireMessage;
+          this.handleDiscoveryWire(msg, remoteId);
+        } catch {
+          // ignore malformed discovery traffic
+        }
+      });
     });
     hostPeer.on("disconnected", () => {
       if (this.closed) return;
@@ -1195,6 +1239,117 @@ export class LanRoom {
     });
   }
 
+  /** User-key roster for discovery bootstrap (never includes room host id). */
+  private rosterForDiscovery(): Array<{ id: string; name: string }> {
+    const discoveryId = roomHostId(this.room);
+    const peers = Array.from(this.peerNames.entries())
+      .filter(([id]) => id && id !== this.localId && id !== discoveryId)
+      .map(([id, name]) => ({ id, name }));
+    if (this.localId) peers.push({ id: this.localId, name: this.localName });
+    const unique = new Map(peers.map((p) => [p.id, p]));
+    return Array.from(unique.values()).slice(0, 64);
+  }
+
+  /** Cleartext hello/peers only — no E2E on the hostId channel. */
+  private handleDiscoveryWire(msg: WireMessage, viaPeerId: string) {
+    if (!msg || typeof msg !== "object" || typeof (msg as { t?: unknown }).t !== "string") return;
+
+    if (msg.t === "hello") {
+      const userKey = sanitizePeerId(msg.id);
+      const name = sanitizeDisplayName(msg.name, "Peer");
+      // Prefer the advertised user key; fall back to transport id.
+      const id = userKey || sanitizePeerId(viaPeerId);
+      if (!id || id === this.localId || id === roomHostId(this.room)) return;
+      this.rememberPeer(id, name);
+      this.enterSoftOnline(id, DIALING_SOFT_ONLINE_MS);
+      this.ensureMeshConnection(id);
+      if (this.isHost) {
+        // Refresh roster to other bootstrap clients.
+        this.broadcastDiscoveryRoster();
+      }
+      return;
+    }
+
+    if (msg.t === "peers") {
+      if (!Array.isArray(msg.peers)) return;
+      const discoveryId = roomHostId(this.room);
+      for (const peer of msg.peers.slice(0, 64)) {
+        const peerId = sanitizePeerId(peer?.id);
+        if (!peerId || peerId === this.localId || peerId === discoveryId) continue;
+        this.rememberPeer(peerId, peer?.name || "User");
+        this.enterSoftOnline(peerId, DIALING_SOFT_ONLINE_MS);
+        this.ensureMeshConnection(peerId);
+      }
+      this.emitPeers();
+    }
+  }
+
+  private broadcastDiscoveryRoster() {
+    // Fan-out on personal mesh is handled by broadcastPeerList; discovery clients
+    // get updates when they re-hello. Also push on any open bootstrap if we are host.
+    if (this.isHost) this.broadcastPeerList();
+  }
+
+  /** Guest: connect to room host id for peer list only (no E2E). */
+  private dialDiscovery(hostId: string) {
+    if (this.closed || !this.peer || this.isHost) return;
+    if (this.localId && this.localId === hostId) return;
+    if (this.discoveryBootstrap?.open) return;
+    try {
+      if (this.discoveryBootstrap) {
+        try {
+          this.discoveryBootstrap.close();
+        } catch {
+          // ignore
+        }
+        this.discoveryBootstrap = null;
+      }
+      const conn = this.peer.connect(hostId, { reliable: true, serialization: "json" });
+      this.discoveryBootstrap = conn;
+
+      const onOpen = () => {
+        if (this.closed || !conn.open) return;
+        try {
+          this.send(conn, {
+            v: 1,
+            t: "hello",
+            id: this.localId,
+            name: this.localName,
+            room: this.room,
+          });
+        } catch {
+          // ignore
+        }
+      };
+      if (conn.open) onOpen();
+      else conn.on("open", onOpen);
+
+      conn.on("data", (data) => {
+        try {
+          const msg = (typeof data === "string" ? JSON.parse(data) : data) as WireMessage;
+          this.handleDiscoveryWire(msg, hostId);
+        } catch {
+          // ignore
+        }
+      });
+
+      conn.on("close", () => {
+        if (this.discoveryBootstrap === conn) this.discoveryBootstrap = null;
+        if (!this.closed && !this.isHost) {
+          this.scheduleReconnect(hostId, false);
+        }
+      });
+
+      conn.on("error", () => {
+        if (!this.closed && !this.isHost) {
+          this.scheduleReconnect(hostId, false);
+        }
+      });
+    } catch {
+      this.scheduleReconnect(hostId, false);
+    }
+  }
+
   private scheduleReconnect(hostId: string, immediate = false) {
     if (this.closed || this.isHost) return;
     if (this.reconnectTimer !== null) return;
@@ -1202,12 +1357,14 @@ export class LanRoom {
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       if (this.closed || !this.peer || this.isHost) return;
-      const existing = this.connections.get(hostId);
-      if (existing?.open) return;
+      // Discovery bootstrap (host id) — not the encrypted chat channel.
+      if (this.discoveryBootstrap?.open) return;
+      // If we already have an encrypted mesh peer, discovery is optional.
+      const anyChat = Array.from(this.connections.values()).some((c) => c.open);
+      if (anyChat && this.discoveryBootstrap?.open) return;
       this.handlers.onStatus(this.statusForMode("Searching for nearby users…"));
-      this.dialPeer(hostId, true);
-      // Keep polling until connected or closed.
-      if (!this.connections.get(hostId)?.open) {
+      this.dialDiscovery(hostId);
+      if (!this.discoveryBootstrap?.open) {
         this.scheduleReconnect(hostId, false);
       }
     }, delay);
@@ -1246,6 +1403,12 @@ export class LanRoom {
   private dialPeer(peerId: string, outgoing: boolean) {
     const target = sanitizePeerId(peerId);
     if (!this.peer || !target || target === this.localId) return;
+    const discoveryId = roomHostId(this.room);
+    // Room host id is discovery-only — never start E2E against it.
+    if (target === discoveryId) {
+      this.dialDiscovery(target);
+      return;
+    }
     const existing = this.connections.get(target);
     if (existing?.open) return;
     // Show in online list while ICE/DataChannel negotiates.
@@ -1304,15 +1467,11 @@ export class LanRoom {
       this.touchPeer(peerId);
       this.clearSoftOnline(peerId);
       this.send(conn, { v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
+      // E2E only on personal user-key channels (never room host id).
       void this.beginE2eHandshake(peerId);
       if (this.isHost) this.broadcastPeerList();
       this.handlers.onStatus(this.statusForMode("Connected."));
       this.emitPeers();
-      // Guest: once host is open, stop aggressive reconnect noise.
-      if (!this.isHost && peerId === roomHostId(this.room) && this.reconnectTimer !== null) {
-        window.clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-      }
     });
 
     conn.on("data", (data) => {
@@ -1336,10 +1495,6 @@ export class LanRoom {
       this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
       this.scheduleRedial(peerId, true);
       if (this.isHost) this.broadcastPeerList();
-      // Guest always re-dials host as well (discovery anchor).
-      if (!this.isHost && peerId === roomHostId(this.room)) {
-        this.scheduleReconnect(peerId, true);
-      }
       this.armLanIceFallback();
     });
 
@@ -1347,9 +1502,6 @@ export class LanRoom {
       this.clearDialOpenTimer(peerId);
       this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
       this.scheduleRedial(peerId, false);
-      if (!this.isHost && peerId === roomHostId(this.room)) {
-        this.scheduleReconnect(peerId, false);
-      }
       this.armLanIceFallback();
     });
 
@@ -1358,6 +1510,8 @@ export class LanRoom {
 
   private async beginE2eHandshake(peerId: string) {
     if (this.closed || !this.localId) return;
+    // Never E2E against the room discovery id.
+    if (peerId === roomHostId(this.room)) return;
     let session = this.e2eSessions.get(peerId);
     if (!session) {
       const localPair = await generateE2eKeyPair();
@@ -1367,7 +1521,8 @@ export class LanRoom {
     const conn = this.connections.get(peerId);
     if (!conn?.open) return;
     try {
-      if (!session.offered) {
+      // Re-send offer if we still have no remote key (lost first hello).
+      if (!session.offered || !session.remotePub) {
         const pub = await exportPublicJwk(session.localPair.publicKey);
         this.send(conn, {
           v: 1,
@@ -1745,15 +1900,22 @@ export class LanRoom {
   private ensureMeshConnection(peerId: string) {
     const target = sanitizePeerId(peerId);
     if (!this.peer || !target || target === this.localId) return;
+    const discoveryId = roomHostId(this.room);
+    if (target === discoveryId) {
+      if (!this.isHost) this.dialDiscovery(target);
+      return;
+    }
     if (this.connections.get(target)?.open) return;
-    // Both sides may dial: LAN discovery is more reliable under NAT/glare than
-    // a strict "higher id only" rule (half-open collisions are dropped in wireConnection).
+    // Both sides may dial; half-open collisions are dropped in wireConnection.
     this.dialPeer(target, true);
   }
 
   private broadcastPeerList() {
-    const peers = Array.from(this.peerNames.entries()).map(([id, name]) => ({ id, name }));
-    peers.push({ id: this.localId, name: this.localName });
+    const discoveryId = roomHostId(this.room);
+    const peers = Array.from(this.peerNames.entries())
+      .filter(([id]) => id && id !== discoveryId)
+      .map(([id, name]) => ({ id, name }));
+    if (this.localId) peers.push({ id: this.localId, name: this.localName });
     const unique = new Map(peers.map((p) => [p.id, p]));
     const list = Array.from(unique.values()).filter((p) => p.id);
     this.broadcastWire({ v: 1, t: "peers", peers: list });
