@@ -9,7 +9,8 @@ import {
   type StoredContact,
 } from "./lan-history";
 import {
-  EMPTY_ICE_CONFIG,
+  DEFAULT_ICE_CONFIG,
+  DEFAULT_STUN_URLS,
   clearIceConfig,
   iceMode,
   iceModeHint,
@@ -96,8 +97,11 @@ export default function LanShare() {
   /** Fill the browser viewport (not OS display fullscreen). */
   const [viewportFill, setViewportFill] = useState(false);
   const [discoveryKey, setDiscoveryKey] = useState(0);
-  const [iceConfig, setIceConfig] = useState<LanIceConfig>(EMPTY_ICE_CONFIG);
-  const [stunText, setStunText] = useState("");
+  const [iceConfig, setIceConfig] = useState<LanIceConfig>(() => ({
+    ...DEFAULT_ICE_CONFIG,
+    stunUrls: [...DEFAULT_STUN_URLS],
+  }));
+  const [stunText, setStunText] = useState(() => urlsToText(DEFAULT_STUN_URLS));
   const [turnText, setTurnText] = useState("");
   const [turnUser, setTurnUser] = useState("");
   const [turnCred, setTurnCred] = useState("");
@@ -729,8 +733,8 @@ export default function LanShare() {
                     </span>
                   </div>
                   <p className="wx-ice-hint">
-                    Local network works by default. Add STUN or TURN servers only if you need to
-                    connect across different networks.
+                    Default public STUN servers are enabled (Google + Cloudflare). Local network
+                    host paths still work. Clear STUN for local-only, or add TURN for hard NATs.
                   </p>
                   <label className="guide-field">
                     <span>STUN servers</span>
@@ -738,9 +742,9 @@ export default function LanShare() {
                       className="lan-code-input wx-ice-textarea"
                       value={stunText}
                       onChange={(event) => setStunText(event.target.value)}
-                      placeholder={"stun:stun.example.com:3478"}
+                      placeholder={DEFAULT_STUN_URLS.join("\n")}
                       spellCheck={false}
-                      rows={2}
+                      rows={4}
                     />
                   </label>
                   <label className="guide-field">

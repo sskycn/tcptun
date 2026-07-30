@@ -1,9 +1,9 @@
 /**
  * User-configurable STUN / TURN for WebRTC.
  *
- * Default (empty) = LAN mode: only host ICE candidates → same local network.
- * With STUN/TURN: LAN host candidates are ALWAYS still gathered (iceTransportPolicy=all),
- * so local discovery/connect keeps working; STUN/TURN only extend cross-network reach.
+ * Default: public STUN servers (Google + Cloudflare) so ICE works on typical NATs.
+ * Host (LAN) candidates are always gathered (iceTransportPolicy=all).
+ * Empty STUN/TURN = pure LAN host candidates only.
  */
 
 export type IceServerEntry = {
@@ -28,9 +28,25 @@ const MAX_URLS = 12;
 const MAX_URL_LEN = 256;
 const MAX_CRED_LEN = 256;
 
-/** Default: no STUN/TURN — pure LAN host candidates. */
+/** Built-in default STUN list for chat discovery. */
+export const DEFAULT_STUN_URLS: string[] = [
+  "stun:stun.l.google.com:19302",
+  "stun:stun1.l.google.com:19302",
+  "stun:stun2.l.google.com:19302",
+  "stun:stun.cloudflare.com:3478",
+];
+
+/** No STUN/TURN — pure LAN host candidates (explicit local-only mode). */
 export const EMPTY_ICE_CONFIG: LanIceConfig = {
   stunUrls: [],
+  turnUrls: [],
+  turnUsername: "",
+  turnCredential: "",
+};
+
+/** Default chat ICE config (public STUN, no TURN). */
+export const DEFAULT_ICE_CONFIG: LanIceConfig = {
+  stunUrls: [...DEFAULT_STUN_URLS],
   turnUrls: [],
   turnUsername: "",
   turnCredential: "",
@@ -156,14 +172,19 @@ export function sanitizeIceConfig(input: Partial<LanIceConfig> | null | undefine
 }
 
 export function loadIceConfig(): LanIceConfig {
-  if (typeof window === "undefined") return { ...EMPTY_ICE_CONFIG };
+  if (typeof window === "undefined") {
+    return { ...DEFAULT_ICE_CONFIG, stunUrls: [...DEFAULT_STUN_URLS] };
+  }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...EMPTY_ICE_CONFIG };
+    // First visit: ship with the public STUN defaults.
+    if (!raw) {
+      return { ...DEFAULT_ICE_CONFIG, stunUrls: [...DEFAULT_STUN_URLS] };
+    }
     const parsed = JSON.parse(raw) as Partial<LanIceConfig>;
     return sanitizeIceConfig(parsed);
   } catch {
-    return { ...EMPTY_ICE_CONFIG };
+    return { ...DEFAULT_ICE_CONFIG, stunUrls: [...DEFAULT_STUN_URLS] };
   }
 }
 
@@ -179,42 +200,19 @@ export function saveIceConfig(config: LanIceConfig): LanIceConfig {
   return clean;
 }
 
+/** Persist empty STUN/TURN so "local only" is not overwritten by defaults on reload. */
 export function clearIceConfig(): LanIceConfig {
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
-  }
-  return { ...EMPTY_ICE_CONFIG };
+  return saveIceConfig({ ...EMPTY_ICE_CONFIG });
 }
 
 /**
- * Baseline STUN so ICE can complete on typical home/office NATs.
- * Host (LAN) candidates are always gathered alongside these (iceTransportPolicy=all).
- * User-configured STUN/TURN are appended on top.
- */
-const BASELINE_STUN: RTCIceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-];
-
-/**
- * PeerJS / RTCPeerConnection config.
+ * PeerJS / RTCPeerConnection config from user (or default) STUN/TURN.
  * Always iceTransportPolicy "all" so host (LAN) candidates are never disabled
- * when the user adds STUN/TURN for wider reach.
+ * when STUN/TURN is present for wider reach.
+ * Empty iceServers = pure local host candidates (LAN-only mode).
  */
 export function peerRtcConfig(config: LanIceConfig): RTCConfiguration {
-  const extra = buildIceServers(config) as RTCIceServer[];
-  const seen = new Set<string>();
-  const iceServers: RTCIceServer[] = [];
-  for (const server of [...BASELINE_STUN, ...extra]) {
-    const key = JSON.stringify(server.urls);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    iceServers.push(server);
-  }
+  const iceServers = buildIceServers(config) as RTCIceServer[];
   return {
     iceServers,
     // Never "relay" — that would kill pure LAN paths when TURN is present.
