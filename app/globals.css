@@ -764,7 +764,10 @@ html.lan-viewport-fill-active body {
 .wx-shell {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  /* Fixed outer frame — new messages scroll inside, never grow the shell. */
+  height: min(72vh, 780px);
   min-height: min(72vh, 780px);
+  max-height: min(72vh, 780px);
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
   border-radius: var(--radius);
   background: var(--surface);
@@ -776,6 +779,9 @@ html.lan-viewport-fill-active body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   border-right: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   background: color-mix(in srgb, var(--surface-soft) 75%, var(--surface));
 }
@@ -1283,12 +1289,21 @@ html[data-theme="dark"] .wx-menu-dots > span {
 
 .wx-chat {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  /* header | message list (flex) | transfers | compose — list takes remaining space only */
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
   /* Solid, high-contrast chat canvas (avoid washed-out gradients). */
   background: #ededed;
   color: #111827;
+}
+
+.lan-section.is-viewport-fill .wx-shell {
+  height: 100%;
+  min-height: 100%;
+  max-height: 100%;
 }
 
 .lan-section.is-viewport-fill .wx-sidebar,
@@ -1347,6 +1362,9 @@ html.dark .wx-chat-title span {
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  /* Occupy only the grid middle row; never expand the outer chat frame. */
+  height: 100%;
+  max-height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1504,6 +1522,9 @@ html.dark .wx-bubble-row.is-self .wx-bubble-time {
 .wx-transfers {
   display: grid;
   gap: 8px;
+  flex-shrink: 0;
+  max-height: 72px;
+  overflow: auto;
   border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   padding: 8px 14px;
@@ -1580,6 +1601,7 @@ html.dark .wx-bubble-row.is-self .wx-bubble-time {
 }
 
 .wx-compose {
+  flex-shrink: 0;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   background: #f7f7f7;
   padding: 10px 14px 12px;
@@ -1598,80 +1620,55 @@ html.dark .wx-compose {
 
 .wx-compose-main {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
-.wx-compose-main textarea {
+.wx-compose-main textarea,
+.wx-compose-input {
   width: 100%;
-  min-height: 56px;
-  max-height: 160px;
-  resize: vertical;
+  /* Fixed height — never grow when typing or after send. */
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  resize: none !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  field-sizing: fixed;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: var(--radius-xs);
   background: #ffffff;
-  padding: 10px 12px;
+  padding: 12px 14px;
   color: #111827;
   font: inherit;
   font-size: 15px;
   line-height: 1.5;
   font-weight: 500;
+  box-sizing: border-box;
 }
 
-html.dark .wx-compose-main textarea {
+html.dark .wx-compose-main textarea,
+html.dark .wx-compose-input,
+html[data-theme="dark"] .wx-compose-input {
   border-color: rgba(255, 255, 255, 0.12);
   background: #1c2733;
   color: #f3f6f9;
 }
 
-.wx-compose-main textarea::placeholder {
+.wx-compose-main textarea::placeholder,
+.wx-compose-input::placeholder {
   color: #6b7280;
   opacity: 1;
 }
 
-html.dark .wx-compose-main textarea::placeholder {
+html.dark .wx-compose-main textarea::placeholder,
+html.dark .wx-compose-input::placeholder,
+html[data-theme="dark"] .wx-compose-input::placeholder {
   color: #9aa8b5;
 }
 
-.wx-compose-main textarea:disabled {
+.wx-compose-main textarea:disabled,
+.wx-compose-input:disabled {
   opacity: 0.65;
-}
-
-.wx-compose-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.wx-compose-more {
-  display: inline-grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 50%;
-  background: #fff;
-  color: #111827;
-  font-size: 20px;
-  font-weight: 500;
-  line-height: 1;
-  cursor: pointer;
-}
-
-html.dark .wx-compose-more {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: #1c2733;
-  color: #f3f6f9;
-}
-
-.wx-compose-more:hover {
-  background: color-mix(in srgb, var(--primary-soft) 40%, #fff);
-}
-
-.wx-char-count {
-  color: #4b5563;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 html.dark .wx-char-count {
@@ -5907,17 +5904,24 @@ button:focus-visible {
   .guide-review-list > div,
   .wx-shell {
     grid-template-columns: 1fr;
-    min-height: 0;
+    grid-template-rows: minmax(0, 38%) minmax(0, 1fr);
+    height: min(80vh, 720px);
+    min-height: min(80vh, 720px);
+    max-height: min(80vh, 720px);
   }
 
   .wx-sidebar {
-    max-height: 42vh;
+    max-height: none;
+    height: 100%;
     border-right: 0;
     border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   }
 
   .lan-section.is-viewport-fill .wx-shell {
     grid-template-rows: minmax(0, 38%) minmax(0, 1fr);
+    height: 100%;
+    min-height: 100%;
+    max-height: 100%;
   }
 
   .lan-section.is-viewport-fill .wx-sidebar {
@@ -5925,7 +5929,8 @@ button:focus-visible {
   }
 
   .wx-chat {
-    min-height: 55vh;
+    min-height: 0;
+    height: 100%;
   }
 
   .lan-section.is-viewport-fill .wx-chat {

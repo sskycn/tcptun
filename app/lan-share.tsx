@@ -25,7 +25,6 @@ import LanMarkdown, { markdownPreview } from "./lan-markdown";
 import {
   LanRoom,
   MAX_CHAT_TEXT_CHARS,
-  MAX_LAN_FILE_BYTES,
   type ChatMessage,
   type RoomPeer,
   type TransferProgress,
@@ -84,9 +83,6 @@ export default function LanShare() {
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [draft, setDraft] = useState("");
   const [transfers, setTransfers] = useState<TransferProgress[]>([]);
-  const [configName, setConfigName] = useState("client.json");
-  const [configBody, setConfigBody] = useState("");
-  const [showTools, setShowTools] = useState(false);
   /** Alias editor — opened by tapping your avatar. */
   const [showAlias, setShowAlias] = useState(false);
   /** Overflow menu (viewport fill, network settings, …). */
@@ -110,7 +106,6 @@ export default function LanShare() {
   const iceConfigRef = useRef(iceConfig);
   const historyContactsRef = useRef(historyContacts);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const composeRef = useRef<HTMLTextAreaElement | null>(null);
   const menuBtnRef = useRef<HTMLButtonElement | null>(null);
   const menuPanelRef = useRef<HTMLDivElement | null>(null);
@@ -124,70 +119,36 @@ export default function LanShare() {
   const selfId = peerId || stablePeerId;
 
   const contacts: ContactRow[] = useMemo(() => {
-    // Show every discovered live peer (not only fully open channels).
-    const live = peers.filter((peer) => !peer.self);
-    const byId = new Map<string, ContactRow>();
-
-    for (const peer of live) {
-      const peerMessages = messages.filter((m) => m.peerId === peer.id && m.kind !== "system");
-      const lastMessage = peerMessages[peerMessages.length - 1];
-      byId.set(peer.id, {
-        id: peer.id,
-        name: peer.name,
-        connected: Boolean(peer.connected),
-        encrypted: Boolean(peer.encrypted),
-        lastMessage,
-        unreadCount: unread[peer.id] || 0,
-        lastTs: lastMessage?.ts || Date.now(),
+    // Contact list: online peers only (DataChannel open).
+    const online = peers.filter((peer) => !peer.self && peer.connected);
+    return online
+      .map((peer) => {
+        const peerMessages = messages.filter((m) => m.peerId === peer.id && m.kind !== "system");
+        const lastMessage = peerMessages[peerMessages.length - 1];
+        const storedName = historyContacts.find((c) => c.id === peer.id)?.name;
+        return {
+          id: peer.id,
+          name: peer.name && peer.name !== "User" ? peer.name : storedName || peer.name,
+          connected: true,
+          encrypted: Boolean(peer.encrypted),
+          lastMessage,
+          unreadCount: unread[peer.id] || 0,
+          lastTs: lastMessage?.ts || Date.now(),
+        };
+      })
+      .sort((a, b) => {
+        if (a.encrypted !== b.encrypted) return a.encrypted ? -1 : 1;
+        return b.lastTs - a.lastTs || a.name.localeCompare(b.name);
       });
-    }
-
-    // Include offline contacts that still have history.
-    for (const stored of historyContacts) {
-      if (byId.has(stored.id)) {
-        const cur = byId.get(stored.id)!;
-        if (cur.name === "Peer" || !cur.name) cur.name = stored.name;
-        continue;
-      }
-      const peerMessages = messages.filter((m) => m.peerId === stored.id && m.kind !== "system");
-      if (peerMessages.length === 0) continue;
-      const lastMessage = peerMessages[peerMessages.length - 1];
-      byId.set(stored.id, {
-        id: stored.id,
-        name: stored.name,
-        connected: false,
-        encrypted: false,
-        lastMessage,
-        unreadCount: unread[stored.id] || 0,
-        lastTs: lastMessage?.ts || stored.lastTs,
-      });
-    }
-
-    // Any message peer not yet listed
-    for (const msg of messages) {
-      if (!msg.peerId || byId.has(msg.peerId) || msg.kind === "system") continue;
-      const peerMessages = messages.filter((m) => m.peerId === msg.peerId && m.kind !== "system");
-      const lastMessage = peerMessages[peerMessages.length - 1];
-      const name =
-        lastMessage && lastMessage.fromId === msg.peerId
-          ? lastMessage.from
-          : historyContacts.find((c) => c.id === msg.peerId)?.name || "Peer";
-      byId.set(msg.peerId, {
-        id: msg.peerId,
-        name,
-        connected: false,
-        encrypted: false,
-        lastMessage,
-        unreadCount: unread[msg.peerId] || 0,
-        lastTs: lastMessage?.ts || msg.ts,
-      });
-    }
-
-    return Array.from(byId.values()).sort((a, b) => {
-      if (a.connected !== b.connected) return a.connected ? -1 : 1;
-      return b.lastTs - a.lastTs;
-    });
   }, [peers, messages, unread, historyContacts]);
+
+  // Drop selection when the peer goes offline so the UI stays on the online list.
+  useEffect(() => {
+    if (!selectedPeerId) return;
+    if (!contacts.some((peer) => peer.id === selectedPeerId)) {
+      setSelectedPeerId("");
+    }
+  }, [contacts, selectedPeerId]);
 
   const selectedPeer = contacts.find((peer) => peer.id === selectedPeerId);
   const conversation = useMemo(
@@ -389,7 +350,6 @@ export default function LanShare() {
     setSelectedPeerId(id);
     setUnread((prev) => ({ ...prev, [id]: 0 }));
     setError(null);
-    setShowTools(false);
     window.setTimeout(() => composeRef.current?.focus(), 0);
   }
 
@@ -533,8 +493,10 @@ export default function LanShare() {
 
   async function handleSendChat() {
     if (!selectedPeerId || !canSend) return;
+    const text = draft.trim();
+    if (!text) return;
     try {
-      await roomRef.current?.sendChat(selectedPeerId, draft);
+      await roomRef.current?.sendChat(selectedPeerId, text);
       setDraft("");
       setError(null);
     } catch (err) {
@@ -542,22 +504,53 @@ export default function LanShare() {
     }
   }
 
-  async function handleShareConfig() {
-    if (!selectedPeerId || !canSend) return;
-    try {
-      await roomRef.current?.sendConfig(selectedPeerId, configName, configBody);
-      setConfigBody("");
-      setError(null);
-      setShowTools(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to share config.");
+  function collectClipboardFiles(data: DataTransfer | null): File[] {
+    if (!data) return [];
+    const files: File[] = [];
+    const seen = new Set<string>();
+
+    const push = (file: File | null) => {
+      if (!file || file.size <= 0) return;
+      const key = `${file.name}:${file.size}:${file.type}:${file.lastModified}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      // Clipboard images often have an empty name.
+      if (!file.name || file.name === "image.png" || file.name === "blob") {
+        const ext =
+          file.type === "image/jpeg" || file.type === "image/jpg"
+            ? "jpg"
+            : file.type === "image/webp"
+              ? "webp"
+              : file.type === "image/gif"
+                ? "gif"
+                : file.type === "image/png"
+                  ? "png"
+                  : "bin";
+        const named = new File([file], `paste-${Date.now()}.${ext}`, {
+          type: file.type || "application/octet-stream",
+          lastModified: file.lastModified || Date.now(),
+        });
+        files.push(named);
+        return;
+      }
+      files.push(file);
+    };
+
+    if (data.items?.length) {
+      for (const item of Array.from(data.items)) {
+        if (item.kind === "file") push(item.getAsFile());
+      }
     }
+    if (data.files?.length) {
+      for (const file of Array.from(data.files)) push(file);
+    }
+    return files;
   }
 
-  async function handleFiles(fileList: FileList | null) {
-    if (!fileList?.length || !roomRef.current || !selectedPeerId || !canSend) return;
+  async function handleSendFiles(files: File[]) {
+    if (!files.length || !roomRef.current || !selectedPeerId || !canSend) return;
     setError(null);
-    for (const file of Array.from(fileList)) {
+    for (const file of files) {
       try {
         await roomRef.current.sendFile(selectedPeerId, file);
       } catch (err) {
@@ -565,8 +558,23 @@ export default function LanShare() {
         break;
       }
     }
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    setShowTools(false);
+  }
+
+  async function handleComposePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (!canSend) return;
+    const files = collectClipboardFiles(event.clipboardData);
+    if (files.length === 0) return;
+    // File paste takes precedence over inserting binary garbage as text.
+    event.preventDefault();
+    await handleSendFiles(files);
+  }
+
+  async function handleComposeDrop(event: React.DragEvent<HTMLTextAreaElement>) {
+    if (!canSend) return;
+    const files = collectClipboardFiles(event.dataTransfer);
+    if (files.length === 0) return;
+    event.preventDefault();
+    await handleSendFiles(files);
   }
 
   return (
@@ -755,7 +763,7 @@ export default function LanShare() {
           <div className="wx-contact-list" role="list">
             {contacts.length === 0 ? (
               <div className="wx-contact-empty">
-                No contacts yet.
+                No one online yet.
                 <br />
                 Open this page on another device on the same network to get started.
               </div>
@@ -773,7 +781,7 @@ export default function LanShare() {
                     key={peer.id}
                     type="button"
                     role="listitem"
-                    className={`wx-contact ${selected ? "is-selected" : ""} ${peer.connected ? "" : "is-offline"}`}
+                    className={`wx-contact ${selected ? "is-selected" : ""}`}
                     onClick={() => selectContact(peer.id)}
                   >
                     <span className="wx-avatar" aria-hidden="true">
@@ -781,10 +789,7 @@ export default function LanShare() {
                     </span>
                     <span className="wx-contact-body">
                       <span className="wx-contact-top">
-                        <strong>
-                          {peer.name}
-                          {!peer.connected ? " · offline" : ""}
-                        </strong>
+                        <strong>{peer.name}</strong>
                         <time>{peer.lastMessage ? formatDayTime(peer.lastMessage.ts) : ""}</time>
                       </span>
                       <span className="wx-contact-bottom">
@@ -807,11 +812,7 @@ export default function LanShare() {
               <div className="wx-chat-title">
                 <strong>{selectedPeer.name}</strong>
                 <span>
-                  {selectedPeer.connected
-                    ? selectedPeer.encrypted
-                      ? "Online · end-to-end encrypted"
-                      : "Online · securing…"
-                    : "Offline"}
+                  {selectedPeer.encrypted ? "Online · end-to-end encrypted" : "Online · securing…"}
                 </span>
               </div>
             ) : (
@@ -844,7 +845,7 @@ export default function LanShare() {
                 <span>
                   {canSend
                     ? `Send a message to ${selectedPeer?.name}.`
-                    : `${selectedPeer?.name} is offline. Previous messages stay available here.`}
+                    : "Waiting for a secure connection…"}
                 </span>
               </div>
             ) : (
@@ -926,53 +927,6 @@ export default function LanShare() {
             </div>
           ) : null}
 
-          {showTools && selectedPeer && canSend ? (
-            <div className="wx-tools">
-              <div className="lan-tool-card">
-                <strong>Send config</strong>
-                <label className="guide-field">
-                  <span>File name</span>
-                  <input
-                    value={configName}
-                    onChange={(event) => setConfigName(event.target.value)}
-                    maxLength={180}
-                    autoComplete="off"
-                  />
-                </label>
-                <label className="guide-field">
-                  <span>JSON / URI content</span>
-                  <textarea
-                    className="lan-code-input lan-config-input"
-                    value={configBody}
-                    onChange={(event) => setConfigBody(event.target.value)}
-                    placeholder="Paste server.json / client.json / client.uri"
-                    spellCheck={false}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="button secondary"
-                  disabled={!configBody.trim()}
-                  onClick={() => void handleShareConfig()}
-                >
-                  Send config to {selectedPeer.name}
-                </button>
-              </div>
-              <div className="lan-tool-card">
-                <strong>Send file</strong>
-                <p className="guide-field-hint">
-                  Up to {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB per file.
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  onChange={(event) => void handleFiles(event.target.files)}
-                />
-              </div>
-            </div>
-          ) : null}
-
           <footer className="wx-compose">
             {error ? (
               <p className="generator-error wx-error" role="alert">
@@ -982,6 +936,7 @@ export default function LanShare() {
             <div className="wx-compose-main">
               <textarea
                 ref={composeRef}
+                className="wx-compose-input"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value.slice(0, MAX_CHAT_TEXT_CHARS))}
                 onKeyDown={(event) => {
@@ -990,40 +945,30 @@ export default function LanShare() {
                     void handleSendChat();
                   }
                 }}
+                onPaste={(event) => {
+                  void handleComposePaste(event);
+                }}
+                onDragOver={(event) => {
+                  if (!canSend) return;
+                  if (event.dataTransfer?.types?.includes("Files")) {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "copy";
+                  }
+                }}
+                onDrop={(event) => {
+                  void handleComposeDrop(event);
+                }}
                 placeholder={
                   !selectedPeer
                     ? "Select a contact"
-                    : !selectedPeer.connected
-                      ? `${selectedPeer.name} is offline`
-                      : !selectedPeer.encrypted
-                        ? "Securing connection…"
-                        : `Message ${selectedPeer.name}`
+                    : !selectedPeer.encrypted
+                      ? "Securing connection…"
+                      : `Message ${selectedPeer.name} · Enter to send · paste files here`
                 }
                 disabled={!canSend}
-                rows={2}
+                rows={1}
                 maxLength={MAX_CHAT_TEXT_CHARS}
               />
-              <div className="wx-compose-actions">
-                {canSend ? (
-                  <button
-                    type="button"
-                    className="wx-compose-more"
-                    onClick={() => setShowTools((v) => !v)}
-                    aria-expanded={showTools}
-                    title="Send file or config"
-                  >
-                    +
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="button primary"
-                  disabled={!canSend || !draft.trim()}
-                  onClick={() => void handleSendChat()}
-                >
-                  Send
-                </button>
-              </div>
             </div>
           </footer>
         </div>
