@@ -1221,6 +1221,35 @@ html[data-theme="dark"] .wx-menu-dots > span {
   text-align: center;
 }
 
+.wx-contact-empty-status {
+  display: block;
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 11.5px;
+}
+
+.wx-contact-empty-status.is-error {
+  color: var(--danger);
+}
+
+.wx-empty-retry {
+  margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 6px 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wx-empty-retry:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  color: var(--primary);
+}
+
 .wx-contact {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

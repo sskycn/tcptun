@@ -30,6 +30,7 @@ import {
   sanitizePeerId,
 } from "./lan-security";
 import {
+  discoveryAnchorId,
   fileChunkCount,
   fileChunkLength,
   shouldInitiateMesh,
@@ -123,8 +124,10 @@ const STALE_CHANNEL_MS = 28_000;
 /** Half-open DataChannel: abandon and redial so a stuck STUN gather cannot pin the dial. */
 const DIAL_OPEN_TIMEOUT_MS = 14_000;
 /** Discovery uses a separate channel and needs its own half-open watchdog. */
-const DISCOVERY_OPEN_TIMEOUT_MS = 14_000;
+const DISCOVERY_OPEN_TIMEOUT_MS = 7_000;
 const DISCOVERY_CLAIM_TIMEOUT_MS = 10_000;
+/** Enough independent anchors to avoid one global PeerJS id pinning every LAN. */
+const DISCOVERY_ANCHOR_COUNT = 64;
 /** If no peer channel opens while STUN/TURN is configured, fall back to host-only ICE. */
 const LAN_ICE_FALLBACK_MS = 18_000;
 /** Soft-online window while dialing so peers appear in the list before open. */
@@ -155,11 +158,7 @@ function uid(): string {
 }
 
 export function roomHostId(room: string): string {
-  const cleaned = room.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  const base = cleaned.slice(0, 18) || "lan";
-  let hash = 0;
-  for (let i = 0; i < room.length; i++) hash = (hash * 33 + room.charCodeAt(i)) >>> 0;
-  return `tcptun${base}${hash.toString(36)}`.slice(0, 48);
+  return discoveryAnchorId(room, 0);
 }
 
 function toBase64(buffer: ArrayBuffer): string {
@@ -228,6 +227,9 @@ export class LanRoom {
   private discoveryOpenTimer: number | null = null;
   private discoveryClaimTimer: number | null = null;
   private discoveryClaimPeer: Peer | null = null;
+  private discoveryAnchorIndex = 0;
+  private discoveryAnchorId = "";
+  private discoveryBootstrapOpened = false;
   /** Last time we saw activity (open/data/ping/pong) from a peer. */
   private lastAlive = new Map<string, number>();
   /** Peers in soft-online grace after a channel drop (tab switch, brief ICE blip). */
@@ -295,6 +297,8 @@ export class LanRoom {
     this.iceForceLanOnly = false;
     this.lanIceFallbackInFlight = false;
     this.room = options.room.trim().slice(0, 64) || "tcptun-lan";
+    this.discoveryAnchorIndex = 0;
+    this.discoveryAnchorId = discoveryAnchorId(this.room, this.discoveryAnchorIndex);
     this.localName = sanitizeDisplayName(options.displayName, "User");
     this.iceConfig = options.iceConfig ? { ...options.iceConfig } : { ...EMPTY_ICE_CONFIG };
     // Every user gets a globally unique key (UUID-based) used as their chat PeerJS id.
@@ -303,7 +307,7 @@ export class LanRoom {
     this.peerNames.clear();
     this.connections.clear();
 
-    const hostId = roomHostId(this.room);
+    const hostId = this.currentDiscoveryId();
     // Join PeerJS immediately — do NOT block on STUN probes (that delayed discovery
     // and could empty iceServers on false negatives, breaking find-peers).
     this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
@@ -390,6 +394,13 @@ export class LanRoom {
     this.announceTimer = window.setInterval(tick, 4000);
   }
 
+  private currentDiscoveryId(): string {
+    if (!this.discoveryAnchorId) {
+      this.discoveryAnchorId = discoveryAnchorId(this.room, this.discoveryAnchorIndex);
+    }
+    return this.discoveryAnchorId;
+  }
+
   private bindPresenceLifecycle() {
     if (this.presenceBound || typeof window === "undefined") return;
     this.presenceBound = true;
@@ -461,7 +472,7 @@ export class LanRoom {
 
     // Guest: ensure discovery host is dialed.
     if (!this.isHost) {
-      const hostId = roomHostId(this.room);
+      const hostId = this.currentDiscoveryId();
       if (hostId && hostId !== this.localId) {
         this.dialDiscovery(hostId);
       }
@@ -607,7 +618,7 @@ export class LanRoom {
 
   private scheduleRedial(peerId: string, immediate = false) {
     if (this.closed || !this.peer || !peerId || peerId === this.localId) return;
-    if (peerId !== roomHostId(this.room) && !shouldInitiateMesh(this.localId, peerId)) return;
+    if (peerId !== this.currentDiscoveryId() && !shouldInitiateMesh(this.localId, peerId)) return;
     if (this.connections.get(peerId)?.open) return;
     if (this.redialTimers.has(peerId)) {
       if (!immediate) return;
@@ -638,6 +649,7 @@ export class LanRoom {
     this.clearDiscoveryClaimTimer();
     const discoveryClaimPeer = this.discoveryClaimPeer;
     this.discoveryClaimPeer = null;
+    this.discoveryBootstrapOpened = false;
     try {
       discoveryClaimPeer?.destroy();
     } catch {
@@ -714,7 +726,7 @@ export class LanRoom {
   }
 
   listPeers(): RoomPeer[] {
-    const discoveryId = roomHostId(this.room);
+    const discoveryId = this.currentDiscoveryId();
     const peers: RoomPeer[] = [
       {
         id: this.localId || "local",
@@ -827,8 +839,7 @@ export class LanRoom {
       } catch {
         // ignore
       }
-      this.scheduleReconnect(hostId, false);
-      this.scheduleDiscoveryClaim(hostId);
+      this.advanceDiscoveryAnchor(hostId);
       this.armLanIceFallback();
     }, DISCOVERY_OPEN_TIMEOUT_MS);
   }
@@ -868,7 +879,7 @@ export class LanRoom {
       if (conn.open) return;
     }
     // Only fall back when we are actually trying to reach someone.
-    const hostId = roomHostId(this.room);
+    const hostId = this.currentDiscoveryId();
     const trying =
       this.peerNames.size > 0 ||
       this.connections.size > 0 ||
@@ -887,6 +898,7 @@ export class LanRoom {
     this.clearDiscoveryClaimTimer();
     const discoveryClaimPeer = this.discoveryClaimPeer;
     this.discoveryClaimPeer = null;
+    this.discoveryBootstrapOpened = false;
     try {
       discoveryClaimPeer?.destroy();
     } catch {
@@ -1283,7 +1295,7 @@ export class LanRoom {
         if (type === "peer-unavailable") {
           // Host not up yet — personal peer is fine.
           if (!settled && this.localId) finishOk();
-          this.scheduleReconnect(hostId, true);
+          this.scheduleReconnect(this.currentDiscoveryId(), true);
           return;
         }
         this.handlers.onError(err.message || "Connection error");
@@ -1392,7 +1404,7 @@ export class LanRoom {
 
   /** User-key roster for discovery bootstrap (never includes room host id). */
   private rosterForDiscovery(): Array<{ id: string; name: string }> {
-    const discoveryId = roomHostId(this.room);
+    const discoveryId = this.currentDiscoveryId();
     const peers = Array.from(this.peerNames.entries())
       .filter(
         ([id]) =>
@@ -1416,7 +1428,7 @@ export class LanRoom {
       const name = sanitizeDisplayName(msg.name, "Peer");
       // Prefer the advertised user key; fall back to transport id.
       const id = userKey || sanitizePeerId(viaPeerId);
-      if (!id || id === this.localId || id === roomHostId(this.room)) return;
+      if (!id || id === this.localId || id === this.currentDiscoveryId()) return;
       this.rememberPeer(id, name);
       this.enterSoftOnline(id, DIALING_SOFT_ONLINE_MS);
       this.ensureMeshConnection(id);
@@ -1429,7 +1441,7 @@ export class LanRoom {
 
     if (msg.t === "peers") {
       if (!Array.isArray(msg.peers)) return;
-      const discoveryId = roomHostId(this.room);
+      const discoveryId = this.currentDiscoveryId();
       for (const peer of msg.peers.slice(0, 64)) {
         const peerId = sanitizePeerId(peer?.id);
         if (!peerId || peerId === this.localId || peerId === discoveryId) continue;
@@ -1465,12 +1477,14 @@ export class LanRoom {
     try {
       const conn = this.peer.connect(hostId, { reliable: true, serialization: "json" });
       this.discoveryBootstrap = conn;
+      this.discoveryBootstrapOpened = false;
       this.armDiscoveryOpenWatchdog(hostId, conn);
 
       const onOpen = () => {
         if (this.closed || this.discoveryBootstrap !== conn || !conn.open) return;
         this.clearDiscoveryOpenTimer(conn);
         this.clearDiscoveryClaimTimer();
+        this.discoveryBootstrapOpened = true;
         if (this.reconnectTimer !== null) {
           window.clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
@@ -1501,16 +1515,24 @@ export class LanRoom {
 
       conn.on("close", () => {
         if (this.discoveryBootstrap !== conn) return;
+        const wasOpen = this.discoveryBootstrapOpened;
+        this.discoveryBootstrapOpened = false;
         this.clearDiscoveryOpenTimer(conn);
         this.discoveryBootstrap = null;
         if (!this.closed && !this.isHost) {
-          this.scheduleReconnect(hostId, false);
-          this.scheduleDiscoveryClaim(hostId);
+          if (wasOpen) {
+            this.scheduleReconnect(hostId, false);
+            this.scheduleDiscoveryClaim(hostId);
+          } else {
+            this.advanceDiscoveryAnchor(hostId);
+          }
         }
       });
 
       conn.on("error", () => {
         if (this.discoveryBootstrap !== conn) return;
+        const wasOpen = this.discoveryBootstrapOpened;
+        this.discoveryBootstrapOpened = false;
         this.clearDiscoveryOpenTimer(conn);
         this.discoveryBootstrap = null;
         try {
@@ -1519,14 +1541,54 @@ export class LanRoom {
           // ignore
         }
         if (!this.closed && !this.isHost) {
-          this.scheduleReconnect(hostId, false);
-          this.scheduleDiscoveryClaim(hostId);
+          if (wasOpen) {
+            this.scheduleReconnect(hostId, false);
+            this.scheduleDiscoveryClaim(hostId);
+          } else {
+            this.advanceDiscoveryAnchor(hostId);
+          }
         }
       });
     } catch {
-      this.scheduleReconnect(hostId, false);
-      this.scheduleDiscoveryClaim(hostId);
+      this.advanceDiscoveryAnchor(hostId);
     }
+  }
+
+  /** Skip a globally occupied discovery id whose owner is not reachable on this LAN. */
+  private advanceDiscoveryAnchor(failedHostId: string) {
+    if (this.closed || this.isHost || failedHostId !== this.currentDiscoveryId()) return;
+    this.clearDiscoveryOpenTimer();
+    this.clearDiscoveryClaimTimer();
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    const claimPeer = this.discoveryClaimPeer;
+    this.discoveryClaimPeer = null;
+    try {
+      claimPeer?.destroy();
+    } catch {
+      // ignore
+    }
+    const bootstrap = this.discoveryBootstrap;
+    this.discoveryBootstrap = null;
+    this.discoveryBootstrapOpened = false;
+    try {
+      bootstrap?.close();
+    } catch {
+      // ignore
+    }
+
+    this.discoveryAnchorIndex = (this.discoveryAnchorIndex + 1) % DISCOVERY_ANCHOR_COUNT;
+    this.discoveryAnchorId = discoveryAnchorId(this.room, this.discoveryAnchorIndex);
+    const nextHostId = this.currentDiscoveryId();
+    this.handlers.onStatus(
+      this.statusForMode(
+        `Discovery route ${this.discoveryAnchorIndex + 1}/${DISCOVERY_ANCHOR_COUNT}…`,
+      ),
+    );
+    this.dialDiscovery(nextHostId);
+    this.scheduleDiscoveryClaim(nextHostId);
   }
 
   /**
@@ -1552,7 +1614,7 @@ export class LanRoom {
       this.discoveryClaimPeer = candidate;
       let settled = false;
 
-      const finishGuest = () => {
+      const finishGuest = (action: "retry" | "advance" = "retry") => {
         if (settled) return;
         settled = true;
         window.clearTimeout(timeout);
@@ -1563,16 +1625,33 @@ export class LanRoom {
         } catch {
           // ignore
         }
-        if (ownsClaim && !this.closed && !this.isHost) {
+        if (ownsClaim && !this.closed && !this.isHost && hostId === this.currentDiscoveryId()) {
+          if (action === "advance") {
+            this.advanceDiscoveryAnchor(hostId);
+            return;
+          }
+          // Another local browser may have won this anchor while our original
+          // offer targeted a not-yet-existing peer. Replace that stale offer.
+          this.clearDiscoveryOpenTimer();
+          const bootstrap = this.discoveryBootstrap;
+          this.discoveryBootstrap = null;
+          this.discoveryBootstrapOpened = false;
+          try {
+            bootstrap?.close();
+          } catch {
+            // ignore
+          }
           this.dialDiscovery(hostId);
-          this.scheduleReconnect(hostId, false);
         }
       };
 
-      const timeout = window.setTimeout(finishGuest, DISCOVERY_CLAIM_TIMEOUT_MS);
+      const timeout = window.setTimeout(
+        () => finishGuest("advance"),
+        DISCOVERY_CLAIM_TIMEOUT_MS,
+      );
       candidate.on("open", () => {
         if (settled || this.closed || this.isHost || this.discoveryClaimPeer !== candidate) {
-          finishGuest();
+          finishGuest("retry");
           return;
         }
         settled = true;
@@ -1598,7 +1677,10 @@ export class LanRoom {
         this.broadcastDiscoveryRoster();
         this.emitPeers();
       });
-      candidate.on("error", finishGuest);
+      candidate.on("error", (err) => {
+        const type = String((err as { type?: string }).type || "");
+        finishGuest(type === "unavailable-id" ? "retry" : "advance");
+      });
     }, delay);
   }
 
@@ -1650,7 +1732,7 @@ export class LanRoom {
   private dialPeer(peerId: string, outgoing: boolean) {
     const target = sanitizePeerId(peerId);
     if (!this.peer || !target || target === this.localId) return;
-    const discoveryId = roomHostId(this.room);
+    const discoveryId = this.currentDiscoveryId();
     // Room host id is discovery-only — never start E2E against it.
     if (target === discoveryId) {
       this.dialDiscovery(target);
@@ -1783,7 +1865,7 @@ export class LanRoom {
   private async beginE2eHandshake(peerId: string) {
     if (this.closed || !this.localId) return;
     // Never E2E against the room discovery id.
-    if (peerId === roomHostId(this.room)) return;
+    if (peerId === this.currentDiscoveryId()) return;
     try {
       const session = await this.getOrCreateE2eSession(peerId);
       const conn = this.connections.get(peerId);
@@ -2229,7 +2311,7 @@ export class LanRoom {
   private ensureMeshConnection(peerId: string) {
     const target = sanitizePeerId(peerId);
     if (!this.peer || !target || target === this.localId) return;
-    const discoveryId = roomHostId(this.room);
+    const discoveryId = this.currentDiscoveryId();
     if (target === discoveryId) {
       if (!this.isHost) this.dialDiscovery(target);
       return;
@@ -2247,7 +2329,7 @@ export class LanRoom {
   }
 
   private broadcastPeerList() {
-    const discoveryId = roomHostId(this.room);
+    const discoveryId = this.currentDiscoveryId();
     const peers = Array.from(this.peerNames.entries())
       .filter(
         ([id]) =>

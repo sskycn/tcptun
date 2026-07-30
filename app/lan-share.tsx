@@ -311,6 +311,7 @@ export default function LanShare() {
       onPeers: (next) => {
         if (!active) return;
         setPeers(next);
+        if (next.some((peer) => !peer.self && peer.connected)) setError(null);
         // Refresh contact names for history directory.
         setHistoryContacts((prev) => {
           let merged = prev;
@@ -364,6 +365,7 @@ export default function LanShare() {
       onError: (next) => active && setError(next),
       onJoined: (info) => {
         if (!active) return;
+        setError(null);
         setJoined(true);
         setPeerId(info.peerId);
         // Always the globally unique user key (host discovery uses a separate Peer).
@@ -846,6 +848,15 @@ export default function LanShare() {
                 No one online yet.
                 <br />
                 Open this page on another device on the same network to get started.
+                <span
+                  className={`wx-contact-empty-status${error ? " is-error" : ""}`}
+                  role={error ? "alert" : "status"}
+                >
+                  {error || status}
+                </span>
+                <button type="button" className="wx-empty-retry" onClick={restartDiscovery}>
+                  Retry discovery
+                </button>
               </div>
             ) : (
               contacts.map((peer) => {

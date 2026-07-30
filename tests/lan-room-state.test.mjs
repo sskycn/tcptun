@@ -2,10 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   base64LengthForBytes,
+  discoveryAnchorId,
   fileChunkCount,
   fileChunkLength,
   shouldInitiateMesh,
 } from "../app/lan-room-state.ts";
+
+test("discovery anchors are stable, valid, and distinct", () => {
+  const room = "tcptun-direct-users-v1";
+  const anchors = Array.from({ length: 64 }, (_, index) => discoveryAnchorId(room, index));
+  assert.equal(new Set(anchors).size, anchors.length);
+  assert.equal(discoveryAnchorId(room), anchors[0]);
+  assert.ok(anchors.every((id) => /^[A-Za-z0-9]+$/.test(id) && id.length <= 48));
+});
 
 test("mesh dial ownership is deterministic and has exactly one initiator", () => {
   const pairs = [
