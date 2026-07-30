@@ -10,7 +10,6 @@ import {
 } from "./lan-history";
 import {
   DEFAULT_ICE_CONFIG,
-  DEFAULT_STUN_URLS,
   clearIceConfig,
   iceMode,
   iceModeHint,
@@ -97,11 +96,8 @@ export default function LanShare() {
   /** Fill the browser viewport (not OS display fullscreen). */
   const [viewportFill, setViewportFill] = useState(false);
   const [discoveryKey, setDiscoveryKey] = useState(0);
-  const [iceConfig, setIceConfig] = useState<LanIceConfig>(() => ({
-    ...DEFAULT_ICE_CONFIG,
-    stunUrls: [...DEFAULT_STUN_URLS],
-  }));
-  const [stunText, setStunText] = useState(() => urlsToText(DEFAULT_STUN_URLS));
+  const [iceConfig, setIceConfig] = useState<LanIceConfig>(() => ({ ...DEFAULT_ICE_CONFIG }));
+  const [stunText, setStunText] = useState("");
   const [turnText, setTurnText] = useState("");
   const [turnUser, setTurnUser] = useState("");
   const [turnCred, setTurnCred] = useState("");
@@ -737,9 +733,8 @@ export default function LanShare() {
                     </span>
                   </div>
                   <p className="wx-ice-hint">
-                    Default Google STUN servers are enabled; unreachable STUNs are dropped
-                    automatically at connect. Local host paths still work. Clear STUN for
-                    local-only, or add TURN for hard NATs.
+                    Local network only by default (no public STUN). Add STUN or TURN only if
+                    you need to reach peers across different networks.
                   </p>
                   <label className="guide-field">
                     <span>STUN servers</span>
@@ -747,9 +742,9 @@ export default function LanShare() {
                       className="lan-code-input wx-ice-textarea"
                       value={stunText}
                       onChange={(event) => setStunText(event.target.value)}
-                      placeholder={DEFAULT_STUN_URLS.join("\n")}
+                      placeholder={"stun:stun.example.com:3478"}
                       spellCheck={false}
-                      rows={4}
+                      rows={3}
                     />
                   </label>
                   <label className="guide-field">

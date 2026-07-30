@@ -49,11 +49,8 @@ type WireMessage =
 const CHUNK_CHARS = 12_000;
 export const MAX_LAN_FILE_BYTES = 40 * 1024 * 1024;
 
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" },
-];
+/** Legacy path: local host candidates only (no public STUN by default). */
+const ICE_SERVERS: RTCIceServer[] = [];
 
 export function createPeerConnection(): RTCPeerConnection {
   return new RTCPeerConnection({

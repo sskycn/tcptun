@@ -1,10 +1,10 @@
 /**
  * User-configurable STUN / TURN for WebRTC.
  *
- * Default: public Google STUN servers so ICE works on typical NATs.
- * Unreachable STUNs are probed out before PeerJS connect (see filterReachableStunUrls).
- * Host (LAN) candidates are always gathered (iceTransportPolicy=all).
- * Empty STUN/TURN = pure LAN host candidates only.
+ * Default: no STUN/TURN — pure LAN host candidates (same local network).
+ * Users may add STUN/TURN in settings for wider reach; unreachable STUNs can be
+ * refined in the background (see filterReachableStunUrls).
+ * Host (LAN) candidates are always gathered when iceTransportPolicy=all.
  */
 
 export type IceServerEntry = {
@@ -29,18 +29,10 @@ const MAX_URLS = 12;
 const MAX_URL_LEN = 256;
 const MAX_CRED_LEN = 256;
 
-/**
- * Built-in default STUN list for chat discovery.
- * Cloudflare dropped: IPv4 binding often times out from many networks.
- * Runtime probe still drops any URL that does not return srflx in time.
- */
-export const DEFAULT_STUN_URLS: string[] = [
-  "stun:stun.l.google.com:19302",
-  "stun:stun1.l.google.com:19302",
-  "stun:stun2.l.google.com:19302",
-];
+/** No built-in public STUN — chat defaults to local network only. */
+export const DEFAULT_STUN_URLS: string[] = [];
 
-/** No STUN/TURN — pure LAN host candidates (explicit local-only mode). */
+/** No STUN/TURN — pure LAN host candidates (default + explicit local-only mode). */
 export const EMPTY_ICE_CONFIG: LanIceConfig = {
   stunUrls: [],
   turnUrls: [],
@@ -48,9 +40,9 @@ export const EMPTY_ICE_CONFIG: LanIceConfig = {
   turnCredential: "",
 };
 
-/** Default chat ICE config (public STUN, no TURN). */
+/** Default chat ICE config: local network only (no public STUN/TURN). */
 export const DEFAULT_ICE_CONFIG: LanIceConfig = {
-  stunUrls: [...DEFAULT_STUN_URLS],
+  stunUrls: [],
   turnUrls: [],
   turnUsername: "",
   turnCredential: "",
@@ -188,18 +180,18 @@ export function sanitizeIceConfig(input: Partial<LanIceConfig> | null | undefine
 
 export function loadIceConfig(): LanIceConfig {
   if (typeof window === "undefined") {
-    return { ...DEFAULT_ICE_CONFIG, stunUrls: [...DEFAULT_STUN_URLS] };
+    return { ...DEFAULT_ICE_CONFIG };
   }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    // First visit: ship with the public STUN defaults.
+    // First visit: local network only (empty STUN/TURN).
     if (!raw) {
-      return { ...DEFAULT_ICE_CONFIG, stunUrls: [...DEFAULT_STUN_URLS] };
+      return { ...DEFAULT_ICE_CONFIG };
     }
     const parsed = JSON.parse(raw) as Partial<LanIceConfig>;
     return sanitizeIceConfig(parsed);
   } catch {
-    return { ...DEFAULT_ICE_CONFIG, stunUrls: [...DEFAULT_STUN_URLS] };
+    return { ...DEFAULT_ICE_CONFIG };
   }
 }
 
