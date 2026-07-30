@@ -43,4 +43,7 @@ next-env.d.ts
 # local release packaging output
 /.release-staging/
 *.apk
-!/public/releases/**/*.apk
+
+# CLI binaries ship via npm — never host under GitHub Pages
+/public/releases/**
+!/public/releases/README.md

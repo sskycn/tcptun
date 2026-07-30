@@ -1,16 +1,23 @@
-export const releaseVersion = "0.2.3";
+export const releaseVersion = "0.2.4";
 
+/** Download and package links for the published npm package `tcptun`. */
 export const npmLinks = {
   package: "https://www.npmjs.com/package/tcptun",
+  packageVersion: `https://www.npmjs.com/package/tcptun/v/${releaseVersion}`,
   tarball: `https://registry.npmjs.org/tcptun/-/tcptun-${releaseVersion}.tgz`,
+  /** Individual binaries from the npm package (served via jsDelivr). */
+  binaryBase: `https://cdn.jsdelivr.net/npm/tcptun@${releaseVersion}/dist`,
+  latestBinaryBase: "https://cdn.jsdelivr.net/npm/tcptun@latest/dist",
 };
 
-/** Static assets hosted on GitHub Pages under /releases/<version>/ */
-export const releaseBasePath = `/releases/${releaseVersion}`;
+/** @deprecated Prefer npmLinks.binaryBase — binaries are no longer hosted on Pages. */
+export const releaseBasePath = npmLinks.binaryBase;
 
 export const installCommand = "curl -fsSL https://tcptun.com/install.sh | sh";
 
 export const pinnedInstallCommand = `curl -fsSL https://tcptun.com/install.sh | TCPTUN_VERSION=${releaseVersion} sh`;
+
+export const npmInstallCommand = `npm install -g tcptun@${releaseVersion}`;
 
 export const releaseHighlights = [
   {
@@ -19,9 +26,9 @@ export const releaseHighlights = [
     body: "With group mux, security.type=reality binds TCP and UDP on one address, dials Reality QUIC first, falls back to Reality TCP with backoff, and probes to restore QUIC preference after recovery.",
   },
   {
-    label: "Carrier control",
-    title: "Force TCP or force QUIC",
-    body: "Use reality-tcp for deterministic TCP-only Reality, or reality-quic with mux.mode=quic for a dedicated QUIC pool without fallback. Without mux, Reality stays TCP-only as before.",
+    label: "Mux & QUIC stability",
+    title: "Healthier carrier lifecycle",
+    body: "v0.2.4 hardens native and Xray mux carrier retirement, stream isolation, and QUIC path recovery so unhealthy carriers fail closed without stranding active streams.",
   },
   {
     label: "Continuity",
@@ -29,13 +36,13 @@ export const releaseHighlights = [
     body: "Opt-in mux.resume keeps an eligible TCP logical stream alive while its physical QUIC/TCP attachment is replaced, with bounded replay buffers, recovery timeouts, and a runtime-wide buffer budget.",
   },
   {
-    label: "Runtime & Android",
-    title: "Fail-closed lifecycle and quieter diagnostics",
-    body: "Shutdown, partial startup, resource budgets, reverse publish, and mux ownership fail closed. Android adds endpoint diagnostics, bounded health wakes, and near-zero idle polling.",
+    label: "Interop & Android",
+    title: "VMess and bridge improvements",
+    body: "VMess body security tracks current Xray behavior. The Android bridge exposes dynamic log levels and core build identity for quieter, clearer diagnostics.",
   },
 ] as const;
 
-/** Detailed v0.2.3 native + raw + reality capability notes. */
+/** Detailed native + raw + reality capability notes (available since v0.2.3). */
 export const nativeRealityAutoNotes = [
   {
     title: "Required stack",
@@ -77,7 +84,7 @@ export const nativeRealityAutoLayers = [
   {
     label: "Security",
     value: "reality",
-    body: "v0.2.3 automatic mode: QUIC-first Reality with TCP fallback on one address (not the forced reality-quic stack).",
+    body: "Automatic mode: QUIC-first Reality with TCP fallback on one address (not the forced reality-quic stack).",
   },
   {
     label: "Multiplexing",
@@ -110,30 +117,30 @@ export const faqItems = [
   {
     question: "Where does one-line install put the binary, and how do I pin a version?",
     answer:
-      "It installs to /usr/local/bin by default. Use TCPTUN_INSTALL_DIR to change the directory and TCPTUN_VERSION to pin a version (downloaded from tcptun.com/releases).",
+      "It installs to /usr/local/bin by default. Use TCPTUN_INSTALL_DIR to change the directory and TCPTUN_VERSION to pin a version. The installer downloads platform binaries from the published npm package (cdn.jsdelivr.net/npm/tcptun).",
   },
   {
     question: "Which platforms are supported?",
-    answer: "macOS, Linux, and Windows on amd64 / arm64 (Linux also includes armv7).",
+    answer: "macOS, Linux, and Windows on amd64 / arm64 (Linux also includes armv7). Prefer npm install -g tcptun or the one-line installer for CLI builds.",
   },
   {
     question: "How is the native token configured?",
     answer: "Server users[].id and client token must match. Use tcptun config native to generate a paired config.",
   },
   {
-    question: "What is native + raw + reality in v0.2.3?",
+    question: "What is native + raw + reality in v0.2.4?",
     answer:
       "It is the automatic dual-carrier stack: type=native, transport raw, group mux, and security.type=reality. The server binds TCP and UDP on one address; the client prefers Reality QUIC, falls back to Reality TCP with backoff, and probes to restore QUIC. Camouflage keys/SNI/dest are shared by both carriers. Without mux, Reality stays TCP-only.",
   },
   {
     question: "When should I enable mux or QUIC?",
     answer:
-      "For many short connections, prefer mux: {}. In v0.2.3, native + raw + group mux + reality automatically prefers QUIC and falls back to Reality TCP. Use reality-tcp to force TCP, or mux.mode=quic with reality-quic to force QUIC without fallback.",
+      "For many short connections, prefer mux: {}. In v0.2.4, native + raw + group mux + reality automatically prefers QUIC and falls back to Reality TCP. Use reality-tcp to force TCP, or mux.mode=quic with reality-quic to force QUIC without fallback.",
   },
   {
     question: "How do resumable streams work?",
     answer:
-      "Set mux.resume=true on both native endpoints using the Reality-auto stack (raw + group mux + security.type=reality). A TCP logical stream can reattach after its physical QUIC/TCP carrier fails. It does not cover UDP, reverse publish, forced reality-tcp/reality-quic, or cross-process failover; keep it off during rolling upgrades until both peers run v0.2.3 or newer.",
+      "Set mux.resume=true on both native endpoints using the Reality-auto stack (raw + group mux + security.type=reality). A TCP logical stream can reattach after its physical QUIC/TCP carrier fails. It does not cover UDP, reverse publish, forced reality-tcp/reality-quic, or cross-process failover; keep it off during rolling upgrades until both peers run v0.2.4 or newer.",
   },
   {
     question: "Can REALITY be used together with TLS?",
@@ -213,17 +220,15 @@ export const cookieNotice = {
     "By continuing to browse or use this website, you acknowledge and accept this cookies statement. If you do not agree, please stop using the site and clear this site’s cookies and stored data from your browser.",
 } as const;
 
+/** CLI binaries published inside the npm package `tcptun` under dist/. */
 export const binaryDownloads = [
-  binary("tcptun-android-arm64-v0.2.3.apk", "android", "Android", "arm64", "ARM64", 54927617),
-  binary("tcptun-android-armv7-v0.2.3.apk", "android", "Android", "armv7", "ARMv7", 51581195),
-  binary("tcptun-android-x86_64-v0.2.3.apk", "android", "Android", "amd64", "x86_64", 57958642),
-  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 19798208),
-  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 18416978),
-  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 19226786),
-  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 17825954),
-  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 18088098),
-  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 19740160),
-  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 17999360),
+  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 19982560),
+  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 18586274),
+  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 19407010),
+  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 17957026),
+  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 18219170),
+  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 19893760),
+  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 18147328),
 ] as const;
 
 export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;
@@ -317,7 +322,7 @@ export const nativeGuideConcepts = [
     body: "raw is the default and best for throughput. ws / h2 / h3 are available when you need path-based fronting; QUIC mode requires raw.",
   },
   {
-    title: "Security (v0.2.3)",
+    title: "Security (v0.2.4)",
     body: "With native + raw + group mux, security.type=reality is the automatic dual-carrier mode: QUIC first, Reality TCP fallback, shared keys/SNI/dest. reality-tcp forces TCP; reality-quic + mux.mode=quic forces QUIC without fallback. TLS still needs cert/key on the server.",
   },
   {
@@ -327,7 +332,7 @@ export const nativeGuideConcepts = [
 ] as const;
 
 /**
- * Interactive wizard for first-time setup with the recommended v0.2.3 stack:
+ * Interactive wizard for first-time setup with the recommended v0.2.4 stack:
  * native + raw + group mux + security.type=reality (QUIC-first, TCP fallback).
  */
 export const realityAutoWizardSteps = [
@@ -335,7 +340,7 @@ export const realityAutoWizardSteps = [
     id: "goal",
     title: "What you will build",
     summary: "A private native tunnel with automatic Reality carriers.",
-    body: "This wizard walks through the recommended v0.2.3 path: native + raw + group mux + security.type=reality. One public address carries Reality QUIC (preferred) and Reality TCP (fallback). Your laptop runs a local mixed proxy on 127.0.0.1:1080 and forwards through the tunnel.",
+    body: "This wizard walks through the recommended v0.2.4 path: native + raw + group mux + security.type=reality. One public address carries Reality QUIC (preferred) and Reality TCP (fallback). Your laptop runs a local mixed proxy on 127.0.0.1:1080 and forwards through the tunnel.",
     bullets: [
       "Server: VPS or edge host with a public IP (or DNS name)",
       "Client: laptop / phone / second host that needs a local proxy",
@@ -343,7 +348,7 @@ export const realityAutoWizardSteps = [
       "Outcome: apps use socks5h://127.0.0.1:1080 after both sides start",
     ],
     tips: [
-      "Use the same tcptun version (v0.2.3+) on both ends for auto carriers and optional resume.",
+      "Use the same tcptun version (v0.2.4+) on both ends for auto carriers and optional resume.",
       "Camouflage dest should support HTTPS on TCP and ideally HTTP/3 on UDP.",
     ],
     commands: [] as string[],
@@ -353,17 +358,18 @@ export const realityAutoWizardSteps = [
     id: "install",
     title: "Install tcptun",
     summary: "Put the binary on the server and the client.",
-    body: "Install on both machines. Prefer the one-line installer on Linux/macOS, or download a platform build from this site. Confirm the binary works with --version.",
+    body: "Install on both machines. Prefer the one-line installer or npm package; both pull CLI binaries from the published npm package. Confirm the binary works with --version.",
     bullets: [
       "Server and client both need the tcptun binary",
-      "Android can use the APK builds from the download page",
-      "npm also publishes a package if you prefer that install path",
+      "Binaries are published on npm as package tcptun (dist/*)",
+      "Pin with TCPTUN_VERSION or npm install -g tcptun@x.y.z",
     ],
     tips: [
-      "If you pin a version: TCPTUN_VERSION=0.2.3 sh -c \"$(curl -fsSL https://tcptun.com/install.sh)\"",
+      "If you pin a version: TCPTUN_VERSION=0.2.4 sh -c \"$(curl -fsSL https://tcptun.com/install.sh)\"",
     ],
     commands: [
       "curl -fsSL https://tcptun.com/install.sh | sh",
+      "npm install -g tcptun",
       "tcptun --version",
     ],
     configSide: null as null | "server" | "client" | "both",
@@ -480,7 +486,7 @@ export const realityAutoWizardSteps = [
     ],
     tips: [
       "If only TCP works, UDP may be blocked and Reality auto fell back to TCP — that can still be success.",
-      "Optional next step: set mux.resume=true on both ends for resumable TCP streams (v0.2.3+).",
+      "Optional next step: set mux.resume=true on both ends for resumable TCP streams (v0.2.4+).",
     ],
     commands: [
       "curl -x socks5h://127.0.0.1:1080 https://example.com -I",
@@ -500,7 +506,7 @@ export const realityAutoWizardSteps = [
       "Browse more copy-ready topologies on the Examples page",
     ],
     tips: [
-      "Keep resume off during rolling upgrades until both peers run v0.2.3+.",
+      "Keep resume off during rolling upgrades until both peers run v0.2.4+.",
       "Resumable streams need one unique server process address — not multi-backend L4 load balancing.",
     ],
     commands: [
@@ -772,12 +778,12 @@ export const nativeConfigHighlights = [
     body: "address is a host:port array. Multiple addresses race as candidate entry points for the same service; they are not balance.",
   },
   {
-    title: "v0.2.3 Reality auto",
+    title: "v0.2.4 Reality auto",
     body: "native + raw + group mux + security.type=reality prefers QUIC, falls back to TCP, and shares one camouflage identity on both carriers.",
   },
   {
     title: "Resumable TCP",
-    body: "mux.resume=true on both Reality-auto peers can preserve an eligible TCP logical stream across carrier replacement (v0.2.3+).",
+    body: "mux.resume=true on both Reality-auto peers can preserve an eligible TCP logical stream across carrier replacement (v0.2.4+).",
   },
   {
     title: "Throughput",
@@ -822,7 +828,7 @@ export const nativeFieldGroups = [
       { key: "mux.max_streams_per_session", side: "client", detail: "Per-connection stream cap, 1–4096." },
       { key: "mux.warm_spares", side: "client", detail: "Warm idle connections; must be less than max_sessions." },
       { key: "mux.udp_mode", side: "client", detail: "QUIC only: reliable / auto / datagram." },
-      { key: "mux.resume", side: "both", detail: "v0.2.3: preserve eligible native TCP logical streams across Reality auto carrier replacement." },
+      { key: "mux.resume", side: "both", detail: "v0.2.4: preserve eligible native TCP logical streams across Reality auto carrier replacement." },
       { key: "mux.resume_timeout", side: "both", detail: "Recovery window: default 15s; explicit 100ms–5m." },
       { key: "mux.resume_buffer_size", side: "both", detail: "Per-direction replay buffer: default 4 MiB; explicit 64 KiB–64 MiB." },
       { key: "mux.*_receive_window", side: "both", detail: "QUIC receive windows; stream max 16 MiB, connection max 64 MiB." },
@@ -994,7 +1000,7 @@ export const vlessRealityClientExample = `{
 }`;
 
 /**
- * Native v0.2.3 automatic Reality carriers:
+ * Native v0.2.4 automatic Reality carriers:
  * native + raw + group mux + security.type=reality
  * (QUIC-first with TCP fallback on one address).
  */
@@ -1062,7 +1068,7 @@ export const nativeRealityClientExample = `{
   "route": { "default_outbound": "proxy", "rules": [] }
 }`;
 
-/** Native v0.2.3 automatic Reality carriers with resumable TCP logical streams. */
+/** Native v0.2.4 automatic Reality carriers with resumable TCP logical streams. */
 export const nativeResumableServerExample = `{
   "log": { "level": "info" },
   "resources": { "resumable_buffer_budget": 1073741824 },
@@ -1158,8 +1164,8 @@ export const nativeUseCases = [
   {
     id: "reality",
     title: "native + raw + reality (auto)",
-    summary: "v0.2.3 automatic dual carriers: Reality QUIC first, Reality TCP fallback, shared keys on one address.",
-    when: "Both ends run tcptun v0.2.3+ and you want QUIC when available without managing a second port or certs.",
+    summary: "v0.2.4 automatic dual carriers: Reality QUIC first, Reality TCP fallback, shared keys on one address.",
+    when: "Both ends run tcptun v0.2.4+ and you want QUIC when available without managing a second port or certs.",
     steps: [
       "Use type=native, transport raw, mux group mode, and security.type=reality on both ends.",
       "Generate with --server-name and --dest; dest should support HTTPS (TCP) and HTTP/3 (UDP).",
@@ -1179,10 +1185,10 @@ export const nativeUseCases = [
   {
     id: "resumable",
     title: "Resumable Reality auto",
-    summary: "v0.2.3 keeps eligible TCP logical streams alive while the physical carrier switches between QUIC and Reality TCP.",
+    summary: "v0.2.4 keeps eligible TCP logical streams alive while the physical carrier switches between QUIC and Reality TCP.",
     when: "Long-lived TCP flows should tolerate a temporary UDP/TCP path change without redialing the target connection.",
     steps: [
-      "Run v0.2.3 or newer on both ends before enabling resume.",
+      "Run v0.2.4 or newer on both ends before enabling resume.",
       "Use native + raw + security.type=reality + group mux on both endpoints.",
       "Set matching resume timeout and buffer size values.",
       "Keep the address pinned to one server process; cross-instance resume is unsupported.",
@@ -1262,7 +1268,7 @@ export const realityRules = [
     body: "Server private_key pairs with client public_key; short_id must match on both ends.",
   },
   {
-    title: "native auto (v0.2.3)",
+    title: "native auto (v0.2.4)",
     body: "On native + raw + group mux, security.type=reality enables dual carriers: QUIC-first with TCP fallback. Without mux, Reality stays TCP-only.",
   },
   {
@@ -1746,8 +1752,8 @@ export const protocolUseCases = [
     id: "native-reality",
     protocol: "native",
     title: "native · raw + reality auto",
-    summary: "v0.2.3 stack: native + raw + group mux + reality. QUIC-first with TCP fallback on one address.",
-    when: "Both ends run tcptun v0.2.3+ and you want automatic dual carriers without certs or a second port.",
+    summary: "v0.2.4 stack: native + raw + group mux + reality. QUIC-first with TCP fallback on one address.",
+    when: "Both ends run tcptun v0.2.4+ and you want automatic dual carriers without certs or a second port.",
     steps: [
       "Generate with --server-name and --dest (HTTPS + HTTP/3 capable camouflage).",
       "Ensure mux group mode is present so automatic carriers activate.",
@@ -1790,10 +1796,10 @@ export const protocolUseCases = [
     id: "native-resumable",
     protocol: "native",
     title: "native · resumable auto",
-    summary: "v0.2.3 automatic QUIC/TCP Reality carriers with resumable TCP logical streams.",
+    summary: "v0.2.4 automatic QUIC/TCP Reality carriers with resumable TCP logical streams.",
     when: "Long-lived TCP flows should survive a physical carrier replacement on one server process.",
     steps: [
-      "Use v0.2.3+ on both ends and keep one unique server address.",
+      "Use v0.2.4+ on both ends and keep one unique server address.",
       "Set native + raw + reality + group mux on both endpoints.",
       "Enable mux.resume with matching timeout and buffer size values.",
     ],
@@ -1993,6 +1999,7 @@ function binary(
     arch,
     archLabel,
     size,
-    url: `${releaseBasePath}/${filename}`,
+    url: `${npmLinks.binaryBase}/${filename}`,
+    source: "npm" as const,
   };
 }

@@ -10,7 +10,7 @@ import {
   formatBytes,
   platformInitial,
 } from "./detect-platform";
-import { binaryDownloads, npmLinks } from "./site-data";
+import { binaryDownloads, npmInstallCommand, npmLinks } from "./site-data";
 import InstallCommand from "./install-command";
 
 type PlatformDownloadButtonProps = {
@@ -57,7 +57,7 @@ export function PlatformDownloadButton({
   }
 
   return (
-    <a className={className} href={recommended.url} download={recommended.filename}>
+    <a className={className} href={recommended.url} rel="noreferrer">
       Download {recommended.platformLabel} {recommended.archLabel}
     </a>
   );
@@ -96,11 +96,22 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
         <div>
           <p className="eyebrow">Download</p>
           <h2>Multi-platform binaries, ready to run.</h2>
-          <p>Hosted on this site&apos;s GitHub Pages under /releases/{releaseVersion}/.</p>
+          <p>
+            CLI builds ship inside the npm package{" "}
+            <a href={npmLinks.packageVersion} target="_blank" rel="noreferrer">
+              tcptun@{releaseVersion}
+            </a>
+            . Direct file links below come from that package.
+          </p>
         </div>
-        <a className="button secondary" href={`/releases/${releaseVersion}/SHA256SUMS`}>
-          SHA256SUMS
-        </a>
+        <div className="download-heading-actions">
+          <a className="button secondary" href={npmLinks.package} target="_blank" rel="noreferrer">
+            npm package
+          </a>
+          <a className="button ghost" href={npmLinks.tarball} rel="noreferrer">
+            tarball
+          </a>
+        </div>
       </div>
 
       {recommended && detected ? (
@@ -117,11 +128,7 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
               </p>
             </div>
           </div>
-          <a
-            className="button primary"
-            href={recommended.url}
-            download={recommended.filename}
-          >
+          <a className="button primary" href={recommended.url} rel="noreferrer">
             Download recommended build
           </a>
         </div>
@@ -145,14 +152,31 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
                   {isRecommended ? <span className="recommend-pill">Recommended</span> : null}
                 </div>
                 <code>{item.filename}</code>
-                <p>{formatBytes(item.size)} · Pages</p>
+                <p>{formatBytes(item.size)} · npm</p>
               </div>
-              <a className="download-link" href={item.url} download={item.filename}>
+              <a className="download-link" href={item.url} rel="noreferrer">
                 Download
               </a>
             </article>
           );
         })}
+      </div>
+
+      <div className="download-note npm-install-note">
+        <div className="download-note-copy">
+          <strong>Install via npm</strong>
+          <div className="download-note-command">
+            <code>{npmInstallCommand}</code>
+          </div>
+          <span>
+            The package wraps the same platform binaries under <code>dist/</code>. Use{" "}
+            <code>npm install -g tcptun@latest</code> for the newest release.
+          </span>
+        </div>
+        <a className="download-note-link" href={npmLinks.packageVersion} target="_blank" rel="noreferrer">
+          View on npm
+          <span aria-hidden="true">↗</span>
+        </a>
       </div>
 
       <InstallCommand variant="panel" />

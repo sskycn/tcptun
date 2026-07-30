@@ -2,7 +2,7 @@
 
 Next.js static site for tcptun, published to [tcptun.com](https://tcptun.com/) via GitHub Pages.
 
-Site copy and examples are based on the sibling `../tcptun-go` source. CLI / Android packages are built locally into `public/releases/` and ship with Pages.
+Site copy and examples track the sibling [`../tcptun-go`](../tcptun-go) source. **CLI binaries are not hosted on this site** — they ship inside the npm package [`tcptun`](https://www.npmjs.com/package/tcptun) and are linked from the download page.
 
 ## Local development
 
@@ -17,54 +17,32 @@ Production build:
 pnpm build
 ```
 
-## Publish binaries to GitHub Pages
+## Install / download
 
-Run from the website repo root (defaults to sibling `../tcptun-go` and `../tcptun-kotlin`):
-
-```bash
-# Build Go (+ Android) into public/releases/<version>/ and latest/
-./scripts/publish-pages-assets.sh --version v0.2.2
-
-# Go only
-./scripts/publish-pages-assets.sh --version v0.2.2 --only go
-
-# Sync version and file sizes into app/site-data.ts
-./scripts/publish-pages-assets.sh --version v0.2.2 --only go --update-site-data
-
-# Skip build when dist / APKs already exist
-./scripts/publish-pages-assets.sh --version v0.2.2 --skip-build
-
-# Remove older version directories after publishing this version
-./scripts/publish-pages-assets.sh --version v0.2.2 --skip-build --prune-old
-```
-
-Then commit and push. The Pages workflow builds and deploys (`public/` is copied into `out/`):
+| Source | Description |
+|--------|-------------|
+| [npmjs.com/package/tcptun](https://www.npmjs.com/package/tcptun) | Package page |
+| `https://registry.npmjs.org/tcptun/-/tcptun-<version>.tgz` | Full package tarball |
+| `https://cdn.jsdelivr.net/npm/tcptun@<version>/dist/tcptun-linux-amd64` | Individual binary (from npm package files) |
+| `https://tcptun.com/install.sh` | One-line installer (pulls binaries from the npm package via jsDelivr) |
 
 ```bash
-git add public/releases app/site-data.ts public/install.sh
-git commit -m "release: publish v0.2.2 assets"
-git push origin main
-```
-
-Example URLs after deploy:
-
-| Path | Description |
-|------|-------------|
-| `https://tcptun.com/releases/0.2.2/tcptun-linux-amd64` | Pinned version |
-| `https://tcptun.com/releases/0.2.2/tcptun-android-arm64-v0.2.2.apk` | Android ARM64 APK |
-| `https://tcptun.com/releases/0.2.2/tcptun-android-armv7-v0.2.2.apk` | Android ARMv7 APK |
-| `https://tcptun.com/releases/0.2.2/tcptun-android-x86_64-v0.2.2.apk` | Android x86_64 APK |
-| `https://tcptun.com/releases/latest/tcptun-linux-amd64` | Latest copy |
-| `https://tcptun.com/install.sh` | One-line install (pulls binaries from `/releases/...`) |
-
-```bash
+# latest
 curl -fsSL https://tcptun.com/install.sh | sh
-TCPTUN_VERSION=0.2.2 sh -c "$(curl -fsSL https://tcptun.com/install.sh)"
+
+# pin a version
+curl -fsSL https://tcptun.com/install.sh | TCPTUN_VERSION=0.2.4 sh
+
+# or npm
+npm install -g tcptun@0.2.4
 ```
 
-Android builds need `signing.properties` or `TCPTUN_RELEASE_*` env vars in `tcptun-kotlin`.
+After a new `tcptun-go` release is published to npm:
+
+1. Bump `releaseVersion` and binary sizes in `app/site-data.ts` (and any release notes copy).
+2. Confirm `public/install.sh` still targets the npm package layout (`@version/dist/...`).
+3. Commit and push — the Pages workflow deploys the static site only (no large binaries).
 
 ## Site content
 
 Pushing to `main` triggers `.github/workflows/pages.yml` to deploy the static site.
-After a new release, update `public/releases/` with the script above and, if needed, the copy and version in `app/site-data.ts`.

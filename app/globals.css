@@ -2027,6 +2027,18 @@ pre {
   max-width: 720px;
 }
 
+.download-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.npm-install-note {
+  margin-top: 1.25rem;
+}
+
 /* ---------- capability cards ---------- */
 
 .capability-grid {

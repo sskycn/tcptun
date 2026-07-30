@@ -156,11 +156,11 @@ export default function Home() {
         <div className="section-heading row-heading">
           <div>
             <p className="eyebrow">What&apos;s new · {displayVersion}</p>
-            <h2>Carrier continuity, bounded recovery, quieter Android.</h2>
+            <h2>Mux stability, QUIC recovery, and quieter Android diagnostics.</h2>
             <p>
-              v0.2.3 centers on <code>native + raw + reality</code> automatic dual carriers
-              (QUIC-first, TCP fallback), optional resumable TCP streams, and tighter lifecycle
-              across the runtime and Android app.
+              v0.2.4 hardens native and Xray mux carrier lifecycle, improves QUIC path recovery,
+              keeps <code>native + raw + reality</code> automatic dual carriers, and refreshes
+              Android bridge logging and VMess interop.
             </p>
           </div>
           <Link className="button secondary" href="/config/#native-carriers">

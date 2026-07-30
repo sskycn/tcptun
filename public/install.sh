@@ -5,7 +5,9 @@ set -eu
 package="tcptun"
 version="${TCPTUN_VERSION:-latest}"
 install_dir="${TCPTUN_INSTALL_DIR:-/usr/local/bin}"
-base_url="${TCPTUN_BASE_URL:-https://tcptun.com/releases}"
+# Binaries live in the published npm package under dist/.
+# Override with TCPTUN_BASE_URL if you need a mirror (must include @version/dist layout).
+base_url="${TCPTUN_BASE_URL:-https://cdn.jsdelivr.net/npm/tcptun}"
 
 fail() {
   printf 'tcptun installer: %s\n' "$*" >&2
@@ -53,7 +55,11 @@ if [ "$arch" = "armv7" ] && [ "$platform" != "linux" ]; then
 fi
 
 filename="tcptun-${platform}-${arch}${suffix}"
-url="${base_url}/${version}/${filename}"
+# Default layout: https://cdn.jsdelivr.net/npm/tcptun@<version>/dist/<filename>
+case "$base_url" in
+  */) base_url=${base_url%/} ;;
+esac
+url="${base_url}@${version}/dist/${filename}"
 
 tmp_dir=$(mktemp -d 2>/dev/null || mktemp -d -t tcptun) || fail "cannot create temporary directory"
 tmp_binary="$tmp_dir/$filename"

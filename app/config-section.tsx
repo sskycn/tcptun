@@ -145,7 +145,7 @@ const nativeRealityQuicLayers = [
 
 const nativeCarrierModes = [
   {
-    label: "Automatic · v0.2.3",
+    label: "Automatic · v0.2.4",
     config: "reality + group mux",
     body: "Binds TCP and UDP on one address, prefers QUIC, falls back to Reality TCP with backoff, and probes to restore QUIC preference.",
   },
@@ -168,7 +168,7 @@ const resumableRules = [
   },
   {
     title: "Both peers",
-    body: "Set mux.resume=true on both endpoints running v0.2.3+. There is no silent downgrade when only one peer enables it.",
+    body: "Set mux.resume=true on both endpoints running v0.2.4+. There is no silent downgrade when only one peer enables it.",
   },
   {
     title: "Bounded recovery",
@@ -237,12 +237,12 @@ export default function ConfigSection() {
       <div className="native-reality-quic" id="native-carriers">
         <div className="native-reality-quic-heading">
           <div>
-            <p className="eyebrow">v0.2.3 · native + raw + reality</p>
+            <p className="eyebrow">v0.2.4 · native + raw + reality</p>
             <h3>
               <code>native + raw + reality + group mux</code>
             </h3>
             <p>
-              This is the recommended automatic stack in v0.2.3: one listen address, dual Reality
+              This is the recommended automatic stack in v0.2.4: one listen address, dual Reality
               carriers, QUIC preferred, TCP fallback, and optional resumable TCP streams. Without{" "}
               <code>mux</code>, ordinary native / VLESS / VMess / Trojan REALITY remains TCP-only.
             </p>
@@ -394,7 +394,7 @@ export default function ConfigSection() {
             <strong>Both ends must match</strong>
             <p>
               token, REALITY key pair, server name, and short ID must correspond. Plain{" "}
-              <code>security.type=reality</code> selects v0.2.3 automatic carriers only with group
+              <code>security.type=reality</code> selects v0.2.4 automatic carriers only with group
               mux; this forced QUIC stack still requires <code>reality-quic</code>.
             </p>
           </div>
@@ -502,7 +502,7 @@ export default function ConfigSection() {
 
       <div className="mux-panel" id="resumable">
         <div className="section-subheading">
-          <p className="eyebrow">v0.2.3 continuity</p>
+          <p className="eyebrow">v0.2.4 continuity</p>
           <h3>Resumable TCP logical streams</h3>
           <p>
             Add <code>resume</code> to matching Reality-auto mux blocks to preserve an eligible TCP
@@ -656,7 +656,7 @@ export default function ConfigSection() {
           <strong>Note</strong>
           <p>
             Native + raw + group mux + <code>reality</code> is automatic QUIC-first with TCP
-            fallback in v0.2.3. The separate forced <code>mux.mode=quic</code> stack requires
+            fallback in v0.2.4. The separate forced <code>mux.mode=quic</code> stack requires
             certificate TLS or <code>security.type=reality-quic</code>;{" "}
             <code>tcptun config native --quic</code> generates the latter.
           </p>

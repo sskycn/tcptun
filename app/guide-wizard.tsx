@@ -45,7 +45,7 @@ const profiles: Array<{
     id: "native-reality-auto",
     title: "native + raw + reality",
     stack: "group mux · QUIC-first · TCP fallback",
-    hint: "Recommended for tcptun-to-tcptun on v0.2.3+",
+    hint: "Recommended for tcptun-to-tcptun on v0.2.4+",
     recommended: true,
   },
   {
@@ -583,8 +583,8 @@ export default function GuideWizard() {
                 {form.profile === "native-reality-auto" ? (
                   <>
                     <p className="guide-wizard-body">
-                      Optional v0.2.3 feature. Resumable streams keep eligible TCP flows alive when the
-                      physical Reality QUIC/TCP carrier is replaced. Both ends must run v0.2.3+.
+                      Optional v0.2.4 feature. Resumable streams keep eligible TCP flows alive when the
+                      physical Reality QUIC/TCP carrier is replaced. Both ends must run v0.2.4+.
                     </p>
                     <div className="guide-choice-grid" role="radiogroup" aria-label="Resumable streams">
                       <button
