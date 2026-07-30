@@ -67,6 +67,7 @@ export type RoomPeer = {
   id: string;
   name: string;
   self?: boolean;
+  /** True only after the personal chat DataChannel has opened. */
   connected?: boolean;
   /** True when an E2E session key is ready for this peer. */
   encrypted?: boolean;
@@ -130,7 +131,7 @@ const DISCOVERY_CLAIM_TIMEOUT_MS = 10_000;
 const DISCOVERY_ANCHOR_COUNT = 64;
 /** If no peer channel opens while STUN/TURN is configured, fall back to host-only ICE. */
 const LAN_ICE_FALLBACK_MS = 18_000;
-/** Soft-online window while dialing so peers appear in the list before open. */
+/** Presence grace while a discovered peer's personal channel is dialing. */
 const DIALING_SOFT_ONLINE_MS = 30_000;
 
 export type LanRoomHandlers = {
@@ -742,9 +743,9 @@ export class LanRoom {
       if (id === discoveryId) continue;
       const conn = this.connections.get(id);
       const e2e = this.e2eSessions.get(id);
-      const live = conn?.open === true;
-      // Soft-online: stay in the contact list during brief tab-switch drops.
-      const connected = live || this.isSoftOnline(id);
+      // Discovery and a pending ICE offer are not a usable chat connection.
+      // Only expose a contact as online after its personal DataChannel opens.
+      const connected = conn?.open === true;
       peers.push({
         id,
         name,
@@ -778,6 +779,21 @@ export class LanRoom {
   private statusForMode(base: string): string {
     const label = this.effectiveIceModeLabel();
     return `${base} ${label}.`;
+  }
+
+  private iceFailureMessage(peerId?: string): string {
+    const name = peerId
+      ? sanitizeDisplayName(this.peerNames.get(peerId), "the nearby user")
+      : "a nearby user";
+    if (this.effectiveIceModeLabel() === iceModeLabel("lan-only")) {
+      return `Received a discovery signal for ${name}, but the browser could not open a local WebRTC data path. Allow Local Network access, turn off Wi-Fi client/AP isolation, then retry. You can also enable Compatibility mode on both devices.`;
+    }
+    return `Received a discovery signal for ${name}, but WebRTC ICE negotiation failed. Check Local Network access and Wi-Fi client/AP isolation. If compatibility STUN also fails, configure a TURN server on both devices.`;
+  }
+
+  private reportIceFailure(peerId?: string) {
+    if (this.closed) return;
+    this.handlers.onError(this.iceFailureMessage(peerId));
   }
 
   private clearLanIceFallbackTimer() {
@@ -1340,11 +1356,10 @@ export class LanRoom {
         }
       }
       this.discoveryClients.set(remoteId, conn);
-      this.rememberPeer(remoteId, this.peerNames.get(remoteId) || "User");
-      this.enterSoftOnline(remoteId, DIALING_SOFT_ONLINE_MS);
 
       const pushRoster = () => {
         if (this.closed || !conn.open) return;
+        this.handlers.onStatus(this.statusForMode("Nearby user found. Opening secure chat…"));
         try {
           // Advertise our user key (not the room host id) so the guest can mesh-chat.
           this.send(conn, {
@@ -1367,6 +1382,15 @@ export class LanRoom {
       if (conn.open) pushRoster();
       else conn.on("open", pushRoster);
 
+      conn.on("iceStateChanged", (state) => {
+        if (this.closed || this.discoveryClients.get(remoteId) !== conn) return;
+        if (state === "checking") {
+          this.handlers.onStatus(this.statusForMode("Nearby signal found. Checking local path…"));
+        } else if (state === "failed") {
+          this.reportIceFailure();
+        }
+      });
+
       conn.on("data", (data) => {
         try {
           const msg = (typeof data === "string" ? JSON.parse(data) : data) as WireMessage;
@@ -1380,14 +1404,16 @@ export class LanRoom {
         if (this.discoveryClients.get(remoteId) !== conn) return;
         this.discoveryClients.delete(remoteId);
         if (this.connections.get(remoteId)?.open) return;
-        this.enterSoftOnline(remoteId, SOFT_ONLINE_GRACE_MS);
+        if (this.peerNames.has(remoteId)) this.enterSoftOnline(remoteId, SOFT_ONLINE_GRACE_MS);
         this.broadcastDiscoveryRoster();
       });
 
-      conn.on("error", () => {
+      conn.on("error", (err) => {
         if (this.discoveryClients.get(remoteId) !== conn) return;
         this.discoveryClients.delete(remoteId);
-        if (!this.connections.get(remoteId)?.open) {
+        const type = String((err as { type?: string }).type || "");
+        if (type === "negotiation-failed") this.reportIceFailure();
+        if (!this.connections.get(remoteId)?.open && this.peerNames.has(remoteId)) {
           this.enterSoftOnline(remoteId, SOFT_ONLINE_GRACE_MS);
         }
       });
@@ -1503,6 +1529,15 @@ export class LanRoom {
       };
       if (conn.open) onOpen();
       else conn.on("open", onOpen);
+
+      conn.on("iceStateChanged", (state) => {
+        if (this.closed || this.discoveryBootstrap !== conn) return;
+        if (state === "checking") {
+          this.handlers.onStatus(this.statusForMode("Discovery signal found. Checking local path…"));
+        } else if (state === "failed" && this.peerNames.size > 0) {
+          this.reportIceFailure();
+        }
+      });
 
       conn.on("data", (data) => {
         try {
@@ -1723,8 +1758,6 @@ export class LanRoom {
       }
       return;
     }
-    this.rememberPeer(remoteId, this.peerNames.get(remoteId) || "User");
-    this.enterSoftOnline(remoteId, DIALING_SOFT_ONLINE_MS);
     this.wireConnection(conn, remoteId, false);
   }
 
@@ -1798,6 +1831,8 @@ export class LanRoom {
       }
     }
 
+    const knownBeforeOffer = this.peerNames.has(peerId);
+    let opened = conn.open;
     this.connections.set(peerId, conn);
     this.rememberPeer(peerId, this.peerNames.get(peerId) || "User");
     // Watch for STUN/ICE stall before "open".
@@ -1814,6 +1849,7 @@ export class LanRoom {
       }
       this.clearDialOpenTimer(peerId);
       this.clearLanIceFallbackTimer();
+      opened = true;
       this.touchPeer(peerId);
       this.clearSoftOnline(peerId);
       this.send(conn, { v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
@@ -1839,24 +1875,40 @@ export class LanRoom {
       }
     });
 
+    conn.on("iceStateChanged", (state) => {
+      if (this.closed || this.connections.get(peerId) !== conn) return;
+      if (state === "checking") {
+        const name = sanitizeDisplayName(this.peerNames.get(peerId), "nearby user");
+        this.handlers.onStatus(this.statusForMode(`Connecting to ${name}; checking ICE path…`));
+      } else if (state === "failed") {
+        this.reportIceFailure(peerId);
+      }
+    });
+
     conn.on("close", () => {
       if (this.connections.get(peerId) !== conn) return;
       this.clearDialOpenTimer(peerId);
       this.connections.delete(peerId);
       // Drop E2E for this transport — re-handshake on next open.
       this.e2eSessions.delete(peerId);
-      // Soft-online grace: stay in the contact list while we redial (tab switch / brief drop).
-      this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
-      this.scheduleRedial(peerId, true);
+      // Keep retry eligibility during a brief tab switch / transport drop.
+      if (opened || knownBeforeOffer) {
+        this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
+        this.scheduleRedial(peerId, true);
+      }
       if (this.isHost) this.broadcastDiscoveryRoster();
       this.armLanIceFallback();
     });
 
-    conn.on("error", () => {
+    conn.on("error", (err) => {
       if (this.connections.get(peerId) !== conn) return;
       this.clearDialOpenTimer(peerId);
-      this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
-      this.scheduleRedial(peerId, false);
+      const type = String((err as { type?: string }).type || "");
+      if (type === "negotiation-failed") this.reportIceFailure(peerId);
+      if (opened || knownBeforeOffer) {
+        this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
+        this.scheduleRedial(peerId, false);
+      }
       this.armLanIceFallback();
     });
 

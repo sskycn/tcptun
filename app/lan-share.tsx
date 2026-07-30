@@ -9,6 +9,7 @@ import {
   type StoredContact,
 } from "./lan-history";
 import {
+  COMPATIBILITY_STUN_URLS,
   DEFAULT_ICE_CONFIG,
   clearIceConfig,
   iceMode,
@@ -470,6 +471,20 @@ export default function LanShare() {
     restartDiscovery();
   }
 
+  function enableCompatibilityMode() {
+    const next = saveIceConfig({
+      ...iceConfigRef.current,
+      stunUrls: [...COMPATIBILITY_STUN_URLS],
+    });
+    setIceConfig(next);
+    iceConfigRef.current = next;
+    setStunText(urlsToText(next.stunUrls));
+    setError(null);
+    setStatus("Compatibility mode enabled (Local + STUN). Reconnecting…");
+    setShowSettings(false);
+    restartDiscovery();
+  }
+
   function applyAlias() {
     const alias = sanitizeDisplayName(localName, "User");
     setLocalName(alias);
@@ -772,8 +787,10 @@ export default function LanShare() {
                     </span>
                   </div>
                   <p className="wx-ice-hint">
-                    Local network only by default (no public STUN). Add STUN or TURN only if
-                    you need to reach peers across different networks.
+                    Local network only by default (no public STUN). Compatibility STUN can help
+                    when browser local-network rules, multicast DNS, or Wi-Fi isolation block a
+                    direct host candidate, but it can widen discovery beyond your LAN. TURN is
+                    only needed when every direct path fails.
                   </p>
                   <label className="guide-field">
                     <span>STUN servers</span>
@@ -822,6 +839,9 @@ export default function LanShare() {
                     <button type="button" className="button primary" onClick={saveIceAndReconnect}>
                       Save network
                     </button>
+                    <button type="button" className="button secondary" onClick={enableCompatibilityMode}>
+                      Use compatibility STUN
+                    </button>
                     <button type="button" className="button ghost" onClick={resetIceToLanOnly}>
                       Use local network only
                     </button>
@@ -854,9 +874,16 @@ export default function LanShare() {
                 >
                   {error || status}
                 </span>
-                <button type="button" className="wx-empty-retry" onClick={restartDiscovery}>
-                  Retry discovery
-                </button>
+                <div className="wx-empty-actions">
+                  <button type="button" className="wx-empty-retry" onClick={restartDiscovery}>
+                    Retry discovery
+                  </button>
+                  {mode === "lan-only" ? (
+                    <button type="button" className="wx-empty-retry" onClick={enableCompatibilityMode}>
+                      Try compatibility mode
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : (
               contacts.map((peer) => {

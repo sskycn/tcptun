@@ -1233,7 +1233,6 @@ html[data-theme="dark"] .wx-menu-dots > span {
 }
 
 .wx-empty-retry {
-  margin-top: 12px;
   border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
   border-radius: 999px;
   background: var(--surface);
@@ -1243,6 +1242,14 @@ html[data-theme="dark"] .wx-menu-dots > span {
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.wx-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .wx-empty-retry:hover {

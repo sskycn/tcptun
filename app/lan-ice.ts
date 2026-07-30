@@ -32,6 +32,19 @@ const MAX_CRED_LEN = 256;
 /** No built-in public STUN — chat defaults to local network only. */
 export const DEFAULT_STUN_URLS: string[] = [];
 
+/**
+ * Explicit opt-in preset for LANs that block direct host/mDNS candidates.
+ *
+ * STUN still gathers host candidates and does not relay chat data. It only adds
+ * server-reflexive candidates, which can make WebRTC work through AP isolation,
+ * broken multicast DNS, or a NAT with hairpin support. TURN remains a separate,
+ * user-supplied setting because relaying data changes the privacy boundary.
+ */
+export const COMPATIBILITY_STUN_URLS = [
+  "stun:stun.cloudflare.com:3478",
+  "stun:stun.l.google.com:19302",
+] as const;
+
 /** No STUN/TURN — pure LAN host candidates (default + explicit local-only mode). */
 export const EMPTY_ICE_CONFIG: LanIceConfig = {
   stunUrls: [],
