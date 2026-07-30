@@ -12,7 +12,7 @@ test("mesh dial ownership is deterministic and has exactly one initiator", () =>
     ["tcptu0001", "tcptu0002"],
     ["alice", "bob"],
     ["z-user", "a-user"],
-  ] as const;
+  ];
 
   for (const [a, b] of pairs) {
     assert.notEqual(shouldInitiateMesh(a, b), shouldInitiateMesh(b, a));

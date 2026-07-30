@@ -124,6 +124,7 @@ const STALE_CHANNEL_MS = 28_000;
 const DIAL_OPEN_TIMEOUT_MS = 14_000;
 /** Discovery uses a separate channel and needs its own half-open watchdog. */
 const DISCOVERY_OPEN_TIMEOUT_MS = 14_000;
+const DISCOVERY_CLAIM_TIMEOUT_MS = 10_000;
 /** If no peer channel opens while STUN/TURN is configured, fall back to host-only ICE. */
 const LAN_ICE_FALLBACK_MS = 18_000;
 /** Soft-online window while dialing so peers appear in the list before open. */
@@ -225,6 +226,8 @@ export class LanRoom {
   >();
   private reconnectTimer: number | null = null;
   private discoveryOpenTimer: number | null = null;
+  private discoveryClaimTimer: number | null = null;
+  private discoveryClaimPeer: Peer | null = null;
   /** Last time we saw activity (open/data/ping/pong) from a peer. */
   private lastAlive = new Map<string, number>();
   /** Peers in soft-online grace after a channel drop (tab switch, brief ICE blip). */
@@ -632,6 +635,14 @@ export class LanRoom {
     this.clearLanIceFallbackTimer();
     this.clearAllDialOpenTimers();
     this.clearDiscoveryOpenTimer();
+    this.clearDiscoveryClaimTimer();
+    const discoveryClaimPeer = this.discoveryClaimPeer;
+    this.discoveryClaimPeer = null;
+    try {
+      discoveryClaimPeer?.destroy();
+    } catch {
+      // ignore
+    }
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -768,9 +779,7 @@ export class LanRoom {
     if (this.closed || this.iceForceLanOnly || this.lanIceFallbackInFlight) return;
     if (!hasRemoteIce(this.iceConfig)) return;
     // Already have a live channel — STUN path is fine (or host already won).
-    const meshConnections = Array.from(this.connections.values());
-    this.connections.clear();
-    for (const conn of meshConnections) {
+    for (const conn of this.connections.values()) {
       if (conn.open) return;
     }
     if (this.lanIceFallbackTimer !== null) return;
@@ -800,6 +809,13 @@ export class LanRoom {
     }
   }
 
+  private clearDiscoveryClaimTimer() {
+    if (this.discoveryClaimTimer !== null) {
+      window.clearTimeout(this.discoveryClaimTimer);
+      this.discoveryClaimTimer = null;
+    }
+  }
+
   private armDiscoveryOpenWatchdog(hostId: string, conn: DataConnection) {
     this.clearDiscoveryOpenTimer();
     this.discoveryOpenTimer = window.setTimeout(() => {
@@ -812,6 +828,7 @@ export class LanRoom {
         // ignore
       }
       this.scheduleReconnect(hostId, false);
+      this.scheduleDiscoveryClaim(hostId);
       this.armLanIceFallback();
     }, DISCOVERY_OPEN_TIMEOUT_MS);
   }
@@ -867,6 +884,14 @@ export class LanRoom {
 
     this.clearAllDialOpenTimers();
     this.clearDiscoveryOpenTimer();
+    this.clearDiscoveryClaimTimer();
+    const discoveryClaimPeer = this.discoveryClaimPeer;
+    this.discoveryClaimPeer = null;
+    try {
+      discoveryClaimPeer?.destroy();
+    } catch {
+      // ignore
+    }
     for (const timer of this.redialTimers.values()) window.clearTimeout(timer);
     this.redialTimers.clear();
     if (this.reconnectTimer !== null) {
@@ -874,7 +899,9 @@ export class LanRoom {
       this.reconnectTimer = null;
     }
 
-    for (const conn of this.connections.values()) {
+    const meshConnections = Array.from(this.connections.values());
+    this.connections.clear();
+    for (const conn of meshConnections) {
       try {
         conn.close();
       } catch {
@@ -1141,7 +1168,7 @@ export class LanRoom {
         resolve();
       };
 
-      const timeout = window.setTimeout(() => becomeGuestDiscovery(), 3500);
+      const timeout = window.setTimeout(() => becomeGuestDiscovery(), DISCOVERY_CLAIM_TIMEOUT_MS);
 
       hostPeer.on("open", () => {
         if (settled || this.closed) {
@@ -1443,6 +1470,7 @@ export class LanRoom {
       const onOpen = () => {
         if (this.closed || this.discoveryBootstrap !== conn || !conn.open) return;
         this.clearDiscoveryOpenTimer(conn);
+        this.clearDiscoveryClaimTimer();
         if (this.reconnectTimer !== null) {
           window.clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
@@ -1477,6 +1505,7 @@ export class LanRoom {
         this.discoveryBootstrap = null;
         if (!this.closed && !this.isHost) {
           this.scheduleReconnect(hostId, false);
+          this.scheduleDiscoveryClaim(hostId);
         }
       });
 
@@ -1491,11 +1520,86 @@ export class LanRoom {
         }
         if (!this.closed && !this.isHost) {
           this.scheduleReconnect(hostId, false);
+          this.scheduleDiscoveryClaim(hostId);
         }
       });
     } catch {
       this.scheduleReconnect(hostId, false);
+      this.scheduleDiscoveryClaim(hostId);
     }
+  }
+
+  /**
+   * If every browser timed out while initially claiming the room id, there may
+   * be no discovery host at all. Retry election with jitter; an existing host
+   * simply answers "id unavailable" and guests continue using it.
+   */
+  private scheduleDiscoveryClaim(hostId: string) {
+    if (
+      this.closed ||
+      this.isHost ||
+      this.discoveryPeer ||
+      this.discoveryClaimPeer ||
+      this.discoveryClaimTimer !== null
+    ) {
+      return;
+    }
+    const delay = 3_000 + Math.floor(Math.random() * 3_000);
+    this.discoveryClaimTimer = window.setTimeout(() => {
+      this.discoveryClaimTimer = null;
+      if (this.closed || this.isHost || this.discoveryPeer || this.discoveryClaimPeer) return;
+      const candidate = new Peer(hostId, this.peerServerOptions());
+      this.discoveryClaimPeer = candidate;
+      let settled = false;
+
+      const finishGuest = () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        const ownsClaim = this.discoveryClaimPeer === candidate;
+        if (ownsClaim) this.discoveryClaimPeer = null;
+        try {
+          candidate.destroy();
+        } catch {
+          // ignore
+        }
+        if (ownsClaim && !this.closed && !this.isHost) {
+          this.dialDiscovery(hostId);
+          this.scheduleReconnect(hostId, false);
+        }
+      };
+
+      const timeout = window.setTimeout(finishGuest, DISCOVERY_CLAIM_TIMEOUT_MS);
+      candidate.on("open", () => {
+        if (settled || this.closed || this.isHost || this.discoveryClaimPeer !== candidate) {
+          finishGuest();
+          return;
+        }
+        settled = true;
+        window.clearTimeout(timeout);
+        this.discoveryClaimPeer = null;
+        this.clearDiscoveryOpenTimer();
+        if (this.reconnectTimer !== null) {
+          window.clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = null;
+        }
+        const bootstrap = this.discoveryBootstrap;
+        this.discoveryBootstrap = null;
+        try {
+          bootstrap?.close();
+        } catch {
+          // ignore
+        }
+        this.discoveryPeer = candidate;
+        this.isHost = true;
+        this.bindDiscoveryHost(candidate);
+        this.handlers.onJoined({ peerId: this.localId, isHost: true, room: this.room });
+        this.handlers.onStatus(this.statusForMode("Discovery recovered. You are online…"));
+        this.broadcastDiscoveryRoster();
+        this.emitPeers();
+      });
+      candidate.on("error", finishGuest);
+    }, delay);
   }
 
   private scheduleReconnect(hostId: string, immediate = false) {
@@ -1507,9 +1611,6 @@ export class LanRoom {
       if (this.closed || !this.peer || this.isHost) return;
       // Discovery bootstrap (host id) — not the encrypted chat channel.
       if (this.discoveryBootstrap?.open) return;
-      // If we already have an encrypted mesh peer, discovery is optional.
-      const anyChat = Array.from(this.connections.values()).some((c) => c.open);
-      if (anyChat && this.discoveryBootstrap?.open) return;
       this.handlers.onStatus(this.statusForMode("Searching for nearby users…"));
       this.dialDiscovery(hostId);
       // The discovery channel's open/close/error/watchdog events own retries.
@@ -1714,8 +1815,7 @@ export class LanRoom {
     if (pending) return pending;
 
     const epoch = this.e2eEpoch;
-    let creating!: Promise<E2eSession>;
-    creating = generateE2eKeyPair()
+    const creating: Promise<E2eSession> = generateE2eKeyPair()
       .then((localPair) => {
         if (this.closed || this.e2eEpoch !== epoch) {
           throw new Error("Encrypted session was cancelled.");
