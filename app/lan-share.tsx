@@ -87,8 +87,10 @@ export default function LanShare() {
   const [configName, setConfigName] = useState("client.json");
   const [configBody, setConfigBody] = useState("");
   const [showTools, setShowTools] = useState(false);
-  /** Profile drawer: opened by tapping your avatar (alias + STUN/TURN). */
-  const [showProfile, setShowProfile] = useState(false);
+  /** Alias editor — opened by tapping your avatar. */
+  const [showAlias, setShowAlias] = useState(false);
+  /** Settings panel — network / STUN / TURN and other options. */
+  const [showSettings, setShowSettings] = useState(false);
   const [discoveryKey, setDiscoveryKey] = useState(0);
   const [iceConfig, setIceConfig] = useState<LanIceConfig>(EMPTY_ICE_CONFIG);
   const [stunText, setStunText] = useState("");
@@ -379,7 +381,7 @@ export default function LanShare() {
       setTurnText(urlsToText(saved.turnUrls));
       setError(null);
       setStatus(`Network settings saved (${iceModeLabel(iceMode(saved))}). Reconnecting…`);
-      setShowProfile(false);
+      setShowSettings(false);
       restartDiscovery();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save network settings.");
@@ -396,7 +398,7 @@ export default function LanShare() {
     setTurnCred("");
     setError(null);
     setStatus("Using local network only. Reconnecting…");
-    setShowProfile(false);
+    setShowSettings(false);
     restartDiscovery();
   }
 
@@ -408,6 +410,17 @@ export default function LanShare() {
     if (id) saveDisplayName(alias, id);
     roomRef.current?.setDisplayName(alias);
     setStatus(`Alias saved as ${alias}.`);
+    setShowAlias(false);
+  }
+
+  function openAliasEditor() {
+    setShowSettings(false);
+    setShowAlias((v) => !v);
+  }
+
+  function openSettings() {
+    setShowAlias(false);
+    setShowSettings((v) => !v);
   }
 
   async function handleSendChat() {
@@ -453,30 +466,44 @@ export default function LanShare() {
       <div className="wx-shell" data-online={joined ? "1" : "0"}>
         <aside className="wx-sidebar">
           <header className="wx-sidebar-header">
-            <button
-              type="button"
-              className={`wx-me wx-me-button ${showProfile ? "is-open" : ""}`}
-              onClick={() => setShowProfile((v) => !v)}
-              aria-expanded={showProfile}
-              aria-label="Profile and network settings"
-              title="Profile and network settings"
-            >
-              <span className="wx-avatar wx-avatar-self" aria-hidden="true">
-                {avatarInitials(localName)}
-              </span>
-              <div className="wx-me-copy">
-                <strong>{localName}</strong>
-                <span className={joined ? "is-live" : undefined}>
-                  {joined ? "Online" : "Connecting…"}
-                  <span className="wx-me-mode"> · {iceModeLabel(mode)}</span>
+            <div className="wx-me-bar">
+              <button
+                type="button"
+                className={`wx-me wx-me-button ${showAlias ? "is-open" : ""}`}
+                onClick={openAliasEditor}
+                aria-expanded={showAlias}
+                aria-label="Edit display name"
+                title="Edit display name"
+              >
+                <span className="wx-avatar wx-avatar-self" aria-hidden="true">
+                  {avatarInitials(localName)}
                 </span>
-              </div>
-            </button>
+                <div className="wx-me-copy">
+                  <strong>{localName}</strong>
+                  <span className={joined ? "is-live" : undefined}>
+                    {joined ? "Online" : "Connecting…"}
+                    <span className="wx-me-mode"> · {iceModeLabel(mode)}</span>
+                  </span>
+                </div>
+              </button>
+              <button
+                type="button"
+                className={`wx-settings-btn ${showSettings ? "is-open" : ""}`}
+                onClick={openSettings}
+                aria-expanded={showSettings}
+                aria-label="Settings"
+                title="Settings"
+              >
+                <span className="wx-settings-icon" aria-hidden="true">
+                  ⚙
+                </span>
+              </button>
+            </div>
 
-            {showProfile ? (
+            {showAlias ? (
               <div className="wx-profile-panel">
                 <label className="guide-field">
-                  <span>Alias</span>
+                  <span>Display name</span>
                   <div className="wx-alias-row">
                     <input
                       value={localName}
@@ -486,15 +513,20 @@ export default function LanShare() {
                       }}
                       maxLength={40}
                       autoComplete="off"
-                      aria-label="Your alias"
-                      placeholder="Alias"
+                      aria-label="Display name"
+                      placeholder="Your name"
+                      autoFocus
                     />
                     <button type="button" className="button secondary" onClick={applyAlias}>
                       Save
                     </button>
                   </div>
                 </label>
+              </div>
+            ) : null}
 
+            {showSettings ? (
+              <div className="wx-profile-panel wx-settings-panel">
                 <div className="wx-profile-section">
                   <div className="wx-profile-section-title">
                     <span>Network</span>

@@ -760,11 +760,19 @@ main {
   background: color-mix(in srgb, var(--surface-elevated) 90%, var(--primary-soft));
 }
 
+.wx-me-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
 .wx-me {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   align-items: center;
+  min-width: 0;
 }
 
 .wx-me-button {
@@ -785,6 +793,41 @@ main {
 
 .wx-me-button.is-open {
   background: color-mix(in srgb, var(--primary-soft) 50%, var(--surface));
+}
+
+.wx-settings-btn {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.wx-settings-btn:hover {
+  background: color-mix(in srgb, var(--primary-soft) 40%, var(--surface));
+}
+
+.wx-settings-btn.is-open {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface));
+  color: var(--cyan-text);
+}
+
+.wx-settings-icon {
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.wx-settings-panel {
+  max-height: min(52vh, 420px);
+  overflow: auto;
 }
 
 .wx-me-copy {
