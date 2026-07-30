@@ -11,10 +11,12 @@ import {
 } from "./lan-e2e";
 import {
   EMPTY_ICE_CONFIG,
+  hasRemoteIce,
   iceMode,
-  iceModeHint,
   iceModeLabel,
   peerRtcConfig,
+  peerRtcConfigLanOnly,
+  sanitizeIceConfigWithLiveStun,
   type LanIceConfig,
 } from "./lan-ice";
 import {
@@ -112,6 +114,10 @@ const HEARTBEAT_INTERVAL_MS = 6_000;
 const SOFT_ONLINE_GRACE_MS = 45_000;
 /** If an open channel has no traffic for this long, force redial. */
 const STALE_CHANNEL_MS = 28_000;
+/** Half-open DataChannel: abandon and redial so a stuck STUN gather cannot pin the dial. */
+const DIAL_OPEN_TIMEOUT_MS = 10_000;
+/** If no peer channel opens while STUN/TURN is configured, fall back to host-only ICE. */
+const LAN_ICE_FALLBACK_MS = 12_000;
 
 export type LanRoomHandlers = {
   onStatus: (status: string) => void;
@@ -196,7 +202,15 @@ export class LanRoom {
   private softOnlineUntil = new Map<string, number>();
   private softOfflineTimers = new Map<string, number>();
   private redialTimers = new Map<string, number>();
+  private dialOpenTimers = new Map<string, number>();
   private heartbeatTimer: number | null = null;
+  private lanIceFallbackTimer: number | null = null;
+  /**
+   * When public STUN/TURN is blocked, PeerJS PCs can stall. After a grace period we
+   * rebuild the Peer with host-only ICE so same-LAN discovery still works.
+   */
+  private iceForceLanOnly = false;
+  private lanIceFallbackInFlight = false;
   private presenceBound = false;
   private onVisibilityChange = () => {
     if (typeof document !== "undefined" && document.visibilityState === "visible") {
@@ -209,12 +223,6 @@ export class LanRoom {
 
   constructor(handlers: LanRoomHandlers) {
     this.handlers = handlers;
-  }
-
-  private statusForMode(base: string): string {
-    const mode = iceMode(this.iceConfig);
-    const label = iceModeLabel(mode);
-    return `${base} ${label}.`;
   }
 
   get peerId(): string {
@@ -250,6 +258,8 @@ export class LanRoom {
 
     this.leave();
     this.closed = false;
+    this.iceForceLanOnly = false;
+    this.lanIceFallbackInFlight = false;
     this.room = options.room.trim().slice(0, 64) || "tcptun-lan";
     this.localName = sanitizeDisplayName(options.displayName, "User");
     this.iceConfig = options.iceConfig ? { ...options.iceConfig } : { ...EMPTY_ICE_CONFIG };
@@ -258,7 +268,37 @@ export class LanRoom {
     this.connections.clear();
 
     const hostId = roomHostId(this.room);
-    this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
+
+    // Probe STUN before PeerJS starts — drop URLs that never produce srflx so
+    // dead public STUN cannot stall LAN host-candidate discovery.
+    if (this.iceConfig.stunUrls.length > 0) {
+      this.handlers.onStatus("Checking STUN servers…");
+      try {
+        const { config: liveIce, failedStun } = await sanitizeIceConfigWithLiveStun(this.iceConfig);
+        if (this.closed) return;
+        this.iceConfig = liveIce;
+        if (failedStun.length > 0 && liveIce.stunUrls.length > 0) {
+          this.handlers.onStatus(
+            this.statusForMode(
+              `Dropped ${failedStun.length} unreachable STUN; using ${liveIce.stunUrls.length}…`,
+            ),
+          );
+        } else if (failedStun.length > 0 && liveIce.stunUrls.length === 0) {
+          // All STUN dead → pure LAN host ICE (TURN still applied if configured).
+          this.handlers.onStatus(this.statusForMode("STUN unreachable; local network ICE…"));
+        } else {
+          this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
+        }
+      } catch {
+        if (this.closed) return;
+        // Probe failure must not block join — keep configured list.
+        this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
+      }
+    } else {
+      this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
+    }
+
+    if (this.closed) return;
 
     // Local same-origin discovery (other tabs / windows on this machine).
     // Complements PeerJS room discovery for multi-device LAN.
@@ -275,6 +315,7 @@ export class LanRoom {
       // Dial announced peer over PeerJS when we are online (LAN / mesh).
       if (this.peer && this.localId) {
         this.ensureMeshConnection(id);
+        this.armLanIceFallback();
       }
     };
 
@@ -282,6 +323,7 @@ export class LanRoom {
     this.startLocalAnnounce();
     this.bindPresenceLifecycle();
     this.startHeartbeat();
+    this.armLanIceFallback();
   }
 
   private startLocalAnnounce() {
@@ -548,6 +590,8 @@ export class LanRoom {
     this.closed = true;
     this.unbindPresenceLifecycle();
     this.stopHeartbeat();
+    this.clearLanIceFallbackTimer();
+    this.clearAllDialOpenTimers();
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -562,6 +606,8 @@ export class LanRoom {
     this.redialTimers.clear();
     this.lastAlive.clear();
     this.softOnlineUntil.clear();
+    this.iceForceLanOnly = false;
+    this.lanIceFallbackInFlight = false;
     for (const conn of this.connections.values()) {
       try {
         conn.close();
@@ -619,6 +665,8 @@ export class LanRoom {
   }
 
   private peerServerOptions() {
+    // When STUN/TURN is blocked, rebuild uses host-only ICE so LAN still works.
+    const rtc = this.iceForceLanOnly ? peerRtcConfigLanOnly() : peerRtcConfig(this.iceConfig);
     return {
       debug: 0 as const,
       // Explicit cloud settings — more reliable than defaults under static HTTPS pages.
@@ -627,8 +675,152 @@ export class LanRoom {
       path: "/",
       secure: true,
       pingInterval: 5000,
-      config: peerRtcConfig(this.iceConfig),
+      config: rtc,
     };
+  }
+
+  private effectiveIceModeLabel(): string {
+    if (this.iceForceLanOnly) return iceModeLabel("lan-only");
+    return iceModeLabel(iceMode(this.iceConfig));
+  }
+
+  private statusForMode(base: string): string {
+    const label = this.effectiveIceModeLabel();
+    return `${base} ${label}.`;
+  }
+
+  private clearLanIceFallbackTimer() {
+    if (this.lanIceFallbackTimer !== null) {
+      window.clearTimeout(this.lanIceFallbackTimer);
+      this.lanIceFallbackTimer = null;
+    }
+  }
+
+  private armLanIceFallback() {
+    if (this.closed || this.iceForceLanOnly || this.lanIceFallbackInFlight) return;
+    if (!hasRemoteIce(this.iceConfig)) return;
+    // Already have a live channel — STUN path is fine (or host already won).
+    for (const conn of this.connections.values()) {
+      if (conn.open) return;
+    }
+    if (this.lanIceFallbackTimer !== null) return;
+    this.lanIceFallbackTimer = window.setTimeout(() => {
+      this.lanIceFallbackTimer = null;
+      void this.maybeSwitchToLanOnlyIce();
+    }, LAN_ICE_FALLBACK_MS);
+  }
+
+  private clearDialOpenTimer(peerId: string) {
+    const timer = this.dialOpenTimers.get(peerId);
+    if (timer === undefined) return;
+    window.clearTimeout(timer);
+    this.dialOpenTimers.delete(peerId);
+  }
+
+  private clearAllDialOpenTimers() {
+    for (const timer of this.dialOpenTimers.values()) window.clearTimeout(timer);
+    this.dialOpenTimers.clear();
+  }
+
+  private armDialOpenWatchdog(peerId: string, conn: DataConnection) {
+    this.clearDialOpenTimer(peerId);
+    const timer = window.setTimeout(() => {
+      this.dialOpenTimers.delete(peerId);
+      if (this.closed) return;
+      if (this.connections.get(peerId) !== conn) return;
+      if (conn.open) return;
+      // Stuck half-open (common when STUN gather hangs) — drop and redial.
+      try {
+        conn.close();
+      } catch {
+        // ignore
+      }
+      if (this.connections.get(peerId) === conn) {
+        this.connections.delete(peerId);
+      }
+      this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
+      this.scheduleRedial(peerId, true);
+      this.armLanIceFallback();
+    }, DIAL_OPEN_TIMEOUT_MS);
+    this.dialOpenTimers.set(peerId, timer);
+  }
+
+  /**
+   * Public STUN/TURN blocked → rebuild PeerJS peer with host-only ICE.
+   * Signaling (0.peerjs.com) is unchanged; only RTC iceServers become empty so
+   * same-LAN host candidates can connect without waiting on STUN timeouts.
+   */
+  private async maybeSwitchToLanOnlyIce() {
+    if (this.closed || this.iceForceLanOnly || this.lanIceFallbackInFlight) return;
+    if (!hasRemoteIce(this.iceConfig)) return;
+    for (const conn of this.connections.values()) {
+      if (conn.open) return;
+    }
+    // Only fall back when we are actually trying to reach someone.
+    const hostId = roomHostId(this.room);
+    const trying =
+      this.peerNames.size > 0 ||
+      this.connections.size > 0 ||
+      (!this.isHost && Boolean(this.localId) && this.localId !== hostId);
+    if (!trying) return;
+
+    this.lanIceFallbackInFlight = true;
+    this.iceForceLanOnly = true;
+    this.handlers.onStatus("Public STUN slow/unreachable — using local network ICE…");
+
+    const preferred = this.preferredPeerId || this.localId;
+    const wasHost = this.isHost;
+    const savedNames = new Map(this.peerNames);
+
+    this.clearAllDialOpenTimers();
+    for (const timer of this.redialTimers.values()) window.clearTimeout(timer);
+    this.redialTimers.clear();
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    for (const conn of this.connections.values()) {
+      try {
+        conn.close();
+      } catch {
+        // ignore
+      }
+    }
+    this.connections.clear();
+    this.e2eSessions.clear();
+    try {
+      this.peer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.peer = null;
+    this.localId = "";
+    this.isHost = false;
+    this.peerNames = savedNames;
+
+    try {
+      if (wasHost) {
+        // Re-claim host id with LAN-only ICE; if taken, join as guest.
+        await this.claimOrJoinHost(hostId);
+      } else {
+        await this.joinAsGuest(hostId, preferred || undefined);
+      }
+      // Re-dial known peers over host candidates.
+      for (const peerId of this.peerNames.keys()) {
+        if (!peerId || peerId === this.localId) continue;
+        this.scheduleRedial(peerId, true);
+      }
+      if (!this.isHost) {
+        this.scheduleReconnect(hostId, true);
+      }
+      this.handlers.onStatus(this.statusForMode("Local network discovery active…"));
+      this.emitPeers();
+    } catch (err) {
+      this.handlers.onError(err instanceof Error ? err.message : "Failed to switch to local ICE.");
+    } finally {
+      this.lanIceFallbackInFlight = false;
+    }
   }
 
   private rememberPeer(id: string, name?: string) {
@@ -886,6 +1078,8 @@ export class LanRoom {
         this.dialPeer(hostId, true);
         // Keep retrying host until the channel opens (host may still be starting).
         this.scheduleReconnect(hostId, true);
+        // If STUN is blocked, fall back to host-only ICE so LAN still connects.
+        this.armLanIceFallback();
         // Join succeeds once we are registered with the signaling server;
         // peer discovery continues in the background.
         finishOk();
@@ -971,11 +1165,24 @@ export class LanRoom {
     if (!this.peer || !peerId || peerId === this.localId) return;
     const existing = this.connections.get(peerId);
     if (existing?.open) return;
+    // Drop a stuck half-open dial before opening another.
+    if (existing && !existing.open) {
+      this.clearDialOpenTimer(peerId);
+      try {
+        existing.close();
+      } catch {
+        // ignore
+      }
+      if (this.connections.get(peerId) === existing) {
+        this.connections.delete(peerId);
+      }
+    }
     try {
       const conn = this.peer.connect(peerId, { reliable: true, serialization: "json" });
       this.wireConnection(conn, peerId, outgoing);
     } catch {
       // ignore dial failures; scheduleReconnect will retry
+      this.armLanIceFallback();
     }
   }
 
@@ -992,6 +1199,7 @@ export class LanRoom {
         return;
       }
       // Replace a half-open connection.
+      this.clearDialOpenTimer(peerId);
       try {
         existing.close();
       } catch {
@@ -1001,8 +1209,12 @@ export class LanRoom {
 
     this.connections.set(peerId, conn);
     this.rememberPeer(peerId, this.peerNames.get(peerId) || "User");
+    // Watch for STUN/ICE stall before "open".
+    if (!conn.open) this.armDialOpenWatchdog(peerId, conn);
 
     conn.on("open", () => {
+      this.clearDialOpenTimer(peerId);
+      this.clearLanIceFallbackTimer();
       this.touchPeer(peerId);
       this.clearSoftOnline(peerId);
       this.send(conn, { v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
@@ -1028,6 +1240,7 @@ export class LanRoom {
     });
 
     conn.on("close", () => {
+      this.clearDialOpenTimer(peerId);
       if (this.connections.get(peerId) === conn) {
         this.connections.delete(peerId);
       }
@@ -1041,14 +1254,17 @@ export class LanRoom {
       if (!this.isHost && peerId === roomHostId(this.room)) {
         this.scheduleReconnect(peerId, true);
       }
+      this.armLanIceFallback();
     });
 
     conn.on("error", () => {
+      this.clearDialOpenTimer(peerId);
       this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
       this.scheduleRedial(peerId, false);
       if (!this.isHost && peerId === roomHostId(this.room)) {
         this.scheduleReconnect(peerId, false);
       }
+      this.armLanIceFallback();
     });
 
     void outgoing;

@@ -733,8 +733,9 @@ export default function LanShare() {
                     </span>
                   </div>
                   <p className="wx-ice-hint">
-                    Default public STUN servers are enabled (Google + Cloudflare). Local network
-                    host paths still work. Clear STUN for local-only, or add TURN for hard NATs.
+                    Default Google STUN servers are enabled; unreachable STUNs are dropped
+                    automatically at connect. Local host paths still work. Clear STUN for
+                    local-only, or add TURN for hard NATs.
                   </p>
                   <label className="guide-field">
                     <span>STUN servers</span>

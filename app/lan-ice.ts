@@ -1,7 +1,8 @@
 /**
  * User-configurable STUN / TURN for WebRTC.
  *
- * Default: public STUN servers (Google + Cloudflare) so ICE works on typical NATs.
+ * Default: public Google STUN servers so ICE works on typical NATs.
+ * Unreachable STUNs are probed out before PeerJS connect (see filterReachableStunUrls).
  * Host (LAN) candidates are always gathered (iceTransportPolicy=all).
  * Empty STUN/TURN = pure LAN host candidates only.
  */
@@ -28,12 +29,15 @@ const MAX_URLS = 12;
 const MAX_URL_LEN = 256;
 const MAX_CRED_LEN = 256;
 
-/** Built-in default STUN list for chat discovery. */
+/**
+ * Built-in default STUN list for chat discovery.
+ * Cloudflare dropped: IPv4 binding often times out from many networks.
+ * Runtime probe still drops any URL that does not return srflx in time.
+ */
 export const DEFAULT_STUN_URLS: string[] = [
   "stun:stun.l.google.com:19302",
   "stun:stun1.l.google.com:19302",
   "stun:stun2.l.google.com:19302",
-  "stun:stun.cloudflare.com:3478",
 ];
 
 /** No STUN/TURN — pure LAN host candidates (explicit local-only mode). */
@@ -128,12 +132,18 @@ export function urlsToText(urls: string[]): string {
 
 /** Build RTCConfiguration.iceServers from user config. Empty = LAN-only. */
 export function buildIceServers(config: LanIceConfig): IceServerEntry[] {
-  const servers: IceServerEntry[] = [];
-
+  const stunUrls: string[] = [];
   for (const url of config.stunUrls) {
     const clean = normalizeUrl(url);
     if (!clean || !/^(stun|stuns):/i.test(clean)) continue;
-    servers.push({ urls: clean });
+    if (!stunUrls.includes(clean)) stunUrls.push(clean);
+  }
+
+  const servers: IceServerEntry[] = [];
+  // One STUN entry with multiple URLs — browsers try them without serializing
+  // many iceServers (faster, and host candidates are still gathered first).
+  if (stunUrls.length > 0) {
+    servers.push({ urls: stunUrls.length === 1 ? stunUrls[0]! : stunUrls });
   }
 
   const user = config.turnUsername.trim().slice(0, MAX_CRED_LEN);
@@ -150,6 +160,11 @@ export function buildIceServers(config: LanIceConfig): IceServerEntry[] {
   }
 
   return servers;
+}
+
+/** True when config relies on public STUN/TURN (not pure host/LAN). */
+export function hasRemoteIce(config: LanIceConfig): boolean {
+  return config.stunUrls.length > 0 || config.turnUrls.length > 0;
 }
 
 export function sanitizeIceConfig(input: Partial<LanIceConfig> | null | undefined): LanIceConfig {
@@ -207,9 +222,12 @@ export function clearIceConfig(): LanIceConfig {
 
 /**
  * PeerJS / RTCPeerConnection config from user (or default) STUN/TURN.
- * Always iceTransportPolicy "all" so host (LAN) candidates are never disabled
- * when STUN/TURN is present for wider reach.
- * Empty iceServers = pure local host candidates (LAN-only mode).
+ *
+ * - iceTransportPolicy "all": host (LAN) candidates always gathered alongside STUN/TURN.
+ * - iceCandidatePoolSize 0: do NOT pre-gather STUN before connect. Pre-warming
+ *   (pool>0) can stall for tens of seconds when public STUN is blocked/firewalled,
+ *   which delays or breaks same-LAN discovery even though host candidates work.
+ * - Empty iceServers = pure local host candidates (LAN-only / STUN fallback mode).
  */
 export function peerRtcConfig(config: LanIceConfig): RTCConfiguration {
   const iceServers = buildIceServers(config) as RTCIceServer[];
@@ -219,6 +237,132 @@ export function peerRtcConfig(config: LanIceConfig): RTCConfiguration {
     iceTransportPolicy: "all",
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
-    iceCandidatePoolSize: 2,
+    iceCandidatePoolSize: 0,
+  };
+}
+
+/** Pure host-candidate RTC config — used when public STUN/TURN is unreachable. */
+export function peerRtcConfigLanOnly(): RTCConfiguration {
+  return peerRtcConfig(EMPTY_ICE_CONFIG);
+}
+
+const STUN_PROBE_TIMEOUT_MS = 2_800;
+
+/**
+ * Probe a single STUN URL via a short-lived RTCPeerConnection.
+ * Success = we observe a server-reflexive (srflx) ICE candidate.
+ */
+export function probeStunUrl(url: string, timeoutMs = STUN_PROBE_TIMEOUT_MS): Promise<boolean> {
+  const clean = normalizeUrl(url);
+  if (!clean || !/^(stun|stuns):/i.test(clean)) return Promise.resolve(false);
+  if (typeof RTCPeerConnection === "undefined") return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let pc: RTCPeerConnection | null = null;
+
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      try {
+        pc?.close();
+      } catch {
+        // ignore
+      }
+      pc = null;
+      resolve(ok);
+    };
+
+    const timer = window.setTimeout(() => finish(false), timeoutMs);
+
+    try {
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: clean }],
+        iceCandidatePoolSize: 0,
+        iceTransportPolicy: "all",
+      });
+    } catch {
+      finish(false);
+      return;
+    }
+
+    pc.onicecandidate = (event) => {
+      const cand = event.candidate;
+      if (!cand) return;
+      // STUN worked if we got a server-reflexive address.
+      if (cand.type === "srflx") {
+        finish(true);
+        return;
+      }
+      // Some browsers only put type in the candidate string.
+      const line = cand.candidate || "";
+      if (/\btyp\s+srflx\b/i.test(line)) finish(true);
+    };
+
+    pc.onicegatheringstatechange = () => {
+      if (pc?.iceGatheringState === "complete") {
+        // Gathering finished without srflx → this STUN is unreachable here.
+        finish(false);
+      }
+    };
+
+    try {
+      pc.createDataChannel("stun-probe");
+      void pc
+        .createOffer()
+        .then((offer) => pc?.setLocalDescription(offer))
+        .catch(() => finish(false));
+    } catch {
+      finish(false);
+    }
+  });
+}
+
+/**
+ * Keep only STUN URLs that answer with a srflx candidate within timeout.
+ * Failed servers are excluded so PeerJS does not stall on dead STUN.
+ * If every URL fails, returns [] (LAN host candidates only).
+ */
+export async function filterReachableStunUrls(
+  urls: string[],
+  timeoutMs = STUN_PROBE_TIMEOUT_MS,
+): Promise<{ reachable: string[]; failed: string[] }> {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of urls) {
+    const clean = normalizeUrl(raw);
+    if (!clean || !/^(stun|stuns):/i.test(clean)) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(clean);
+  }
+
+  if (unique.length === 0) return { reachable: [], failed: [] };
+
+  const flags = await Promise.all(unique.map((url) => probeStunUrl(url, timeoutMs)));
+  const reachable: string[] = [];
+  const failed: string[] = [];
+  for (let i = 0; i < unique.length; i++) {
+    if (flags[i]) reachable.push(unique[i]!);
+    else failed.push(unique[i]!);
+  }
+  return { reachable, failed };
+}
+
+/** Drop unreachable STUN from a full ICE config (TURN left unchanged). */
+export async function sanitizeIceConfigWithLiveStun(
+  config: LanIceConfig,
+  timeoutMs = STUN_PROBE_TIMEOUT_MS,
+): Promise<{ config: LanIceConfig; failedStun: string[] }> {
+  const base = sanitizeIceConfig(config);
+  if (base.stunUrls.length === 0) {
+    return { config: base, failedStun: [] };
+  }
+  const { reachable, failed } = await filterReachableStunUrls(base.stunUrls, timeoutMs);
+  return {
+    config: { ...base, stunUrls: reachable },
+    failedStun: failed,
   };
 }
