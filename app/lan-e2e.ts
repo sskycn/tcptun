@@ -1,30 +1,35 @@
-/**
- * End-to-end encryption for LAN chat (browser Web Crypto).
- *
- * Per-connection: ECDH P-256 → HKDF-SHA-256 → AES-256-GCM.
- * Keys never leave the two peers; signaling/host only sees ciphertext envelopes.
- */
+/** Cryptographic primitives for one personal LAN-chat DataChannel. */
 
-export const E2E_ALG = "ECDH-P256-AES-GCM-v1" as const;
+export const E2E_ALG = "tcptun-lan-ecdh-p256-hkdf-aesgcm-v2" as const;
 
-function b64Encode(bytes: ArrayBuffer | Uint8Array): string {
-  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  let bin = "";
-  const step = 0x8000;
-  for (let i = 0; i < view.length; i += step) {
-    bin += String.fromCharCode(...view.subarray(i, i + step));
+const IV_BYTES = 12;
+const MAX_CIPHERTEXT_CHARS = 32_768;
+
+function encodeBase64(value: ArrayBuffer | Uint8Array): string {
+  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+  let raw = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    raw += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
   }
-  return btoa(bin);
+  return btoa(raw);
 }
 
-function b64Decode(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+function decodeBase64(value: string, maxChars: number): Uint8Array {
+  if (value.length > maxChars || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) {
+    throw new Error("Invalid encrypted payload.");
+  }
+  const raw = atob(value);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
 }
 
-export async function generateE2eKeyPair(): Promise<CryptoKeyPair> {
+function context(localId: string, remoteId: string): Uint8Array {
+  const ids = [localId, remoteId].sort();
+  return new TextEncoder().encode(`${E2E_ALG}|${ids[0]}|${ids[1]}`);
+}
+
+export function generateE2eKeyPair(): Promise<CryptoKeyPair> {
   return crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
     true,
@@ -33,54 +38,52 @@ export async function generateE2eKeyPair(): Promise<CryptoKeyPair> {
 }
 
 export async function exportPublicJwk(publicKey: CryptoKey): Promise<JsonWebKey> {
-  const jwk = await crypto.subtle.exportKey("jwk", publicKey);
-  // Strip private material if any; keep only public fields.
-  return {
-    kty: jwk.kty,
-    crv: jwk.crv,
-    x: jwk.x,
-    y: jwk.y,
-    ext: true,
-  };
+  const key = await crypto.subtle.exportKey("jwk", publicKey);
+  return { kty: "EC", crv: "P-256", x: key.x, y: key.y, ext: true };
 }
 
-export async function importPublicJwk(jwk: JsonWebKey): Promise<CryptoKey> {
-  if (jwk.kty !== "EC" || jwk.crv !== "P-256" || !jwk.x || !jwk.y) {
-    throw new Error("Invalid peer key.");
-  }
+export function isPublicJwk(value: unknown): value is JsonWebKey {
+  if (!value || typeof value !== "object") return false;
+  const key = value as JsonWebKey;
+  return (
+    key.kty === "EC" &&
+    key.crv === "P-256" &&
+    typeof key.x === "string" && key.x.length >= 40 && key.x.length <= 48 &&
+    typeof key.y === "string" && key.y.length >= 40 && key.y.length <= 48
+  );
+}
+
+export function importPublicJwk(key: JsonWebKey): Promise<CryptoKey> {
+  if (!isPublicJwk(key)) return Promise.reject(new Error("Invalid peer public key."));
   return crypto.subtle.importKey(
     "jwk",
-    { kty: "EC", crv: "P-256", x: jwk.x, y: jwk.y, ext: true },
+    { kty: "EC", crv: "P-256", x: key.x, y: key.y, ext: true },
     { name: "ECDH", namedCurve: "P-256" },
     false,
     [],
   );
 }
 
-/** Stable HKDF info so both peers derive the same AES key regardless of dial direction. */
-export function sessionInfo(localId: string, remoteId: string): string {
-  const a = localId < remoteId ? localId : remoteId;
-  const b = localId < remoteId ? remoteId : localId;
-  return `${E2E_ALG}|${a}|${b}`;
-}
-
 export async function deriveAesKey(
-  localPrivate: CryptoKey,
-  remotePublic: CryptoKey,
+  privateKey: CryptoKey,
+  remotePublicKey: CryptoKey,
   localId: string,
   remoteId: string,
 ): Promise<CryptoKey> {
-  const bits = await crypto.subtle.deriveBits(
-    { name: "ECDH", public: remotePublic },
-    localPrivate,
+  const shared = await crypto.subtle.deriveBits(
+    { name: "ECDH", public: remotePublicKey },
+    privateKey,
     256,
   );
-  const baseKey = await crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
-  const info = new TextEncoder().encode(sessionInfo(localId, remoteId));
-  const salt = new TextEncoder().encode("tcptun-lan-e2e-salt-v1");
+  const material = await crypto.subtle.importKey("raw", shared, "HKDF", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt, info },
-    baseKey,
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new TextEncoder().encode("tcptun-lan-session-v2") as BufferSource,
+      info: context(localId, remoteId) as BufferSource,
+    },
+    material,
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"],
@@ -89,24 +92,27 @@ export async function deriveAesKey(
 
 export async function encryptPayload(
   key: CryptoKey,
-  plaintext: unknown,
+  payload: unknown,
 ): Promise<{ iv: string; ct: string }> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const data = new TextEncoder().encode(JSON.stringify(plaintext));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data);
-  return { iv: b64Encode(iv), ct: b64Encode(ct) };
+  const plaintext = new TextEncoder().encode(JSON.stringify(payload));
+  if (plaintext.byteLength > 24_000) throw new Error("Encrypted payload is too large.");
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+  return { iv: encodeBase64(iv), ct: encodeBase64(ciphertext) };
 }
 
-export async function decryptPayload(key: CryptoKey, ivB64: string, ctB64: string): Promise<unknown> {
-  const iv = b64Decode(ivB64);
-  const ct = b64Decode(ctB64);
-  if (iv.length !== 12) throw new Error("Invalid ciphertext.");
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, ct as BufferSource);
-  return JSON.parse(new TextDecoder().decode(plain));
-}
-
-export function isPublicJwk(value: unknown): value is JsonWebKey {
-  if (!value || typeof value !== "object") return false;
-  const j = value as JsonWebKey;
-  return j.kty === "EC" && j.crv === "P-256" && typeof j.x === "string" && typeof j.y === "string";
+export async function decryptPayload(
+  key: CryptoKey,
+  ivText: string,
+  ciphertextText: string,
+): Promise<unknown> {
+  const iv = decodeBase64(ivText, 32);
+  const ciphertext = decodeBase64(ciphertextText, MAX_CIPHERTEXT_CHARS);
+  if (iv.byteLength !== IV_BYTES) throw new Error("Invalid encrypted payload.");
+  const plaintext = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: iv as BufferSource },
+    key,
+    ciphertext as BufferSource,
+  );
+  return JSON.parse(new TextDecoder().decode(plaintext));
 }
