@@ -15,7 +15,7 @@ export default function LanPage() {
       <PageHero
         eyebrow="Chat"
         title="Nearby users. Private conversations."
-        description="Users on the same network appear automatically. Share messages, configs, and files. Add STUN/TURN only if you need to reach people outside the local network."
+        description="Users on the same network appear automatically. Messages, configs, and files are end-to-end encrypted between peers. Add STUN/TURN only if you need to reach people outside the local network."
         actions={[
           { href: "/generate/", label: "Generate config", variant: "secondary" },
           { href: "/guide/", label: "Setup wizard", variant: "ghost" },

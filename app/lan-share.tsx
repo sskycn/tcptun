@@ -64,6 +64,7 @@ type ContactRow = {
   id: string;
   name: string;
   connected: boolean;
+  encrypted: boolean;
   lastMessage?: ChatMessage;
   unreadCount: number;
   lastTs: number;
@@ -111,16 +112,18 @@ export default function LanShare() {
   const selfId = peerId || stablePeerId;
 
   const contacts: ContactRow[] = useMemo(() => {
-    const online = peers.filter((peer) => !peer.self && peer.connected);
+    // Show every discovered live peer (not only fully open channels).
+    const live = peers.filter((peer) => !peer.self);
     const byId = new Map<string, ContactRow>();
 
-    for (const peer of online) {
+    for (const peer of live) {
       const peerMessages = messages.filter((m) => m.peerId === peer.id && m.kind !== "system");
       const lastMessage = peerMessages[peerMessages.length - 1];
       byId.set(peer.id, {
         id: peer.id,
         name: peer.name,
-        connected: true,
+        connected: Boolean(peer.connected),
+        encrypted: Boolean(peer.encrypted),
         lastMessage,
         unreadCount: unread[peer.id] || 0,
         lastTs: lastMessage?.ts || Date.now(),
@@ -141,6 +144,7 @@ export default function LanShare() {
         id: stored.id,
         name: stored.name,
         connected: false,
+        encrypted: false,
         lastMessage,
         unreadCount: unread[stored.id] || 0,
         lastTs: lastMessage?.ts || stored.lastTs,
@@ -160,6 +164,7 @@ export default function LanShare() {
         id: msg.peerId,
         name,
         connected: false,
+        encrypted: false,
         lastMessage,
         unreadCount: unread[msg.peerId] || 0,
         lastTs: lastMessage?.ts || msg.ts,
@@ -181,7 +186,7 @@ export default function LanShare() {
     () => transfers.filter((item) => item.peerId === selectedPeerId),
     [transfers, selectedPeerId],
   );
-  const canSend = Boolean(selectedPeer?.connected && joined);
+  const canSend = Boolean(selectedPeer?.connected && selectedPeer?.encrypted && joined);
 
   useEffect(() => {
     selectedPeerRef.current = selectedPeerId;
@@ -405,10 +410,10 @@ export default function LanShare() {
     setStatus(`Alias saved as ${alias}.`);
   }
 
-  function handleSendChat() {
+  async function handleSendChat() {
     if (!selectedPeerId || !canSend) return;
     try {
-      roomRef.current?.sendChat(selectedPeerId, draft);
+      await roomRef.current?.sendChat(selectedPeerId, draft);
       setDraft("");
       setError(null);
     } catch (err) {
@@ -416,10 +421,10 @@ export default function LanShare() {
     }
   }
 
-  function handleShareConfig() {
+  async function handleShareConfig() {
     if (!selectedPeerId || !canSend) return;
     try {
-      roomRef.current?.sendConfig(selectedPeerId, configName, configBody);
+      await roomRef.current?.sendConfig(selectedPeerId, configName, configBody);
       setConfigBody("");
       setError(null);
       setShowTools(false);
@@ -615,7 +620,13 @@ export default function LanShare() {
             {selectedPeer ? (
               <div className="wx-chat-title">
                 <strong>{selectedPeer.name}</strong>
-                <span>{selectedPeer.connected ? "Online" : "Offline"}</span>
+                <span>
+                  {selectedPeer.connected
+                    ? selectedPeer.encrypted
+                      ? "Online · end-to-end encrypted"
+                      : "Online · securing…"
+                    : "Offline"}
+                </span>
               </div>
             ) : (
               <div className="wx-chat-title">
@@ -747,7 +758,7 @@ export default function LanShare() {
                   type="button"
                   className="button secondary"
                   disabled={!configBody.trim()}
-                  onClick={handleShareConfig}
+                  onClick={() => void handleShareConfig()}
                 >
                   Send config to {selectedPeer.name}
                 </button>
@@ -781,15 +792,17 @@ export default function LanShare() {
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
-                    handleSendChat();
+                    void handleSendChat();
                   }
                 }}
                 placeholder={
                   !selectedPeer
                     ? "Select a contact"
-                    : canSend
-                      ? `Message ${selectedPeer.name}`
-                      : `${selectedPeer.name} is offline`
+                    : !selectedPeer.connected
+                      ? `${selectedPeer.name} is offline`
+                      : !selectedPeer.encrypted
+                        ? "Securing connection…"
+                        : `Message ${selectedPeer.name}`
                 }
                 disabled={!canSend}
                 rows={2}
@@ -811,7 +824,7 @@ export default function LanShare() {
                   type="button"
                   className="button primary"
                   disabled={!canSend || !draft.trim()}
-                  onClick={handleSendChat}
+                  onClick={() => void handleSendChat()}
                 >
                   Send
                 </button>

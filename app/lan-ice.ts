@@ -191,18 +191,36 @@ export function clearIceConfig(): LanIceConfig {
 }
 
 /**
+ * Baseline STUN so ICE can complete on typical home/office NATs.
+ * Host (LAN) candidates are always gathered alongside these (iceTransportPolicy=all).
+ * User-configured STUN/TURN are appended on top.
+ */
+const BASELINE_STUN: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+];
+
+/**
  * PeerJS / RTCPeerConnection config.
  * Always iceTransportPolicy "all" so host (LAN) candidates are never disabled
  * when the user adds STUN/TURN for wider reach.
  */
 export function peerRtcConfig(config: LanIceConfig): RTCConfiguration {
-  const iceServers = buildIceServers(config) as RTCIceServer[];
+  const extra = buildIceServers(config) as RTCIceServer[];
+  const seen = new Set<string>();
+  const iceServers: RTCIceServer[] = [];
+  for (const server of [...BASELINE_STUN, ...extra]) {
+    const key = JSON.stringify(server.urls);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    iceServers.push(server);
+  }
   return {
     iceServers,
     // Never "relay" — that would kill pure LAN paths when TURN is present.
     iceTransportPolicy: "all",
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
-    iceCandidatePoolSize: 4,
+    iceCandidatePoolSize: 2,
   };
 }

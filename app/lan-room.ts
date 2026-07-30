@@ -1,5 +1,15 @@
 import Peer, { type DataConnection } from "peerjs";
 import {
+  E2E_ALG,
+  decryptPayload,
+  deriveAesKey,
+  encryptPayload,
+  exportPublicJwk,
+  generateE2eKeyPair,
+  importPublicJwk,
+  isPublicJwk,
+} from "./lan-e2e";
+import {
   EMPTY_ICE_CONFIG,
   iceMode,
   iceModeHint,
@@ -49,11 +59,19 @@ export type RoomPeer = {
   name: string;
   self?: boolean;
   connected?: boolean;
+  /** True when an E2E session key is ready for this peer. */
+  encrypted?: boolean;
 };
 
-type WireMessage =
+/** Cleartext control-plane messages (discovery only). */
+type ClearWireMessage =
   | { v: 1; t: "hello"; id: string; name: string; room: string }
   | { v: 1; t: "peers"; peers: Array<{ id: string; name: string }> }
+  | { v: 1; t: "e2e-hello"; alg: typeof E2E_ALG; fromId: string; pub: JsonWebKey }
+  | { v: 1; t: "e2e"; iv: string; ct: string };
+
+/** Payloads sealed inside AES-GCM envelopes. */
+type SecurePayload =
   | { v: 1; t: "chat"; id: string; text: string; ts: number; name: string; fromId: string }
   | { v: 1; t: "config"; id: string; name: string; content: string; ts: number; from: string; fromId: string }
   | {
@@ -70,6 +88,17 @@ type WireMessage =
     }
   | { v: 1; t: "file-chunk"; id: string; index: number; data: string }
   | { v: 1; t: "file-end"; id: string };
+
+type WireMessage = ClearWireMessage | SecurePayload;
+
+type E2eSession = {
+  localPair: CryptoKeyPair;
+  remotePub: JsonWebKey | null;
+  key: CryptoKey | null;
+  ready: boolean;
+  offered: boolean;
+  pending: SecurePayload[];
+};
 
 export const MAX_LAN_FILE_BYTES = 40 * 1024 * 1024;
 const CHUNK_CHARS = 12_000;
@@ -138,6 +167,7 @@ export class LanRoom {
   private iceConfig: LanIceConfig = { ...EMPTY_ICE_CONFIG };
   private preferredPeerId = "";
   private announceTimer: number | null = null;
+  private e2eSessions = new Map<string, E2eSession>();
   private incoming = new Map<
     string,
     {
@@ -269,6 +299,7 @@ export class LanRoom {
     }
     this.connections.clear();
     this.peerNames.clear();
+    this.e2eSessions.clear();
     this.incoming.clear();
     try {
       this.broadcast?.close();
@@ -290,21 +321,55 @@ export class LanRoom {
 
   listPeers(): RoomPeer[] {
     const peers: RoomPeer[] = [
-      { id: this.localId || "local", name: `${this.localName} (you)`, self: true, connected: true },
+      {
+        id: this.localId || "local",
+        name: `${this.localName} (you)`,
+        self: true,
+        connected: true,
+        encrypted: true,
+      },
     ];
     for (const [id, name] of this.peerNames) {
-      if (id === this.localId) continue;
-      peers.push({ id, name, connected: this.connections.get(id)?.open === true });
+      if (!id || id === this.localId) continue;
+      const conn = this.connections.get(id);
+      const e2e = this.e2eSessions.get(id);
+      peers.push({
+        id,
+        name,
+        connected: conn?.open === true,
+        encrypted: Boolean(e2e?.ready && e2e.key),
+      });
     }
     return peers;
   }
 
-  sendChat(peerId: string, text: string) {
+  private peerServerOptions() {
+    return {
+      debug: 0 as const,
+      // Explicit cloud settings — more reliable than defaults under static HTTPS pages.
+      host: "0.peerjs.com",
+      port: 443,
+      path: "/",
+      secure: true,
+      pingInterval: 5000,
+      config: peerRtcConfig(this.iceConfig),
+    };
+  }
+
+  private rememberPeer(id: string, name?: string) {
+    const peerId = sanitizePeerId(id);
+    if (!peerId || peerId === this.localId) return;
+    const label = sanitizeDisplayName(name, this.peerNames.get(peerId) || "User");
+    this.peerNames.set(peerId, label);
+    this.emitPeers();
+  }
+
+  async sendChat(peerId: string, text: string) {
     const clean = assertSendableChat(text);
     const target = sanitizePeerId(peerId);
     if (!target) throw new Error("Invalid peer.");
-    const conn = this.connectionFor(target);
-    const msg: WireMessage = {
+    this.connectionFor(target);
+    const msg: SecurePayload = {
       v: 1,
       t: "chat",
       id: uid(),
@@ -313,7 +378,7 @@ export class LanRoom {
       name: this.localName,
       fromId: this.localId,
     };
-    this.send(conn, msg);
+    await this.sendSecure(target, msg);
     this.handlers.onMessage({
       id: msg.id,
       kind: "chat",
@@ -325,7 +390,7 @@ export class LanRoom {
     });
   }
 
-  sendConfig(peerId: string, fileName: string, content: string) {
+  async sendConfig(peerId: string, fileName: string, content: string) {
     const target = sanitizePeerId(peerId);
     if (!target) throw new Error("Invalid peer.");
     const name = sanitizeFileName(fileName, "config.json");
@@ -333,8 +398,8 @@ export class LanRoom {
     if (new TextEncoder().encode(content).length > MAX_LAN_FILE_BYTES) {
       throw new Error("Config is too large to send.");
     }
-    const conn = this.connectionFor(target);
-    const msg: WireMessage = {
+    this.connectionFor(target);
+    const msg: SecurePayload = {
       v: 1,
       t: "config",
       id: uid(),
@@ -344,7 +409,7 @@ export class LanRoom {
       from: this.localName,
       fromId: this.localId,
     };
-    this.send(conn, msg);
+    await this.sendSecure(target, msg);
     this.handlers.onMessage({
       id: msg.id,
       kind: "config",
@@ -363,8 +428,8 @@ export class LanRoom {
     if (file.size > MAX_LAN_FILE_BYTES) {
       throw new Error(`File exceeds ${Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB limit.`);
     }
+    this.requireE2e(target);
     const safeName = sanitizeFileName(file.name, "file.bin");
-    const conn = this.connectionFor(target);
 
     const id = uid();
     const buffer = await file.arrayBuffer();
@@ -382,7 +447,7 @@ export class LanRoom {
       peerId: target,
     });
 
-    this.send(conn, {
+    await this.sendSecure(target, {
       v: 1,
       t: "file-start",
       id,
@@ -396,7 +461,7 @@ export class LanRoom {
     });
 
     for (let index = 0; index < chunks.length; index++) {
-      this.send(conn, { v: 1, t: "file-chunk", id, index, data: chunks[index] });
+      await this.sendSecure(target, { v: 1, t: "file-chunk", id, index, data: chunks[index] });
       this.handlers.onTransfer({
         id,
         name: safeName,
@@ -410,7 +475,7 @@ export class LanRoom {
       if (index % 4 === 0) await new Promise((r) => window.setTimeout(r, 0));
     }
 
-    this.send(conn, { v: 1, t: "file-end", id });
+    await this.sendSecure(target, { v: 1, t: "file-end", id });
     this.handlers.onTransfer({
       id,
       name: safeName,
@@ -435,16 +500,13 @@ export class LanRoom {
 
   private async claimOrJoinHost(hostId: string): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      const hostPeer = new Peer(hostId, {
-        debug: 0,
-        config: peerRtcConfig(this.iceConfig),
-      });
-
+      const hostPeer = new Peer(hostId, this.peerServerOptions());
       let settled = false;
 
-      const failToGuest = (reason: string) => {
+      const failToGuest = () => {
         if (settled) return;
         settled = true;
+        window.clearTimeout(timeout);
         try {
           hostPeer.destroy();
         } catch {
@@ -454,9 +516,13 @@ export class LanRoom {
         void this.joinAsGuest(hostId).then(resolve).catch(reject);
       };
 
+      // If host claim hangs (common with flaky signaling), fall through to guest.
+      const timeout = window.setTimeout(() => failToGuest(), 3500);
+
       hostPeer.on("open", (id) => {
         if (settled) return;
         settled = true;
+        window.clearTimeout(timeout);
         this.peer = hostPeer;
         this.localId = id;
         this.isHost = true;
@@ -471,15 +537,24 @@ export class LanRoom {
 
       hostPeer.on("error", (err) => {
         const type = String((err as { type?: string }).type || "");
-        if (type === "unavailable-id" || type === "network" || type === "server-error") {
-          failToGuest(type === "unavailable-id" ? "Session found." : "Connecting…");
+        // unavailable-id → someone else is host; join as guest.
+        // network/server-error → still try guest path (may recover).
+        if (
+          type === "unavailable-id" ||
+          type === "network" ||
+          type === "server-error" ||
+          type === "socket-error" ||
+          type === "socket-closed"
+        ) {
+          failToGuest();
           return;
         }
         if (!settled) {
           settled = true;
-          reject(err instanceof Error ? err : new Error("Failed to join room."));
+          window.clearTimeout(timeout);
+          reject(err instanceof Error ? err : new Error("Failed to join."));
         } else {
-          this.handlers.onError(err.message || "Peer error");
+          this.handlers.onError(err.message || "Connection error");
         }
       });
     });
@@ -490,59 +565,60 @@ export class LanRoom {
       // Reuse a stable peer id so reloads look like the same user to others.
       const wantId = preferredId || this.preferredPeerId || undefined;
       const peer = wantId
-        ? new Peer(wantId, {
-            debug: 0,
-            config: peerRtcConfig(this.iceConfig),
-          })
-        : new Peer({
-            debug: 0,
-            config: peerRtcConfig(this.iceConfig),
-          });
+        ? new Peer(wantId, this.peerServerOptions())
+        : new Peer(this.peerServerOptions());
 
       let settled = false;
 
-      peer.on("open", (id) => {
+      const finishOk = () => {
         if (settled) return;
         settled = true;
+        resolve();
+      };
+
+      peer.on("open", (id) => {
         this.peer = peer;
         this.localId = id;
         this.isHost = false;
         this.preferredPeerId = id;
         this.peerNames.set(id, this.localName);
         this.handlers.onJoined({ peerId: id, isHost: false, room: this.room });
-        this.handlers.onStatus(this.statusForMode("Connected. Looking for nearby users…"));
+        this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
         this.emitPeers();
         this.startLocalAnnounce();
 
         peer.on("connection", (conn) => this.acceptConnection(conn));
+        peer.on("disconnected", () => {
+          if (this.closed) return;
+          this.handlers.onStatus("Connection lost. Reconnecting…");
+          try {
+            peer.reconnect();
+          } catch {
+            // ignore
+          }
+        });
 
         // Never dial yourself if preferred id somehow collides with host.
         if (id === hostId) {
-          resolve();
+          finishOk();
           return;
         }
 
-        const conn = peer.connect(hostId, { reliable: true });
-        this.wireConnection(conn, hostId, true);
-
-        conn.on("open", () => {
-          this.handlers.onStatus(this.statusForMode("Nearby users will appear here."));
-          resolve();
-        });
-
-        conn.on("error", () => {
-          // Host may be temporarily down; retry.
-          this.scheduleReconnect(hostId);
-          resolve();
-        });
+        // Remember the discovery host as a visible peer immediately.
+        this.rememberPeer(hostId, "User");
+        this.dialPeer(hostId, true);
+        // Keep retrying host until the channel opens (host may still be starting).
+        this.scheduleReconnect(hostId, true);
+        // Join succeeds once we are registered with the signaling server;
+        // peer discovery continues in the background.
+        finishOk();
       });
 
       peer.on("error", (err) => {
         const type = String((err as { type?: string }).type || "");
         // Stale tab may still hold our id — mint a new stable id once.
-        if (type === "unavailable-id" && attempt < 2) {
-          if (settled) return;
-          settled = true;
+        if (type === "unavailable-id" && attempt < 3) {
+          if (settled && this.localId) return;
           try {
             peer.destroy();
           } catch {
@@ -560,7 +636,13 @@ export class LanRoom {
             .catch(reject);
           return;
         }
-        this.handlers.onError(err.message || "Peer connection error");
+        // peer-unavailable: host not ready — keep retrying in background.
+        if (type === "peer-unavailable") {
+          this.scheduleReconnect(hostId, true);
+          if (!settled && this.localId) finishOk();
+          return;
+        }
+        this.handlers.onError(err.message || "Connection error");
         if (!this.localId && !settled) {
           settled = true;
           reject(err instanceof Error ? err : new Error(String(err)));
@@ -569,17 +651,22 @@ export class LanRoom {
     });
   }
 
-  private scheduleReconnect(hostId: string) {
+  private scheduleReconnect(hostId: string, immediate = false) {
     if (this.closed || this.isHost) return;
     if (this.reconnectTimer !== null) return;
-    this.handlers.onStatus("Reconnecting…");
+    const delay = immediate ? 800 : 2000;
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       if (this.closed || !this.peer || this.isHost) return;
-      if (this.connections.has(hostId) && this.connections.get(hostId)?.open) return;
-      const conn = this.peer.connect(hostId, { reliable: true });
-      this.wireConnection(conn, hostId, true);
-    }, 2000);
+      const existing = this.connections.get(hostId);
+      if (existing?.open) return;
+      this.handlers.onStatus(this.statusForMode("Searching for nearby users…"));
+      this.dialPeer(hostId, true);
+      // Keep polling until connected or closed.
+      if (!this.connections.get(hostId)?.open) {
+        this.scheduleReconnect(hostId, false);
+      }
+    }, delay);
   }
 
   private bindHost(hostPeer: Peer) {
@@ -587,46 +674,85 @@ export class LanRoom {
     hostPeer.on("disconnected", () => {
       if (this.closed) return;
       this.handlers.onStatus("Connection lost. Reconnecting…");
-      hostPeer.reconnect();
+      try {
+        hostPeer.reconnect();
+      } catch {
+        // ignore
+      }
     });
   }
 
   private acceptConnection(conn: DataConnection) {
-    this.wireConnection(conn, conn.peer, false);
+    const remoteId = sanitizePeerId(conn.peer) || conn.peer;
+    this.rememberPeer(remoteId, this.peerNames.get(remoteId) || "User");
+    this.wireConnection(conn, remoteId, false);
+  }
+
+  /** Open (or re-open) a reliable data connection to peerId. */
+  private dialPeer(peerId: string, outgoing: boolean) {
+    if (!this.peer || !peerId || peerId === this.localId) return;
+    const existing = this.connections.get(peerId);
+    if (existing?.open) return;
+    try {
+      const conn = this.peer.connect(peerId, { reliable: true, serialization: "json" });
+      this.wireConnection(conn, peerId, outgoing);
+    } catch {
+      // ignore dial failures; scheduleReconnect will retry
+    }
   }
 
   private wireConnection(conn: DataConnection, peerId: string, outgoing: boolean) {
-    if (this.connections.has(peerId) && this.connections.get(peerId)?.open) {
+    const existing = this.connections.get(peerId);
+    if (existing && existing !== conn) {
+      if (existing.open) {
+        // Already have a live channel — drop the duplicate.
+        try {
+          conn.close();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      // Replace a half-open connection.
       try {
-        conn.close();
+        existing.close();
       } catch {
         // ignore
       }
-      return;
     }
 
     this.connections.set(peerId, conn);
+    this.rememberPeer(peerId, this.peerNames.get(peerId) || "User");
 
     conn.on("open", () => {
       this.send(conn, { v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
+      void this.beginE2eHandshake(peerId);
       if (this.isHost) this.broadcastPeerList();
       this.handlers.onStatus(this.statusForMode("Connected."));
       this.emitPeers();
+      // Guest: once host is open, stop aggressive reconnect noise.
+      if (!this.isHost && peerId === roomHostId(this.room) && this.reconnectTimer !== null) {
+        window.clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
     });
 
     conn.on("data", (data) => {
       try {
-        const msg = data as WireMessage;
-        this.handleWire(msg, peerId);
+        const msg = (typeof data === "string" ? JSON.parse(data) : data) as WireMessage;
+        void this.handleWire(msg, peerId);
       } catch {
         this.handlers.onError("Could not read an incoming message.");
       }
     });
 
     conn.on("close", () => {
-      this.connections.delete(peerId);
+      if (this.connections.get(peerId) === conn) {
+        this.connections.delete(peerId);
+      }
+      this.e2eSessions.delete(peerId);
       const leftName = this.peerNames.get(peerId) || "User";
-      this.peerNames.delete(peerId);
+      // Keep name in directory for a moment so UI can show offline; mark disconnected via listPeers.
       this.emitPeers();
       if (this.isHost) this.broadcastPeerList();
       this.handlers.onMessage({
@@ -638,35 +764,171 @@ export class LanRoom {
         ts: Date.now(),
       });
       if (!this.isHost && peerId === roomHostId(this.room)) {
-        this.scheduleReconnect(peerId);
+        this.scheduleReconnect(peerId, true);
       }
     });
 
     conn.on("error", () => {
-      this.handlers.onStatus("Connection issue. Retrying…");
+      if (!this.isHost && peerId === roomHostId(this.room)) {
+        this.scheduleReconnect(peerId, false);
+      }
     });
+
+    void outgoing;
   }
 
-  private handleWire(msg: WireMessage, viaPeerId: string) {
+  private async beginE2eHandshake(peerId: string) {
+    if (this.closed || !this.localId) return;
+    let session = this.e2eSessions.get(peerId);
+    if (!session) {
+      const localPair = await generateE2eKeyPair();
+      session = { localPair, remotePub: null, key: null, ready: false, offered: false, pending: [] };
+      this.e2eSessions.set(peerId, session);
+    }
+    const conn = this.connections.get(peerId);
+    if (!conn?.open) return;
+    try {
+      if (!session.offered) {
+        const pub = await exportPublicJwk(session.localPair.publicKey);
+        this.send(conn, {
+          v: 1,
+          t: "e2e-hello",
+          alg: E2E_ALG,
+          fromId: this.localId,
+          pub,
+        });
+        session.offered = true;
+      }
+      if (session.remotePub && !session.ready) {
+        await this.finalizeE2e(peerId);
+      }
+    } catch {
+      this.handlers.onError("Could not start encrypted session.");
+    }
+  }
+
+  private async finalizeE2e(peerId: string) {
+    const session = this.e2eSessions.get(peerId);
+    if (!session?.remotePub || session.ready) return;
+    try {
+      const remoteKey = await importPublicJwk(session.remotePub);
+      const key = await deriveAesKey(session.localPair.privateKey, remoteKey, this.localId, peerId);
+      session.key = key;
+      session.ready = true;
+      this.emitPeers();
+      const pending = session.pending.splice(0, session.pending.length);
+      for (const payload of pending) {
+        await this.sendSecure(peerId, payload);
+      }
+    } catch {
+      this.handlers.onError("Could not establish encryption with a peer.");
+      this.e2eSessions.delete(peerId);
+    }
+  }
+
+  private requireE2e(peerId: string): E2eSession {
+    const session = this.e2eSessions.get(peerId);
+    if (!session?.ready || !session.key) {
+      throw new Error("Secure session is not ready yet. Wait a moment and try again.");
+    }
+    return session;
+  }
+
+  private async waitForE2e(peerId: string, timeoutMs = 5000): Promise<E2eSession> {
+    const start = Date.now();
+    if (!this.e2eSessions.get(peerId)) {
+      await this.beginE2eHandshake(peerId);
+    }
+    while (Date.now() - start < timeoutMs) {
+      const session = this.e2eSessions.get(peerId);
+      if (session?.ready && session.key) return session;
+      await new Promise((r) => window.setTimeout(r, 80));
+    }
+    throw new Error("Secure session is not ready yet. Wait a moment and try again.");
+  }
+
+  private async sendSecure(peerId: string, payload: SecurePayload) {
+    const conn = this.connectionFor(peerId);
+    const session = await this.waitForE2e(peerId);
+    if (!session.key) throw new Error("Secure session is not ready yet.");
+    const sealed = await encryptPayload(session.key, payload);
+    this.send(conn, { v: 1, t: "e2e", iv: sealed.iv, ct: sealed.ct });
+  }
+
+  private async handleWire(msg: WireMessage, viaPeerId: string) {
     // Structural guard — drop anything that is not a plain object with a type.
     if (!msg || typeof msg !== "object" || typeof (msg as { t?: unknown }).t !== "string") return;
+
+    if (msg.t === "e2e-hello") {
+      if (msg.alg !== E2E_ALG || !isPublicJwk(msg.pub)) return;
+      const fromId = sanitizePeerId(msg.fromId) || sanitizePeerId(viaPeerId) || viaPeerId;
+      let session = this.e2eSessions.get(fromId) || this.e2eSessions.get(viaPeerId);
+      if (!session) {
+        const localPair = await generateE2eKeyPair();
+        session = { localPair, remotePub: null, key: null, ready: false, offered: false, pending: [] };
+        this.e2eSessions.set(fromId, session);
+        if (viaPeerId !== fromId) this.e2eSessions.set(viaPeerId, session);
+      } else {
+        this.e2eSessions.set(fromId, session);
+        this.e2eSessions.set(viaPeerId, session);
+      }
+      session.remotePub = msg.pub;
+      // Offer our public key once (handles the case where the peer dialed first).
+      const conn = this.connections.get(viaPeerId) || this.connections.get(fromId);
+      if (conn?.open && !session.offered) {
+        try {
+          const pub = await exportPublicJwk(session.localPair.publicKey);
+          this.send(conn, {
+            v: 1,
+            t: "e2e-hello",
+            alg: E2E_ALG,
+            fromId: this.localId,
+            pub,
+          });
+          session.offered = true;
+        } catch {
+          // ignore
+        }
+      }
+      await this.finalizeE2e(fromId);
+      return;
+    }
+
+    if (msg.t === "e2e") {
+      const session = this.e2eSessions.get(viaPeerId);
+      if (!session?.key || typeof msg.iv !== "string" || typeof msg.ct !== "string") return;
+      try {
+        const inner = (await decryptPayload(session.key, msg.iv, msg.ct)) as SecurePayload;
+        if (!inner || typeof inner !== "object" || typeof (inner as { t?: unknown }).t !== "string") return;
+        this.handleSecurePayload(inner, viaPeerId);
+      } catch {
+        this.handlers.onError("Failed to decrypt a message (integrity check failed).");
+      }
+      return;
+    }
 
     if (msg.t === "hello") {
       const peerId = sanitizePeerId(msg.id) || sanitizePeerId(viaPeerId);
       if (!peerId) return;
       const name = sanitizeDisplayName(msg.name, "Peer");
-      this.peerNames.set(peerId, name);
-      this.emitPeers();
-      this.handlers.onMessage({
-        id: uid(),
-        kind: "system",
-        from: "system",
-        peerId,
-        text: `${name} is online.`,
-        ts: Date.now(),
-      });
-      // Mesh: connect to any peer we don't know yet when host shares list later.
+      const wasKnown = this.peerNames.has(peerId);
+      this.rememberPeer(peerId, name);
+      // Also map the transport peer id if it differs (should not for PeerJS).
+      if (viaPeerId && viaPeerId !== peerId) this.rememberPeer(viaPeerId, name);
+      if (!wasKnown) {
+        this.handlers.onMessage({
+          id: uid(),
+          kind: "system",
+          from: "system",
+          peerId,
+          text: `${name} is online.`,
+          ts: Date.now(),
+        });
+      }
+      // Host redistributes full roster so every guest can mesh.
       if (this.isHost) this.broadcastPeerList();
+      // Dial mesh path to this peer when needed.
+      this.ensureMeshConnection(peerId);
       return;
     }
 
@@ -675,13 +937,26 @@ export class LanRoom {
       for (const peer of msg.peers.slice(0, 64)) {
         const peerId = sanitizePeerId(peer?.id);
         if (!peerId || peerId === this.localId) continue;
-        this.peerNames.set(peerId, sanitizeDisplayName(peer?.name, "Peer"));
+        this.rememberPeer(peerId, peer?.name || "User");
         this.ensureMeshConnection(peerId);
       }
       this.emitPeers();
       return;
     }
 
+    // Reject plaintext application payloads — only sealed e2e is accepted for content.
+    if (
+      msg.t === "chat" ||
+      msg.t === "config" ||
+      msg.t === "file-start" ||
+      msg.t === "file-chunk" ||
+      msg.t === "file-end"
+    ) {
+      return;
+    }
+  }
+
+  private handleSecurePayload(msg: SecurePayload, viaPeerId: string) {
     if (msg.t === "chat") {
       const text = sanitizeChatText(msg.text);
       if (!text) return;
@@ -702,7 +977,6 @@ export class LanRoom {
       if (typeof msg.content !== "string") return;
       if (new TextEncoder().encode(msg.content).length > MAX_LAN_FILE_BYTES) return;
       const name = sanitizeFileName(msg.name, "config.json");
-      // Always treat as octet-stream download — never execute as HTML/JS in-browser.
       const blob = new Blob([msg.content], { type: "application/octet-stream" });
       const url = URL.createObjectURL(blob);
       const fromId = sanitizePeerId(msg.fromId) || sanitizePeerId(viaPeerId) || viaPeerId;
@@ -727,7 +1001,6 @@ export class LanRoom {
       const name = sanitizeFileName(msg.name, "file.bin");
       const fromId = sanitizePeerId(msg.fromId) || sanitizePeerId(viaPeerId) || viaPeerId;
       const transferId = typeof msg.id === "string" ? msg.id.slice(0, 80) : uid();
-      // Cap concurrent incomplete transfers to limit memory abuse.
       if (this.incoming.size >= 8) return;
       this.incoming.set(transferId, {
         name,
@@ -755,9 +1028,7 @@ export class LanRoom {
       if (!entry) return;
       if (typeof msg.index !== "number" || msg.index < 0 || msg.index >= entry.expected) return;
       if (typeof msg.data !== "string") return;
-      // Bound base64 chunk size (CHARS + small slack)
       if (msg.data.length > CHUNK_CHARS + 64) return;
-      // Reject extra chunks beyond expected to stop memory growth
       if (entry.parts.size >= entry.expected && !entry.parts.has(msg.index)) return;
       entry.parts.set(msg.index, msg.data);
       this.handlers.onTransfer({
@@ -785,7 +1056,6 @@ export class LanRoom {
         }
         const bytes = fromBase64(b64);
         if (bytes.byteLength > MAX_LAN_FILE_BYTES) throw new Error("File too large.");
-        // Size mismatch: peer lied about size — still allow if under global cap.
         const copy = new Uint8Array(bytes.byteLength);
         copy.set(bytes);
         const blob = new Blob([copy], { type: "application/octet-stream" });
@@ -828,34 +1098,40 @@ export class LanRoom {
   }
 
   private ensureMeshConnection(peerId: string) {
-    if (!this.peer || peerId === this.localId) return;
-    if (this.connections.has(peerId)) return;
-    // Only one side dials to avoid glare: connect if our id is lexicographically greater.
-    if (this.localId < peerId) return;
-    const conn = this.peer.connect(peerId, { reliable: true });
-    this.wireConnection(conn, peerId, true);
+    if (!this.peer || !peerId || peerId === this.localId) return;
+    if (this.connections.get(peerId)?.open) return;
+    // Only one side dials to avoid glare: higher id initiates.
+    // Exception: anyone may dial the discovery host.
+    const hostId = roomHostId(this.room);
+    if (peerId !== hostId && this.localId < peerId) return;
+    this.dialPeer(peerId, true);
   }
 
   private broadcastPeerList() {
     const peers = Array.from(this.peerNames.entries()).map(([id, name]) => ({ id, name }));
-    // Include host self
     peers.push({ id: this.localId, name: this.localName });
     const unique = new Map(peers.map((p) => [p.id, p]));
-    const list = Array.from(unique.values());
+    const list = Array.from(unique.values()).filter((p) => p.id);
     this.broadcastWire({ v: 1, t: "peers", peers: list });
   }
 
   private broadcastWire(msg: WireMessage) {
     for (const conn of this.connections.values()) {
-      if (conn.open) this.send(conn, msg);
+      if (!conn.open) continue;
+      try {
+        this.send(conn, msg);
+      } catch {
+        // ignore individual fan-out failures
+      }
     }
   }
 
   private send(conn: DataConnection, msg: WireMessage) {
+    if (!conn.open) throw new Error("Peer is not connected.");
     try {
       conn.send(msg);
     } catch {
-      // ignore broken channel
+      throw new Error("Failed to send.");
     }
   }
 
