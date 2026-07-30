@@ -186,12 +186,14 @@ export class LanRoom {
   private incoming = new Map<
     string,
     {
+      wireId: string;
       name: string;
       size: number;
       mime: string;
       parts: Map<number, string>;
       expected: number;
       from: string;
+      /** Always transport peer id — never a claimed spoof. */
       fromId: string;
     }
   >();
@@ -833,9 +835,9 @@ export class LanRoom {
 
   async sendChat(peerId: string, text: string) {
     const clean = assertSendableChat(text);
-    const target = sanitizePeerId(peerId);
-    if (!target) throw new Error("Invalid peer.");
-    this.connectionFor(target);
+    const target = this.transportPeerId(peerId);
+    if (!target || target === this.localId) throw new Error("Invalid peer.");
+    // Snapshot target before await so a UI selection change cannot retarget.
     const msg: SecurePayload = {
       v: 1,
       t: "chat",
@@ -851,6 +853,7 @@ export class LanRoom {
       kind: "chat",
       from: this.localName,
       fromId: this.localId,
+      // Local history for the *conversation with target*, not a broadcast.
       peerId: target,
       text: clean,
       ts: msg.ts,
@@ -858,14 +861,13 @@ export class LanRoom {
   }
 
   async sendConfig(peerId: string, fileName: string, content: string) {
-    const target = sanitizePeerId(peerId);
-    if (!target) throw new Error("Invalid peer.");
+    const target = this.transportPeerId(peerId);
+    if (!target || target === this.localId) throw new Error("Invalid peer.");
     const name = sanitizeFileName(fileName, "config.json");
     if (!content.trim()) throw new Error("Config content is empty.");
     if (new TextEncoder().encode(content).length > MAX_LAN_FILE_BYTES) {
       throw new Error("Config is too large to send.");
     }
-    this.connectionFor(target);
     const msg: SecurePayload = {
       v: 1,
       t: "config",
@@ -890,8 +892,8 @@ export class LanRoom {
   }
 
   async sendFile(peerId: string, file: File) {
-    const target = sanitizePeerId(peerId);
-    if (!target) throw new Error("Invalid peer.");
+    const target = this.transportPeerId(peerId);
+    if (!target || target === this.localId) throw new Error("Invalid peer.");
     if (file.size > MAX_LAN_FILE_BYTES) {
       throw new Error(`File exceeds ${Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB limit.`);
     }
@@ -1340,10 +1342,39 @@ export class LanRoom {
     throw new Error("Secure session is not ready yet. Wait a moment and try again.");
   }
 
+  /**
+   * Conversation peer is always the PeerJS transport id (DataConnection.peer).
+   * Never trust a claimed fromId for routing, history, or E2E session keys —
+   * otherwise forged ids could file messages under the wrong contact.
+   */
+  private transportPeerId(raw: string): string | null {
+    return sanitizePeerId(raw);
+  }
+
   private async sendSecure(peerId: string, payload: SecurePayload) {
-    const conn = this.connectionFor(peerId);
-    const session = await this.waitForE2e(peerId);
+    const target = this.transportPeerId(peerId);
+    if (!target) throw new Error("Invalid peer.");
+    if (target === this.localId) throw new Error("Cannot send to self.");
+
+    // Never queue/history-blast: only the live draft payload for this target.
+    if ("fromId" in payload && payload.fromId !== this.localId) {
+      throw new Error("Refusing to send a message with a forged sender id.");
+    }
+
+    const conn = this.connectionFor(target);
+    // PeerJS connection peer must match the intended recipient.
+    const connPeer = this.transportPeerId(conn.peer);
+    if (!connPeer || connPeer !== target) {
+      throw new Error("Connection peer mismatch; refusing to send.");
+    }
+
+    const session = await this.waitForE2e(target);
     if (!session.key) throw new Error("Secure session is not ready yet.");
+    // Session map is keyed only by transport id — double-check no aliasing.
+    if (this.e2eSessions.get(target) !== session) {
+      throw new Error("Secure session is not bound to this peer.");
+    }
+
     const sealed = await encryptPayload(session.key, payload);
     this.send(conn, { v: 1, t: "e2e", iv: sealed.iv, ct: sealed.ct });
   }
@@ -1351,10 +1382,12 @@ export class LanRoom {
   private async handleWire(msg: WireMessage, viaPeerId: string) {
     // Structural guard — drop anything that is not a plain object with a type.
     if (!msg || typeof msg !== "object" || typeof (msg as { t?: unknown }).t !== "string") return;
+    const transportId = this.transportPeerId(viaPeerId);
+    if (!transportId || transportId === this.localId) return;
 
     if (msg.t === "ping") {
-      this.touchPeer(viaPeerId);
-      const conn = this.connections.get(viaPeerId);
+      this.touchPeer(transportId);
+      const conn = this.connections.get(transportId);
       if (conn?.open) {
         try {
           this.send(conn, {
@@ -1370,26 +1403,26 @@ export class LanRoom {
     }
 
     if (msg.t === "pong") {
-      this.touchPeer(viaPeerId);
+      this.touchPeer(transportId);
       return;
     }
 
     if (msg.t === "e2e-hello") {
       if (msg.alg !== E2E_ALG || !isPublicJwk(msg.pub)) return;
-      const fromId = sanitizePeerId(msg.fromId) || sanitizePeerId(viaPeerId) || viaPeerId;
-      let session = this.e2eSessions.get(fromId) || this.e2eSessions.get(viaPeerId);
+      // Claimed fromId must match the transport peer — reject spoofed identities.
+      const claimed = sanitizePeerId(msg.fromId);
+      if (claimed && claimed !== transportId) return;
+
+      // One session per transport peer id only (no cross-peer aliasing).
+      let session = this.e2eSessions.get(transportId);
       if (!session) {
         const localPair = await generateE2eKeyPair();
         session = { localPair, remotePub: null, key: null, ready: false, offered: false, pending: [] };
-        this.e2eSessions.set(fromId, session);
-        if (viaPeerId !== fromId) this.e2eSessions.set(viaPeerId, session);
-      } else {
-        this.e2eSessions.set(fromId, session);
-        this.e2eSessions.set(viaPeerId, session);
+        this.e2eSessions.set(transportId, session);
       }
       session.remotePub = msg.pub;
       // Offer our public key once (handles the case where the peer dialed first).
-      const conn = this.connections.get(viaPeerId) || this.connections.get(fromId);
+      const conn = this.connections.get(transportId);
       if (conn?.open && !session.offered) {
         try {
           const pub = await exportPublicJwk(session.localPair.publicKey);
@@ -1405,17 +1438,17 @@ export class LanRoom {
           // ignore
         }
       }
-      await this.finalizeE2e(fromId);
+      await this.finalizeE2e(transportId);
       return;
     }
 
     if (msg.t === "e2e") {
-      const session = this.e2eSessions.get(viaPeerId);
+      const session = this.e2eSessions.get(transportId);
       if (!session?.key || typeof msg.iv !== "string" || typeof msg.ct !== "string") return;
       try {
         const inner = (await decryptPayload(session.key, msg.iv, msg.ct)) as SecurePayload;
         if (!inner || typeof inner !== "object" || typeof (inner as { t?: unknown }).t !== "string") return;
-        this.handleSecurePayload(inner, viaPeerId);
+        this.handleSecurePayload(inner, transportId);
       } catch {
         this.handlers.onError("Failed to decrypt a message (integrity check failed).");
       }
@@ -1423,13 +1456,13 @@ export class LanRoom {
     }
 
     if (msg.t === "hello") {
-      const peerId = sanitizePeerId(msg.id) || sanitizePeerId(viaPeerId);
-      if (!peerId) return;
+      // Identity in hello must match the DataChannel peer id.
+      const claimed = sanitizePeerId(msg.id);
+      if (claimed && claimed !== transportId) return;
+      const peerId = transportId;
       const name = sanitizeDisplayName(msg.name, "Peer");
       const wasKnown = this.peerNames.has(peerId);
       this.rememberPeer(peerId, name);
-      // Also map the transport peer id if it differs (should not for PeerJS).
-      if (viaPeerId && viaPeerId !== peerId) this.rememberPeer(viaPeerId, name);
       if (!wasKnown) {
         this.handlers.onMessage({
           id: uid(),
@@ -1472,16 +1505,24 @@ export class LanRoom {
   }
 
   private handleSecurePayload(msg: SecurePayload, viaPeerId: string) {
+    // Conversation binding: always the transport peer that decrypted this envelope.
+    const peerId = this.transportPeerId(viaPeerId);
+    if (!peerId || peerId === this.localId) return;
+    // Optional claimed fromId may only equal this transport peer (never another contact).
+    if ("fromId" in msg && msg.fromId != null) {
+      const claimed = sanitizePeerId(msg.fromId);
+      if (claimed && claimed !== peerId) return;
+    }
+
     if (msg.t === "chat") {
       const text = sanitizeChatText(msg.text);
       if (!text) return;
-      const fromId = sanitizePeerId(msg.fromId) || sanitizePeerId(viaPeerId) || viaPeerId;
       this.handlers.onMessage({
         id: typeof msg.id === "string" ? msg.id.slice(0, 80) : uid(),
         kind: "chat",
         from: sanitizeDisplayName(msg.name, "Peer"),
-        fromId,
-        peerId: fromId,
+        fromId: peerId,
+        peerId,
         text,
         ts: isFiniteTimestamp(msg.ts),
       });
@@ -1494,13 +1535,12 @@ export class LanRoom {
       const name = sanitizeFileName(msg.name, "config.json");
       const blob = new Blob([msg.content], { type: "application/octet-stream" });
       const url = URL.createObjectURL(blob);
-      const fromId = sanitizePeerId(msg.fromId) || sanitizePeerId(viaPeerId) || viaPeerId;
       this.handlers.onMessage({
         id: typeof msg.id === "string" ? msg.id.slice(0, 80) : uid(),
         kind: "config",
         from: sanitizeDisplayName(msg.from, "Peer"),
-        fromId,
-        peerId: fromId,
+        fromId: peerId,
+        peerId,
         text: `Received config ${name}`,
         ts: isFiniteTimestamp(msg.ts),
         fileName: name,
@@ -1514,17 +1554,19 @@ export class LanRoom {
       if (msg.size > MAX_LAN_FILE_BYTES) return;
       if (typeof msg.chunks !== "number" || msg.chunks < 1 || msg.chunks > 50_000) return;
       const name = sanitizeFileName(msg.name, "file.bin");
-      const fromId = sanitizePeerId(msg.fromId) || sanitizePeerId(viaPeerId) || viaPeerId;
       const transferId = typeof msg.id === "string" ? msg.id.slice(0, 80) : uid();
       if (this.incoming.size >= 8) return;
-      this.incoming.set(transferId, {
+      // Namespace transfer ids by peer so concurrent peers cannot collide / hijack.
+      const scopedId = `${peerId}:${transferId}`;
+      this.incoming.set(scopedId, {
+        wireId: transferId,
         name,
         size: msg.size,
         mime: "application/octet-stream",
         parts: new Map(),
         expected: msg.chunks,
         from: sanitizeDisplayName(msg.from, "Peer"),
-        fromId,
+        fromId: peerId,
       });
       this.handlers.onTransfer({
         id: transferId,
@@ -1533,34 +1575,38 @@ export class LanRoom {
         received: 0,
         total: msg.size,
         done: false,
-        peerId: fromId,
+        peerId,
       });
       return;
     }
 
     if (msg.t === "file-chunk") {
-      const entry = this.incoming.get(msg.id);
-      if (!entry) return;
+      if (typeof msg.id !== "string") return;
+      const scopedId = `${peerId}:${msg.id.slice(0, 80)}`;
+      const entry = this.incoming.get(scopedId);
+      if (!entry || entry.fromId !== peerId) return;
       if (typeof msg.index !== "number" || msg.index < 0 || msg.index >= entry.expected) return;
       if (typeof msg.data !== "string") return;
       if (msg.data.length > CHUNK_CHARS + 64) return;
       if (entry.parts.size >= entry.expected && !entry.parts.has(msg.index)) return;
       entry.parts.set(msg.index, msg.data);
       this.handlers.onTransfer({
-        id: msg.id,
+        id: entry.wireId,
         name: entry.name,
         direction: "receive",
         received: Math.min(entry.size, Math.floor((entry.parts.size / entry.expected) * entry.size)),
         total: entry.size,
         done: false,
-        peerId: entry.fromId,
+        peerId,
       });
       return;
     }
 
     if (msg.t === "file-end") {
-      const entry = this.incoming.get(msg.id);
-      if (!entry) return;
+      if (typeof msg.id !== "string") return;
+      const scopedId = `${peerId}:${msg.id.slice(0, 80)}`;
+      const entry = this.incoming.get(scopedId);
+      if (!entry || entry.fromId !== peerId) return;
       try {
         if (entry.parts.size !== entry.expected) throw new Error("Incomplete file transfer.");
         let b64 = "";
@@ -1576,20 +1622,20 @@ export class LanRoom {
         const blob = new Blob([copy], { type: "application/octet-stream" });
         const url = URL.createObjectURL(blob);
         this.handlers.onTransfer({
-          id: msg.id,
+          id: entry.wireId,
           name: entry.name,
           direction: "receive",
           received: entry.size,
           total: entry.size,
           done: true,
-          peerId: entry.fromId,
+          peerId,
         });
         this.handlers.onMessage({
-          id: msg.id,
+          id: entry.wireId,
           kind: "file",
           from: entry.from,
-          fromId: entry.fromId,
-          peerId: entry.fromId,
+          fromId: peerId,
+          peerId,
           text: `Received file ${entry.name}`,
           ts: Date.now(),
           fileName: entry.name,
@@ -1598,17 +1644,17 @@ export class LanRoom {
         });
       } catch (err) {
         this.handlers.onTransfer({
-          id: msg.id,
+          id: entry.wireId,
           name: entry.name,
           direction: "receive",
           received: 0,
           total: entry.size,
           done: true,
           error: err instanceof Error ? err.message : "Failed to assemble file.",
-          peerId: entry.fromId,
+          peerId,
         });
       }
-      this.incoming.delete(msg.id);
+      this.incoming.delete(scopedId);
     }
   }
 

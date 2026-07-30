@@ -52,7 +52,10 @@ export function serializeMessage(message: ChatMessage): ChatMessage | null {
   // System presence noise is not useful after reload.
   if (!isPersistableKind(message.kind)) return null;
 
-  const peerId = sanitizePeerId(message.peerId) || undefined;
+  // Every stored row must belong to exactly one conversation peer.
+  // Without peerId, a message could surface under the wrong contact after reload.
+  const peerId = sanitizePeerId(message.peerId);
+  if (!peerId) return null;
   const fromId = sanitizePeerId(message.fromId) || undefined;
 
   if (message.kind === "chat") {

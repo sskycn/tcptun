@@ -535,11 +535,13 @@ export default function LanShare() {
   }, [showMenu]);
 
   async function handleSendChat() {
-    if (!selectedPeerId || !canSend) return;
+    // Snapshot recipient so a mid-flight contact switch cannot retarget the send.
+    const targetPeerId = selectedPeerId;
+    if (!targetPeerId || !canSend) return;
     const text = draft.trim();
     if (!text) return;
     try {
-      await roomRef.current?.sendChat(selectedPeerId, text);
+      await roomRef.current?.sendChat(targetPeerId, text);
       setDraft("");
       setError(null);
     } catch (err) {
@@ -591,11 +593,13 @@ export default function LanShare() {
   }
 
   async function handleSendFiles(files: File[]) {
-    if (!files.length || !roomRef.current || !selectedPeerId || !canSend) return;
+    const targetPeerId = selectedPeerId;
+    if (!files.length || !roomRef.current || !targetPeerId || !canSend) return;
     setError(null);
     for (const file of files) {
       try {
-        await roomRef.current.sendFile(selectedPeerId, file);
+        // Always the snapshotted peer — never re-read selection mid-batch.
+        await roomRef.current.sendFile(targetPeerId, file);
       } catch (err) {
         setError(err instanceof Error ? err.message : `Failed to send ${file.name}`);
         break;
