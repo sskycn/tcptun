@@ -37,6 +37,10 @@ import {
 } from "./lan-security";
 
 const DISCOVERY_CHANNEL = "tcptun-direct-users-v1";
+/** Auto-hide completed transfer toasts. */
+const TRANSFER_DONE_DISMISS_MS = 4_000;
+/** Auto-hide failed transfer toasts a bit longer so the error can be read. */
+const TRANSFER_ERROR_DISMISS_MS = 7_000;
 
 function formatBytes(size: number): string {
   if (size < 1024) return `${size} B`;
@@ -113,7 +117,29 @@ export default function LanShare() {
   const stickToBottomRef = useRef(true);
   const prevConversationLenRef = useRef(0);
   const prevSelectedRef = useRef("");
+  const transferDismissTimersRef = useRef(new Map<string, number>());
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+
+  function clearTransferDismissTimer(id: string) {
+    const timer = transferDismissTimersRef.current.get(id);
+    if (timer === undefined) return;
+    window.clearTimeout(timer);
+    transferDismissTimersRef.current.delete(id);
+  }
+
+  function dismissTransfer(id: string) {
+    clearTransferDismissTimer(id);
+    setTransfers((prev) => prev.filter((item) => item.id !== id));
+  }
+
+  function scheduleTransferDismiss(id: string, delayMs: number) {
+    clearTransferDismissTimer(id);
+    const timer = window.setTimeout(() => {
+      transferDismissTimersRef.current.delete(id);
+      setTransfers((prev) => prev.filter((item) => item.id !== id));
+    }, delayMs);
+    transferDismissTimersRef.current.set(id, timer);
+  }
 
   const mode = iceMode(iceConfig);
   const selfId = peerId || stablePeerId;
@@ -300,6 +326,15 @@ export default function LanShare() {
           next.push(progress);
           return next.slice(-12);
         });
+        // Completed / failed transfers: auto-dismiss after a short delay.
+        if (progress.done || progress.error) {
+          scheduleTransferDismiss(
+            progress.id,
+            progress.error ? TRANSFER_ERROR_DISMISS_MS : TRANSFER_DONE_DISMISS_MS,
+          );
+        } else {
+          clearTransferDismissTimer(progress.id);
+        }
       },
       onError: (next) => active && setError(next),
       onJoined: (info) => {
@@ -337,6 +372,10 @@ export default function LanShare() {
 
     return () => {
       active = false;
+      for (const timer of transferDismissTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+      transferDismissTimersRef.current.clear();
       // Flush history before tear-down.
       saveHistory(messages, stablePeerIdRef.current || peerId, historyContactsRef.current);
       lan.leave();
@@ -905,17 +944,56 @@ export default function LanShare() {
           </div>
 
           {transferList.length > 0 ? (
-            <div className="wx-transfers">
+            <div className="wx-transfers" aria-live="polite">
               {transferList.map((item) => {
                 const pct = item.total ? Math.min(100, Math.round((item.received / item.total) * 100)) : 0;
+                const finished = Boolean(item.done || item.error);
+                const label = item.error
+                  ? item.direction === "send"
+                    ? "Send failed"
+                    : "Receive failed"
+                  : item.done
+                    ? item.direction === "send"
+                      ? "Sent"
+                      : "Received"
+                    : item.direction === "send"
+                      ? "Sending"
+                      : "Receiving";
+                const statusText = item.error
+                  ? item.error
+                  : item.done
+                    ? "Done"
+                    : `${pct}% · ${formatBytes(item.received)}`;
                 return (
-                  <div key={`${item.id}-${item.direction}`} className="lan-transfer">
+                  <div
+                    key={`${item.id}-${item.direction}`}
+                    className={`lan-transfer${finished ? " is-finished" : ""}${item.error ? " is-error" : ""}${item.done && !item.error ? " is-done" : ""}`}
+                    role={finished ? "status" : undefined}
+                  >
                     <div className="lan-transfer-meta">
-                      <span>
-                        {item.direction === "send" ? "Sending" : "Receiving"} {item.name}
+                      <span className="lan-transfer-label">
+                        {label} {item.name}
                       </span>
-                      <span>
-                        {item.error ? item.error : item.done ? "Done" : `${pct}% · ${formatBytes(item.received)}`}
+                      <span className="lan-transfer-status">
+                        <span>{statusText}</span>
+                        {finished ? (
+                          <button
+                            type="button"
+                            className="lan-transfer-close"
+                            onClick={() => dismissTransfer(item.id)}
+                            aria-label="Dismiss"
+                            title="Dismiss"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                              <path
+                                d="M6 6l12 12M18 6L6 18"
+                                stroke="currentColor"
+                                strokeWidth="2.2"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </button>
+                        ) : null}
                       </span>
                     </div>
                     <div className="lan-transfer-bar" aria-hidden="true">

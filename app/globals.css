@@ -1523,7 +1523,7 @@ html.dark .wx-bubble-row.is-self .wx-bubble-time {
   display: grid;
   gap: 8px;
   flex-shrink: 0;
-  max-height: 72px;
+  max-height: 96px;
   overflow: auto;
   border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
@@ -1535,12 +1535,71 @@ html.dark .wx-bubble-row.is-self .wx-bubble-time {
   gap: 6px;
 }
 
+.lan-transfer.is-done {
+  animation: lan-transfer-fade-in 0.2s ease-out;
+}
+
 .lan-transfer-meta {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.lan-transfer-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lan-transfer-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.lan-transfer.is-done .lan-transfer-status > span:first-child {
+  color: #166534;
+  font-weight: 650;
+}
+
+.lan-transfer.is-error .lan-transfer-status > span:first-child {
+  color: #b91c1c;
+  font-weight: 650;
+}
+
+html[data-theme="dark"] .lan-transfer.is-done .lan-transfer-status > span:first-child {
+  color: #86efac;
+}
+
+html[data-theme="dark"] .lan-transfer.is-error .lan-transfer-status > span:first-child {
+  color: #fca5a5;
+}
+
+.lan-transfer-close {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  padding: 0;
+  color: var(--muted);
+  line-height: 0;
+  cursor: pointer;
+}
+
+.lan-transfer-close:hover {
+  border-color: color-mix(in srgb, var(--line) 100%, transparent);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .lan-transfer-bar {
@@ -1555,10 +1614,24 @@ html.dark .wx-bubble-row.is-self .wx-bubble-time {
   height: 100%;
   border-radius: inherit;
   background: var(--primary);
+  transition: width 0.15s ease-out;
 }
 
 .lan-transfer-bar span[data-error="1"] {
   background: var(--accent);
+}
+
+.lan-transfer.is-done .lan-transfer-bar span {
+  background: #22c55e;
+}
+
+@keyframes lan-transfer-fade-in {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .wx-tools {
