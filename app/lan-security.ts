@@ -10,7 +10,7 @@ export const MAX_FILE_NAME_CHARS = 180;
 export const MAX_PEER_ID_CHARS = 96;
 export const MAX_MARKDOWN_RENDER_CHARS = 16_384;
 export const MAX_URL_CHARS = 2_048;
-/** @deprecated Prefer MAX_MESSAGES_PER_CONVERSATION in lan-history (1000 per chat). */
+/** @deprecated Prefer MAX_MESSAGES_PER_CONVERSATION / MAX_MESSAGES_TOTAL in lan-history (100 per chat, 1000 total). */
 export const MAX_STORED_MESSAGES = 1000;
 
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;

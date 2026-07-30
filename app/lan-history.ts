@@ -15,10 +15,10 @@ import {
 
 const STORAGE_KEY = "tcptun-lan-history-v1";
 /** Hard cap: keep at most this many messages per conversation (peer). */
-export const MAX_MESSAGES_PER_CONVERSATION = 1000;
+export const MAX_MESSAGES_PER_CONVERSATION = 100;
 const MAX_CONTACT_NAMES = 100;
-/** Overall safety cap across all chats (contacts × per-conversation). */
-const MAX_MESSAGES_TOTAL = MAX_MESSAGES_PER_CONVERSATION * MAX_CONTACT_NAMES;
+/** Hard cap: keep at most this many messages across all conversations. */
+export const MAX_MESSAGES_TOTAL = 1000;
 
 function safeTs(raw: unknown): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return Date.now();
