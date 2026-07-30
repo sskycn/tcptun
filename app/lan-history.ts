@@ -1,6 +1,7 @@
 /**
  * Persist LAN chat history in this browser so reloads restore conversations.
- * File blob URLs are not stored (they die with the session).
+ * Stores text chat + file/config *metadata* (name, size, time). Never stores
+ * file bytes, config body, or blob URLs.
  */
 
 import type { ChatMessage } from "./lan-room";
@@ -42,50 +43,71 @@ type HistoryPayload = {
   updatedAt: number;
 };
 
-function isMessageKind(value: unknown): value is ChatMessage["kind"] {
-  return value === "chat" || value === "system" || value === "config" || value === "file";
+function isPersistableKind(value: unknown): value is "chat" | "config" | "file" {
+  return value === "chat" || value === "config" || value === "file";
 }
 
-/** Drop non-serializable / session-only fields before disk write. */
+/** Drop session-only / non-serializable fields before disk write. */
 export function serializeMessage(message: ChatMessage): ChatMessage | null {
+  // System presence noise is not useful after reload.
+  if (!isPersistableKind(message.kind)) return null;
+
   const peerId = sanitizePeerId(message.peerId) || undefined;
   const fromId = sanitizePeerId(message.fromId) || undefined;
-  if (!isMessageKind(message.kind)) return null;
 
-  // System presence noise is not useful after reload.
-  if (message.kind === "system") return null;
+  if (message.kind === "chat") {
+    const text = sanitizeChatText(message.text);
+    if (!text) return null;
+    return {
+      id: clampText(String(message.id || ""), 80) || `msg-${message.ts}`,
+      kind: "chat",
+      from: sanitizeDisplayName(message.from, "Peer"),
+      fromId,
+      peerId,
+      text,
+      ts: safeTs(message.ts),
+    };
+  }
 
+  // File / config: keep name, size, time, short label — never payload or blob URL.
+  const fileName = message.fileName
+    ? sanitizeFileName(message.fileName)
+    : undefined;
+  const fileSize =
+    typeof message.fileSize === "number" && Number.isFinite(message.fileSize) && message.fileSize >= 0
+      ? Math.min(Math.floor(message.fileSize), 40 * 1024 * 1024)
+      : undefined;
+
+  // Keep the short "Sent/Received file …" label; never treat body as content store.
+  const rawText = clampText(String(message.text || "").replace(/\s+/g, " ").trim(), 300);
   const text =
-    message.kind === "chat"
-      ? sanitizeChatText(message.text)
-      : clampText(String(message.text || ""), 500);
-  if (message.kind === "chat" && !text) return null;
+    rawText ||
+    (fileName
+      ? message.kind === "config"
+        ? `Config ${fileName}`
+        : `File ${fileName}`
+      : message.kind === "config"
+        ? "Config"
+        : "File");
 
-  const stored: ChatMessage = {
+  return {
     id: clampText(String(message.id || ""), 80) || `msg-${message.ts}`,
     kind: message.kind,
     from: sanitizeDisplayName(message.from, "Peer"),
     fromId,
     peerId,
-    text: text || String(message.text || "").slice(0, 500),
+    text,
     ts: safeTs(message.ts),
+    ...(fileName ? { fileName } : {}),
+    ...(fileSize != null ? { fileSize } : {}),
+    // fileUrl intentionally omitted — blob: dies with the session and must not hold content.
   };
-
-  if (message.fileName) {
-    stored.fileName = sanitizeFileName(message.fileName);
-  }
-  if (typeof message.fileSize === "number" && Number.isFinite(message.fileSize) && message.fileSize >= 0) {
-    stored.fileSize = Math.min(message.fileSize, 40 * 1024 * 1024);
-  }
-  // Never persist blob: URLs — they are invalid after reload.
-  // fileUrl intentionally omitted.
-
-  return stored;
 }
 
 function sanitizeStoredMessage(raw: unknown): ChatMessage | null {
   if (!raw || typeof raw !== "object") return null;
   const m = raw as Partial<ChatMessage>;
+  if (m.kind === "system") return null;
   return serializeMessage({
     id: String(m.id || ""),
     kind: (m.kind as ChatMessage["kind"]) || "chat",
@@ -96,6 +118,7 @@ function sanitizeStoredMessage(raw: unknown): ChatMessage | null {
     ts: typeof m.ts === "number" ? m.ts : Date.now(),
     fileName: m.fileName,
     fileSize: m.fileSize,
+    // Never rehydrate fileUrl from storage even if an old payload had one.
   });
 }
 
