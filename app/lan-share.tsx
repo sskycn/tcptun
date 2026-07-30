@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   appendMessage,
-  clearHistory,
   loadHistory,
   saveHistory,
   upsertContact,
@@ -87,7 +86,8 @@ export default function LanShare() {
   const [configName, setConfigName] = useState("client.json");
   const [configBody, setConfigBody] = useState("");
   const [showTools, setShowTools] = useState(false);
-  const [showIce, setShowIce] = useState(false);
+  /** Profile drawer: opened by tapping your avatar (alias + STUN/TURN). */
+  const [showProfile, setShowProfile] = useState(false);
   const [discoveryKey, setDiscoveryKey] = useState(0);
   const [iceConfig, setIceConfig] = useState<LanIceConfig>(EMPTY_ICE_CONFIG);
   const [stunText, setStunText] = useState("");
@@ -224,7 +224,7 @@ export default function LanShare() {
     setTurnCred(storedIce.turnCredential);
     iceConfigRef.current = storedIce;
 
-    setStatus("Session restored. Connecting…");
+    setStatus("Connecting…");
     setSessionReady(true);
   }, []);
 
@@ -373,11 +373,11 @@ export default function LanShare() {
       setStunText(urlsToText(saved.stunUrls));
       setTurnText(urlsToText(saved.turnUrls));
       setError(null);
-      setShowIce(false);
-      setStatus(`ICE saved (${iceModeLabel(iceMode(saved))}). Reconnecting…`);
+      setStatus(`Network settings saved (${iceModeLabel(iceMode(saved))}). Reconnecting…`);
+      setShowProfile(false);
       restartDiscovery();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save ICE settings.");
+      setError(err instanceof Error ? err.message : "Failed to save network settings.");
     }
   }
 
@@ -390,8 +390,8 @@ export default function LanShare() {
     setTurnUser("");
     setTurnCred("");
     setError(null);
-    setShowIce(false);
-    setStatus("Cleared STUN/TURN. LAN-only mode. Reconnecting…");
+    setStatus("Using local network only. Reconnecting…");
+    setShowProfile(false);
     restartDiscovery();
   }
 
@@ -403,31 +403,6 @@ export default function LanShare() {
     if (id) saveDisplayName(alias, id);
     roomRef.current?.setDisplayName(alias);
     setStatus(`Alias saved as ${alias}.`);
-  }
-
-  function clearChatHistory() {
-    if (typeof window !== "undefined") {
-      const ok = window.confirm("Clear all saved chat history on this device?");
-      if (!ok) return;
-    }
-    clearHistory();
-    setMessages([]);
-    setHistoryContacts([]);
-    historyContactsRef.current = [];
-    setUnread({});
-    setSelectedPeerId("");
-    setStatus("Chat history cleared on this device.");
-  }
-
-  async function copyKey() {
-    const key = peerId || stablePeerId;
-    if (!key) return;
-    try {
-      await navigator.clipboard.writeText(key);
-      setStatus("Your key was copied.");
-    } catch {
-      setError("Could not copy the key. Select it and copy manually.");
-    }
   }
 
   function handleSendChat() {
@@ -468,128 +443,120 @@ export default function LanShare() {
     setShowTools(false);
   }
 
-  const displayKey = peerId || stablePeerId;
-
   return (
     <section className="section lan-section" id="lan">
       <div className="wx-shell" data-online={joined ? "1" : "0"}>
         <aside className="wx-sidebar">
           <header className="wx-sidebar-header">
-            <div className="wx-me">
+            <button
+              type="button"
+              className={`wx-me wx-me-button ${showProfile ? "is-open" : ""}`}
+              onClick={() => setShowProfile((v) => !v)}
+              aria-expanded={showProfile}
+              aria-label="Profile and network settings"
+              title="Profile and network settings"
+            >
               <span className="wx-avatar wx-avatar-self" aria-hidden="true">
                 {avatarInitials(localName)}
               </span>
               <div className="wx-me-copy">
                 <strong>{localName}</strong>
                 <span className={joined ? "is-live" : undefined}>
-                  {joined ? "Online" : "Connecting…"} · {contacts.length} contact
-                  {contacts.length === 1 ? "" : "s"}
+                  {joined ? "Online" : "Connecting…"}
+                  <span className="wx-me-mode"> · {iceModeLabel(mode)}</span>
                 </span>
               </div>
-            </div>
-            <div className="wx-alias-row">
-              <input
-                value={localName}
-                onChange={(event) => setLocalName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") applyAlias();
-                }}
-                maxLength={40}
-                autoComplete="off"
-                aria-label="Your alias"
-                placeholder="Alias"
-              />
-              <button type="button" className="button ghost" onClick={applyAlias}>
-                Save
-              </button>
-            </div>
-            <div className="wx-key-row">
-              <code title={displayKey || undefined}>
-                {displayKey ? `${displayKey.slice(0, 14)}…` : "Generating key…"}
-              </code>
-              <button type="button" className="button ghost" disabled={!displayKey} onClick={() => void copyKey()}>
-                Copy
-              </button>
-              <button type="button" className="button ghost" onClick={restartDiscovery}>
-                Retry
-              </button>
-            </div>
-            <div className="wx-ice-row">
-              <span className={`wx-ice-badge ${mode === "lan-only" ? "is-lan" : "is-wan"}`}>
-                {iceModeLabel(mode)}
-              </span>
-              <button
-                type="button"
-                className="button ghost"
-                onClick={() => setShowIce((v) => !v)}
-                aria-expanded={showIce}
-              >
-                {showIce ? "Hide ICE" : "STUN / TURN"}
-              </button>
-              <button type="button" className="button ghost" onClick={clearChatHistory}>
-                Clear history
-              </button>
-            </div>
-            <p className="wx-status-line" title={iceModeHint(mode)}>
-              {status}
-            </p>
-            {showIce ? (
-              <div className="wx-ice-panel">
-                <p className="wx-ice-hint">
-                  Leave empty for <strong>LAN only</strong> (host candidates). Add STUN for NAT traversal and
-                  TURN to relay when direct paths fail. Identity, ICE, and chat history stay in this browser.
+            </button>
+
+            {showProfile ? (
+              <div className="wx-profile-panel">
+                <label className="guide-field">
+                  <span>Alias</span>
+                  <div className="wx-alias-row">
+                    <input
+                      value={localName}
+                      onChange={(event) => setLocalName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") applyAlias();
+                      }}
+                      maxLength={40}
+                      autoComplete="off"
+                      aria-label="Your alias"
+                      placeholder="Alias"
+                    />
+                    <button type="button" className="button secondary" onClick={applyAlias}>
+                      Save
+                    </button>
+                  </div>
+                </label>
+
+                <div className="wx-profile-section">
+                  <div className="wx-profile-section-title">
+                    <span>Network</span>
+                    <span className={`wx-ice-badge ${mode === "lan-only" ? "is-lan" : "is-wan"}`}>
+                      {iceModeLabel(mode)}
+                    </span>
+                  </div>
+                  <p className="wx-ice-hint">
+                    Local network works by default. Add STUN or TURN servers only if you need to
+                    connect across different networks.
+                  </p>
+                  <label className="guide-field">
+                    <span>STUN servers</span>
+                    <textarea
+                      className="lan-code-input wx-ice-textarea"
+                      value={stunText}
+                      onChange={(event) => setStunText(event.target.value)}
+                      placeholder={"stun:stun.example.com:3478"}
+                      spellCheck={false}
+                      rows={2}
+                    />
+                  </label>
+                  <label className="guide-field">
+                    <span>TURN servers</span>
+                    <textarea
+                      className="lan-code-input wx-ice-textarea"
+                      value={turnText}
+                      onChange={(event) => setTurnText(event.target.value)}
+                      placeholder={"turn:turn.example.com:3478"}
+                      spellCheck={false}
+                      rows={2}
+                    />
+                  </label>
+                  <div className="wx-ice-creds">
+                    <label className="guide-field">
+                      <span>TURN username</span>
+                      <input
+                        value={turnUser}
+                        onChange={(event) => setTurnUser(event.target.value)}
+                        autoComplete="off"
+                        maxLength={256}
+                      />
+                    </label>
+                    <label className="guide-field">
+                      <span>TURN password</span>
+                      <input
+                        type="password"
+                        value={turnCred}
+                        onChange={(event) => setTurnCred(event.target.value)}
+                        autoComplete="off"
+                        maxLength={256}
+                      />
+                    </label>
+                  </div>
+                  <div className="wx-ice-actions">
+                    <button type="button" className="button primary" onClick={saveIceAndReconnect}>
+                      Save network
+                    </button>
+                    <button type="button" className="button ghost" onClick={resetIceToLanOnly}>
+                      Use local network only
+                    </button>
+                  </div>
+                </div>
+
+                <p className="wx-status-line" title={iceModeHint(mode)}>
+                  {status}
                 </p>
-                <label className="guide-field">
-                  <span>STUN servers (one per line)</span>
-                  <textarea
-                    className="lan-code-input wx-ice-textarea"
-                    value={stunText}
-                    onChange={(event) => setStunText(event.target.value)}
-                    placeholder={"stun:stun.example.com:3478\nstuns:stun.example.com:5349"}
-                    spellCheck={false}
-                    rows={3}
-                  />
-                </label>
-                <label className="guide-field">
-                  <span>TURN servers (one per line)</span>
-                  <textarea
-                    className="lan-code-input wx-ice-textarea"
-                    value={turnText}
-                    onChange={(event) => setTurnText(event.target.value)}
-                    placeholder={"turn:turn.example.com:3478\nturns:turn.example.com:5349"}
-                    spellCheck={false}
-                    rows={3}
-                  />
-                </label>
-                <div className="wx-ice-creds">
-                  <label className="guide-field">
-                    <span>TURN username</span>
-                    <input
-                      value={turnUser}
-                      onChange={(event) => setTurnUser(event.target.value)}
-                      autoComplete="off"
-                      maxLength={256}
-                    />
-                  </label>
-                  <label className="guide-field">
-                    <span>TURN credential</span>
-                    <input
-                      type="password"
-                      value={turnCred}
-                      onChange={(event) => setTurnCred(event.target.value)}
-                      autoComplete="off"
-                      maxLength={256}
-                    />
-                  </label>
-                </div>
-                <div className="wx-ice-actions">
-                  <button type="button" className="button primary" onClick={saveIceAndReconnect}>
-                    Save & reconnect
-                  </button>
-                  <button type="button" className="button ghost" onClick={resetIceToLanOnly}>
-                    LAN only
-                  </button>
-                </div>
               </div>
             ) : null}
           </header>
@@ -599,9 +566,7 @@ export default function LanShare() {
               <div className="wx-contact-empty">
                 No contacts yet.
                 <br />
-                {mode === "lan-only"
-                  ? "LAN-only: peers must share a network, or configure STUN/TURN."
-                  : "Keep this page open to stay discoverable. History appears after you chat."}
+                Open this page on another device on the same network to get started.
               </div>
             ) : (
               contacts.map((peer) => {
@@ -648,29 +613,14 @@ export default function LanShare() {
         <div className={`wx-chat ${selectedPeer ? "is-active" : ""}`}>
           <header className="wx-chat-header">
             {selectedPeer ? (
-              <>
-                <div className="wx-chat-title">
-                  <strong>{selectedPeer.name}</strong>
-                  <span>
-                    {selectedPeer.connected
-                      ? "Online · private peer-to-peer · Markdown"
-                      : "Offline · showing saved history"}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="button ghost"
-                  onClick={() => setShowTools((v) => !v)}
-                  aria-expanded={showTools}
-                  disabled={!canSend}
-                >
-                  {showTools ? "Hide tools" : "File / config"}
-                </button>
-              </>
+              <div className="wx-chat-title">
+                <strong>{selectedPeer.name}</strong>
+                <span>{selectedPeer.connected ? "Online" : "Offline"}</span>
+              </div>
             ) : (
               <div className="wx-chat-title">
-                <strong>Select a contact</strong>
-                <span>History is restored from this browser after reload</span>
+                <strong>Messages</strong>
+                <span>Select a contact to start chatting</span>
               </div>
             )}
           </header>
@@ -678,18 +628,16 @@ export default function LanShare() {
           <div className="wx-chat-log" aria-live="polite">
             {!selectedPeerId ? (
               <div className="wx-empty">
-                <p>WeChat-style direct chat</p>
-                <span>
-                  Your alias, peer key, ICE settings, and chat history are saved on this device.
-                </span>
+                <p>No conversation selected</p>
+                <span>Choose a contact from the list to view messages or start a chat.</span>
               </div>
             ) : conversation.length === 0 ? (
               <div className="wx-empty">
-                <p>Say hello to {selectedPeer?.name}</p>
+                <p>No messages yet</p>
                 <span>
                   {canSend
-                    ? "Markdown: **bold**, `code`, lists, tables. Links open safely; images need your click."
-                    : "Contact is offline. You can still read history; messaging resumes when they are online."}
+                    ? `Send a message to ${selectedPeer?.name}.`
+                    : `${selectedPeer?.name} is offline. Previous messages stay available here.`}
                 </span>
               </div>
             ) : (
@@ -729,10 +677,10 @@ export default function LanShare() {
                       ) : message.kind === "file" || message.kind === "config" ? (
                         <p className="wx-plain wx-history-note">
                           {message.fileName
-                            ? `Saved note: ${sanitizeFileName(message.fileName)}${
-                                message.fileSize ? ` (${formatBytes(message.fileSize)})` : ""
-                              }. Re-send to download again after reload.`
-                            : "Attachment not kept after reload."}
+                            ? `${sanitizeFileName(message.fileName)}${
+                                message.fileSize ? ` · ${formatBytes(message.fileSize)}` : ""
+                              }`
+                            : "Attachment"}
                         </p>
                       ) : null}
                       <time className="wx-bubble-time">{formatDayTime(message.ts)}</time>
@@ -807,8 +755,7 @@ export default function LanShare() {
               <div className="lan-tool-card">
                 <strong>Send file</strong>
                 <p className="guide-field-hint">
-                  Up to {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB · file bytes are not kept after
-                  reload (chat note is).
+                  Up to {Math.floor(MAX_LAN_FILE_BYTES / 1024 / 1024)} MiB per file.
                 </p>
                 <input
                   ref={fileInputRef}
@@ -839,19 +786,27 @@ export default function LanShare() {
                 }}
                 placeholder={
                   !selectedPeer
-                    ? "Select a contact first"
+                    ? "Select a contact"
                     : canSend
-                      ? `Message ${selectedPeer.name}… (Markdown · Shift+Enter for newline)`
-                      : `${selectedPeer.name} is offline — history only`
+                      ? `Message ${selectedPeer.name}`
+                      : `${selectedPeer.name} is offline`
                 }
                 disabled={!canSend}
                 rows={2}
                 maxLength={MAX_CHAT_TEXT_CHARS}
               />
               <div className="wx-compose-actions">
-                <span className="wx-char-count">
-                  {draft.length}/{MAX_CHAT_TEXT_CHARS}
-                </span>
+                {canSend ? (
+                  <button
+                    type="button"
+                    className="wx-compose-more"
+                    onClick={() => setShowTools((v) => !v)}
+                    aria-expanded={showTools}
+                    title="Send file or config"
+                  >
+                    +
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="button primary"

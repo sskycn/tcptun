@@ -63,9 +63,9 @@ const featureLinks = [
   },
   {
     href: "/lan/",
-    label: "LAN",
-    title: "WebRTC chat & files",
-    body: "Share configs and files peer-to-peer on the same network with a one-time host/guest code exchange.",
+    label: "Chat",
+    title: "Nearby chat & file share",
+    body: "Discover users on the same network and exchange messages, configs, and files privately.",
   },
 ];
 

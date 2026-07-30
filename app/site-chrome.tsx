@@ -48,7 +48,7 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
               <h3>Product</h3>
               <Link href="/">Home</Link>
               <Link href="/guide/">Wizard</Link>
-              <Link href="/lan/">LAN share</Link>
+              <Link href="/lan/">Chat</Link>
               <Link href="/config/">Config</Link>
               <Link href="/generate/">Generate</Link>
               <Link href="/uri/">URI</Link>

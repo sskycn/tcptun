@@ -727,7 +727,7 @@ main {
   cursor: pointer;
 }
 
-/* ---------- LAN chat (WeChat-style shell) ---------- */
+/* ---------- LAN chat shell ---------- */
 
 .lan-section {
   padding-top: 8px;
@@ -767,6 +767,26 @@ main {
   align-items: center;
 }
 
+.wx-me-button {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  padding: 6px 4px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-me-button:hover {
+  background: color-mix(in srgb, var(--primary-soft) 35%, transparent);
+}
+
+.wx-me-button.is-open {
+  background: color-mix(in srgb, var(--primary-soft) 50%, var(--surface));
+}
+
 .wx-me-copy {
   display: grid;
   gap: 2px;
@@ -787,6 +807,39 @@ main {
 
 .wx-me-copy span.is-live {
   color: var(--cyan-text);
+}
+
+.wx-me-mode {
+  color: inherit;
+  opacity: 0.85;
+  font-weight: 650;
+}
+
+.wx-profile-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  padding: 12px;
+}
+
+.wx-profile-section {
+  display: grid;
+  gap: 8px;
+}
+
+.wx-profile-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .wx-avatar {
@@ -1158,7 +1211,7 @@ html.dark .wx-system {
   justify-content: flex-start;
 }
 
-/* Peer bubble: pure white + near-black text (WeChat-like). */
+/* Peer bubble: light surface + dark text. */
 .wx-bubble {
   display: grid;
   gap: 6px;
@@ -1176,7 +1229,7 @@ html.dark .wx-system {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Self bubble: classic WeChat green + dark text in BOTH themes for contrast. */
+/* Self bubble: green + dark text in both themes for contrast. */
 .wx-bubble-row.is-self .wx-bubble {
   background: #95ec69;
   border-color: rgba(0, 0, 0, 0.04);
@@ -1383,7 +1436,32 @@ html.dark .wx-compose-main textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
+}
+
+.wx-compose-more {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+  background: #fff;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+
+html.dark .wx-compose-more {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: #1c2733;
+  color: #f3f6f9;
+}
+
+.wx-compose-more:hover {
+  background: color-mix(in srgb, var(--primary-soft) 40%, #fff);
 }
 
 .wx-char-count {

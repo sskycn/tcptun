@@ -5,18 +5,17 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Direct chat · tcptun v${releaseVersion}`,
-  description:
-    "WeChat-style chat with optional STUN/TURN. Default is LAN-only; configure ICE servers for cross-network peers.",
+  title: `Chat · tcptun v${releaseVersion}`,
+  description: "Discover nearby users and chat privately. Optional STUN/TURN for connections beyond the local network.",
 };
 
 export default function LanPage() {
   return (
     <SiteChrome>
       <PageHero
-        eyebrow="Direct chat"
-        title="Contacts on the left. Chat on the right."
-        description="Default is LAN-only (no STUN/TURN). Configure your own STUN and TURN servers for NAT traversal. Messages use secure Markdown over WebRTC DataChannels."
+        eyebrow="Chat"
+        title="Nearby users. Private conversations."
+        description="Users on the same network appear automatically. Share messages, configs, and files. Add STUN/TURN only if you need to reach people outside the local network."
         actions={[
           { href: "/generate/", label: "Generate config", variant: "secondary" },
           { href: "/guide/", label: "Setup wizard", variant: "ghost" },

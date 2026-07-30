@@ -137,6 +137,7 @@ export class LanRoom {
   private closed = false;
   private iceConfig: LanIceConfig = { ...EMPTY_ICE_CONFIG };
   private preferredPeerId = "";
+  private announceTimer: number | null = null;
   private incoming = new Map<
     string,
     {
@@ -158,10 +159,7 @@ export class LanRoom {
   private statusForMode(base: string): string {
     const mode = iceMode(this.iceConfig);
     const label = iceModeLabel(mode);
-    if (mode === "lan-only") {
-      return `${base} Mode: ${label} — ${iceModeHint(mode)}`;
-    }
-    return `${base} ICE: ${label}.`;
+    return `${base} ${label}.`;
   }
 
   get peerId(): string {
@@ -205,21 +203,51 @@ export class LanRoom {
     this.connections.clear();
 
     const hostId = roomHostId(this.room);
-    this.handlers.onStatus(this.statusForMode("Looking for online users…"));
+    this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
 
-    // Same-origin multi-tab discovery
+    // Local same-origin discovery (other tabs / windows on this machine).
+    // Complements PeerJS room discovery for multi-device LAN.
     this.broadcast = new BroadcastChannel(BC_PREFIX + hostId);
     this.broadcast.onmessage = (event) => {
       if (this.closed) return;
-      const data = event.data as WireMessage | { v: 1; t: "bc-announce"; id: string; name: string };
-      if (!data || typeof data !== "object") return;
-      if ("t" in data && data.t === "bc-announce" && data.id && data.id !== this.localId) {
-        // Another tab in this browser — PeerJS mesh handles real peers.
-        return;
+      const data = event.data as { v?: number; t?: string; id?: string; name?: string };
+      if (!data || typeof data !== "object" || data.t !== "bc-announce") return;
+      const id = sanitizePeerId(data.id);
+      if (!id || id === this.localId) return;
+      const name = sanitizeDisplayName(data.name, "Peer");
+      this.peerNames.set(id, name);
+      this.emitPeers();
+      // Dial announced peer over PeerJS when we are online (LAN / mesh).
+      if (this.peer && this.localId) {
+        this.ensureMeshConnection(id);
       }
     };
 
     await this.claimOrJoinHost(hostId);
+    this.startLocalAnnounce();
+  }
+
+  private startLocalAnnounce() {
+    if (this.announceTimer !== null) {
+      window.clearInterval(this.announceTimer);
+      this.announceTimer = null;
+    }
+    const tick = () => {
+      if (this.closed || !this.localId) return;
+      try {
+        this.broadcast?.postMessage({
+          v: 1,
+          t: "bc-announce",
+          id: this.localId,
+          name: this.localName,
+        });
+      } catch {
+        // ignore
+      }
+    };
+    tick();
+    // Periodic announce so late joiners on the same origin see us quickly.
+    this.announceTimer = window.setInterval(tick, 4000);
   }
 
   leave() {
@@ -227,6 +255,10 @@ export class LanRoom {
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    if (this.announceTimer !== null) {
+      window.clearInterval(this.announceTimer);
+      this.announceTimer = null;
     }
     for (const conn of this.connections.values()) {
       try {
@@ -253,7 +285,7 @@ export class LanRoom {
     this.localId = "";
     this.isHost = false;
     this.handlers.onPeers([]);
-    this.handlers.onStatus("Left room.");
+    this.handlers.onStatus("Disconnected.");
   }
 
   listPeers(): RoomPeer[] {
@@ -418,7 +450,7 @@ export class LanRoom {
         } catch {
           // ignore
         }
-        this.handlers.onStatus(`${reason} Connecting as participant…`);
+        this.handlers.onStatus(this.statusForMode("Joining…"));
         void this.joinAsGuest(hostId).then(resolve).catch(reject);
       };
 
@@ -430,17 +462,17 @@ export class LanRoom {
         this.isHost = true;
         this.peerNames.set(id, this.localName);
         this.handlers.onJoined({ peerId: id, isHost: true, room: this.room });
-        this.handlers.onStatus(this.statusForMode("You are online. Waiting for other users…"));
+        this.handlers.onStatus(this.statusForMode("You are online. Waiting for others…"));
         this.emitPeers();
         this.bindHost(hostPeer);
-        this.broadcast?.postMessage({ v: 1, t: "bc-announce", id, name: this.localName });
+        this.startLocalAnnounce();
         resolve();
       });
 
       hostPeer.on("error", (err) => {
         const type = String((err as { type?: string }).type || "");
         if (type === "unavailable-id" || type === "network" || type === "server-error") {
-          failToGuest(type === "unavailable-id" ? "Discovery service found." : "Connecting to discovery service.");
+          failToGuest(type === "unavailable-id" ? "Session found." : "Connecting…");
           return;
         }
         if (!settled) {
@@ -478,8 +510,9 @@ export class LanRoom {
         this.preferredPeerId = id;
         this.peerNames.set(id, this.localName);
         this.handlers.onJoined({ peerId: id, isHost: false, room: this.room });
-        this.handlers.onStatus(this.statusForMode("Your key is ready. Finding online users…"));
+        this.handlers.onStatus(this.statusForMode("Connected. Looking for nearby users…"));
         this.emitPeers();
+        this.startLocalAnnounce();
 
         peer.on("connection", (conn) => this.acceptConnection(conn));
 
@@ -493,7 +526,7 @@ export class LanRoom {
         this.wireConnection(conn, hostId, true);
 
         conn.on("open", () => {
-          this.handlers.onStatus(this.statusForMode("Online users will appear automatically."));
+          this.handlers.onStatus(this.statusForMode("Nearby users will appear here."));
           resolve();
         });
 
@@ -521,7 +554,7 @@ export class LanRoom {
               : `tcptu${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
           this.preferredPeerId = fresh;
           this.handlers.onIdentityRotated?.(fresh);
-          this.handlers.onStatus("Previous session still online. Using a new stable key…");
+          this.handlers.onStatus("Reconnecting with a new session…");
           void this.joinAsGuest(hostId, fresh, attempt + 1)
             .then(resolve)
             .catch(reject);
@@ -539,7 +572,7 @@ export class LanRoom {
   private scheduleReconnect(hostId: string) {
     if (this.closed || this.isHost) return;
     if (this.reconnectTimer !== null) return;
-    this.handlers.onStatus("Discovery service is reconnecting…");
+    this.handlers.onStatus("Reconnecting…");
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       if (this.closed || !this.peer || this.isHost) return;
@@ -553,7 +586,7 @@ export class LanRoom {
     hostPeer.on("connection", (conn) => this.acceptConnection(conn));
     hostPeer.on("disconnected", () => {
       if (this.closed) return;
-      this.handlers.onStatus("Disconnected from signaling. Reconnecting…");
+      this.handlers.onStatus("Connection lost. Reconnecting…");
       hostPeer.reconnect();
     });
   }
@@ -577,9 +610,7 @@ export class LanRoom {
     conn.on("open", () => {
       this.send(conn, { v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
       if (this.isHost) this.broadcastPeerList();
-      this.handlers.onStatus(
-        outgoing ? `Linked to peer ${peerId.slice(0, 8)}…` : `Peer connected: ${peerId.slice(0, 8)}…`,
-      );
+      this.handlers.onStatus(this.statusForMode("Connected."));
       this.emitPeers();
     });
 
@@ -588,12 +619,13 @@ export class LanRoom {
         const msg = data as WireMessage;
         this.handleWire(msg, peerId);
       } catch {
-        this.handlers.onError("Invalid message from peer.");
+        this.handlers.onError("Could not read an incoming message.");
       }
     });
 
     conn.on("close", () => {
       this.connections.delete(peerId);
+      const leftName = this.peerNames.get(peerId) || "User";
       this.peerNames.delete(peerId);
       this.emitPeers();
       if (this.isHost) this.broadcastPeerList();
@@ -602,7 +634,7 @@ export class LanRoom {
         kind: "system",
         from: "system",
         peerId,
-        text: `Peer left (${peerId.slice(0, 8)}…).`,
+        text: `${leftName} left.`,
         ts: Date.now(),
       });
       if (!this.isHost && peerId === roomHostId(this.room)) {
@@ -611,7 +643,7 @@ export class LanRoom {
     });
 
     conn.on("error", () => {
-      this.handlers.onStatus(`Connection issue with ${peerId.slice(0, 8)}…`);
+      this.handlers.onStatus("Connection issue. Retrying…");
     });
   }
 

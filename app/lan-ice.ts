@@ -1,6 +1,9 @@
 /**
  * User-configurable STUN / TURN for WebRTC.
- * Empty config → iceServers: [] → host candidates only (LAN / same-network).
+ *
+ * Default (empty) = LAN mode: only host ICE candidates → same local network.
+ * With STUN/TURN: LAN host candidates are ALWAYS still gathered (iceTransportPolicy=all),
+ * so local discovery/connect keeps working; STUN/TURN only extend cross-network reach.
  */
 
 export type IceServerEntry = {
@@ -25,6 +28,7 @@ const MAX_URLS = 12;
 const MAX_URL_LEN = 256;
 const MAX_CRED_LEN = 256;
 
+/** Default: no STUN/TURN — pure LAN host candidates. */
 export const EMPTY_ICE_CONFIG: LanIceConfig = {
   stunUrls: [],
   turnUrls: [],
@@ -46,26 +50,26 @@ export function iceMode(config: LanIceConfig): LanIceMode {
 export function iceModeLabel(mode: LanIceMode): string {
   switch (mode) {
     case "lan-only":
-      return "LAN only";
+      return "Local network";
     case "stun":
-      return "STUN";
+      return "Local + STUN";
     case "turn":
-      return "TURN";
+      return "Local + TURN";
     case "stun-turn":
-      return "STUN + TURN";
+      return "Local + STUN/TURN";
   }
 }
 
 export function iceModeHint(mode: LanIceMode): string {
   switch (mode) {
     case "lan-only":
-      return "No STUN/TURN configured. Connections use host candidates only — same LAN / local network.";
+      return "Using the local network only.";
     case "stun":
-      return "STUN helps discover public addresses across NATs. Symmetric NAT may still need TURN.";
+      return "Local network plus STUN for wider reach.";
     case "turn":
-      return "TURN relays media when direct paths fail. Requires valid username and credential.";
+      return "Local network plus TURN relay when direct paths fail.";
     case "stun-turn":
-      return "STUN for direct paths when possible; TURN as relay fallback.";
+      return "Local network plus STUN and TURN.";
   }
 }
 
@@ -186,13 +190,19 @@ export function clearIceConfig(): LanIceConfig {
   return { ...EMPTY_ICE_CONFIG };
 }
 
-/** PeerJS / RTCPeerConnection config fragment. */
+/**
+ * PeerJS / RTCPeerConnection config.
+ * Always iceTransportPolicy "all" so host (LAN) candidates are never disabled
+ * when the user adds STUN/TURN for wider reach.
+ */
 export function peerRtcConfig(config: LanIceConfig): RTCConfiguration {
   const iceServers = buildIceServers(config) as RTCIceServer[];
   return {
     iceServers,
-    // Prefer all candidates; with empty iceServers only host (LAN) remain.
+    // Never "relay" — that would kill pure LAN paths when TURN is present.
     iceTransportPolicy: "all",
     bundlePolicy: "max-bundle",
+    rtcpMuxPolicy: "require",
+    iceCandidatePoolSize: 4,
   };
 }
