@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "export": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:lan": "node --test --experimental-strip-types tests/lan-*.test.ts"
   },
   "dependencies": {
     "highlight.js": "^11.11.1",

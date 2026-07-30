@@ -109,6 +109,7 @@ export default function LanShare() {
   const [sessionReady, setSessionReady] = useState(false);
 
   const roomRef = useRef<LanRoom | null>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
   const selectedPeerRef = useRef("");
   const localNameRef = useRef(localName);
   const stablePeerIdRef = useRef(stablePeerId);
@@ -164,7 +165,7 @@ export default function LanShare() {
           encrypted: Boolean(peer.encrypted),
           lastMessage,
           unreadCount: unread[peer.id] || 0,
-          lastTs: lastMessage?.ts || Date.now(),
+          lastTs: lastMessage?.ts || 0,
         };
       })
       .sort((a, b) => {
@@ -173,28 +174,25 @@ export default function LanShare() {
       });
   }, [peers, messages, unread, historyContacts]);
 
-  // Drop selection when the peer goes offline so the UI stays on the online list.
-  useEffect(() => {
-    if (!selectedPeerId) return;
-    if (!contacts.some((peer) => peer.id === selectedPeerId)) {
-      setSelectedPeerId("");
-    }
-  }, [contacts, selectedPeerId]);
-
-  const selectedPeer = contacts.find((peer) => peer.id === selectedPeerId);
+  // Keep the user's selection in state across brief reconnects, but expose it
+  // to the active UI only while that peer is actually online.
+  const activeSelectedPeerId = contacts.some((peer) => peer.id === selectedPeerId)
+    ? selectedPeerId
+    : "";
+  const selectedPeer = contacts.find((peer) => peer.id === activeSelectedPeerId);
   const conversation = useMemo(
-    () => messages.filter((message) => message.peerId === selectedPeerId),
-    [messages, selectedPeerId],
+    () => messages.filter((message) => message.peerId === activeSelectedPeerId),
+    [messages, activeSelectedPeerId],
   );
   const transferList = useMemo(
-    () => transfers.filter((item) => item.peerId === selectedPeerId),
-    [transfers, selectedPeerId],
+    () => transfers.filter((item) => item.peerId === activeSelectedPeerId),
+    [transfers, activeSelectedPeerId],
   );
   const canSend = Boolean(selectedPeer?.connected && selectedPeer?.encrypted && joined);
 
   useEffect(() => {
-    selectedPeerRef.current = selectedPeerId;
-  }, [selectedPeerId]);
+    selectedPeerRef.current = activeSelectedPeerId;
+  }, [activeSelectedPeerId]);
 
   useEffect(() => {
     localNameRef.current = localName;
@@ -214,27 +212,44 @@ export default function LanShare() {
 
   // Restore identity, history, ICE once on the client.
   useEffect(() => {
-    const identity = loadIdentity();
-    setLocalName(identity.displayName);
-    setStablePeerId(identity.peerId);
-    localNameRef.current = identity.displayName;
-    stablePeerIdRef.current = identity.peerId;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      const identity = loadIdentity();
+      setLocalName(identity.displayName);
+      setStablePeerId(identity.peerId);
+      localNameRef.current = identity.displayName;
+      stablePeerIdRef.current = identity.peerId;
 
-    const history = loadHistory(identity.peerId);
-    setMessages(history.messages);
-    setHistoryContacts(history.contacts);
-    historyContactsRef.current = history.contacts;
+      const history = loadHistory(identity.peerId);
+      messagesRef.current = history.messages;
+      setMessages(history.messages);
+      setHistoryContacts(history.contacts);
+      historyContactsRef.current = history.contacts;
 
-    const storedIce = loadIceConfig();
-    setIceConfig(storedIce);
-    setStunText(urlsToText(storedIce.stunUrls));
-    setTurnText(urlsToText(storedIce.turnUrls));
-    setTurnUser(storedIce.turnUsername);
-    setTurnCred(storedIce.turnCredential);
-    iceConfigRef.current = storedIce;
+      const storedIce = loadIceConfig();
+      setIceConfig(storedIce);
+      setStunText(urlsToText(storedIce.stunUrls));
+      setTurnText(urlsToText(storedIce.turnUrls));
+      setTurnUser(storedIce.turnUsername);
+      setTurnCred(storedIce.turnCredential);
+      iceConfigRef.current = storedIce;
 
-    setStatus("Connecting…");
-    setSessionReady(true);
+      setStatus("Connecting…");
+      setSessionReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Object URLs are session resources; release them only when the chat page unmounts.
+  useEffect(() => {
+    return () => {
+      for (const message of messagesRef.current) {
+        if (message.fileUrl && isSafeObjectUrl(message.fileUrl)) URL.revokeObjectURL(message.fileUrl);
+      }
+    };
   }, []);
 
   // Debounced persist of chat history.
@@ -254,8 +269,8 @@ export default function LanShare() {
     const el = chatLogRef.current;
     if (!el) return;
 
-    const selectedChanged = prevSelectedRef.current !== selectedPeerId;
-    prevSelectedRef.current = selectedPeerId;
+    const selectedChanged = prevSelectedRef.current !== activeSelectedPeerId;
+    prevSelectedRef.current = activeSelectedPeerId;
 
     if (selectedChanged) {
       stickToBottomRef.current = true;
@@ -271,7 +286,7 @@ export default function LanShare() {
       // Instant local scroll only — avoids page jump from scrollIntoView.
       el.scrollTop = el.scrollHeight;
     }
-  }, [conversation, transferList, selectedPeerId]);
+  }, [conversation, transferList, activeSelectedPeerId]);
 
   useEffect(() => {
     if (viewportFill) {
@@ -290,6 +305,7 @@ export default function LanShare() {
   useEffect(() => {
     if (!sessionReady || !stablePeerId) return;
     let active = true;
+    const dismissTimers = transferDismissTimersRef.current;
     const lan = new LanRoom({
       onStatus: (next) => active && setStatus(next),
       onPeers: (next) => {
@@ -308,7 +324,11 @@ export default function LanShare() {
       },
       onMessage: (message) => {
         if (!active) return;
-        setMessages((prev) => appendMessage(prev, message));
+        setMessages((prev) => {
+          const next = appendMessage(prev, message);
+          messagesRef.current = next;
+          return next;
+        });
         if (message.peerId && message.kind !== "system") {
           const remoteName =
             message.fromId === message.peerId
@@ -375,12 +395,12 @@ export default function LanShare() {
 
     return () => {
       active = false;
-      for (const timer of transferDismissTimersRef.current.values()) {
+      for (const timer of dismissTimers.values()) {
         window.clearTimeout(timer);
       }
-      transferDismissTimersRef.current.clear();
+      dismissTimers.clear();
       // Flush history before tear-down.
-      saveHistory(messages, stablePeerIdRef.current || peerId, historyContactsRef.current);
+      saveHistory(messagesRef.current, stablePeerIdRef.current || peerId, historyContactsRef.current);
       lan.leave();
       if (roomRef.current === lan) roomRef.current = null;
     };
@@ -894,7 +914,7 @@ export default function LanShare() {
               stickToBottomRef.current = distance < 72;
             }}
           >
-            {!selectedPeerId ? (
+            {!activeSelectedPeerId ? (
               <div className="wx-empty">
                 <p>No conversation selected</p>
                 <span>Choose a contact from the list to view messages or start a chat.</span>

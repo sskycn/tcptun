@@ -29,6 +29,11 @@ import {
   sanitizeFileName,
   sanitizePeerId,
 } from "./lan-security";
+import {
+  fileChunkCount,
+  fileChunkLength,
+  shouldInitiateMesh,
+} from "./lan-room-state";
 
 export { MAX_CHAT_TEXT_CHARS };
 export type { LanIceConfig };
@@ -117,6 +122,8 @@ const SOFT_ONLINE_GRACE_MS = 45_000;
 const STALE_CHANNEL_MS = 28_000;
 /** Half-open DataChannel: abandon and redial so a stuck STUN gather cannot pin the dial. */
 const DIAL_OPEN_TIMEOUT_MS = 14_000;
+/** Discovery uses a separate channel and needs its own half-open watchdog. */
+const DISCOVERY_OPEN_TIMEOUT_MS = 14_000;
 /** If no peer channel opens while STUN/TURN is configured, fall back to host-only ICE. */
 const LAN_ICE_FALLBACK_MS = 18_000;
 /** Soft-online window while dialing so peers appear in the list before open. */
@@ -181,6 +188,8 @@ export class LanRoom {
   private discoveryPeer: Peer | null = null;
   /** Guest→hostId bootstrap DataChannel (peer list only — never E2E/chat). */
   private discoveryBootstrap: DataConnection | null = null;
+  /** Host-side bootstrap channels, retained so roster changes can be pushed. */
+  private discoveryClients = new Map<string, DataConnection>();
   private room = "";
   private localName = "User";
   /** Globally unique user key (PeerJS personal id). */
@@ -196,6 +205,9 @@ export class LanRoom {
   private preferredPeerId = "";
   private announceTimer: number | null = null;
   private e2eSessions = new Map<string, E2eSession>();
+  /** Deduplicates async key generation when hello messages cross in flight. */
+  private e2eSessionPromises = new Map<string, Promise<E2eSession>>();
+  private e2eEpoch = 0;
   private incoming = new Map<
     string,
     {
@@ -205,12 +217,14 @@ export class LanRoom {
       mime: string;
       parts: Map<number, string>;
       expected: number;
+      encodedChars: number;
       from: string;
       /** Always transport peer id — never a claimed spoof. */
       fromId: string;
     }
   >();
   private reconnectTimer: number | null = null;
+  private discoveryOpenTimer: number | null = null;
   /** Last time we saw activity (open/data/ping/pong) from a peer. */
   private lastAlive = new Map<string, number>();
   /** Peers in soft-online grace after a channel drop (tab switch, brief ICE blip). */
@@ -257,7 +271,9 @@ export class LanRoom {
     if (!this.localId) return;
     this.peerNames.set(this.localId, this.localName);
     this.broadcastWire({ v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
-    if (this.isHost) this.broadcastPeerList();
+    if (this.isHost) {
+      this.broadcastDiscoveryRoster();
+    }
     this.emitPeers();
   }
 
@@ -397,6 +413,7 @@ export class LanRoom {
    * On resume: rejoin signaling, redial known peers, keep soft-online presence.
    */
   private resumePresence(_reason: string) {
+    void _reason;
     if (this.closed || !this.peer || !this.localId) return;
     try {
       // PeerJS socket may be disconnected after a long background period.
@@ -443,8 +460,7 @@ export class LanRoom {
     if (!this.isHost) {
       const hostId = roomHostId(this.room);
       if (hostId && hostId !== this.localId) {
-        this.rememberPeer(hostId, this.peerNames.get(hostId) || "User");
-        this.scheduleRedial(hostId, true);
+        this.dialDiscovery(hostId);
       }
     }
 
@@ -561,7 +577,7 @@ export class LanRoom {
     // Drop e2e leftovers if channel never recovered.
     this.e2eSessions.delete(peerId);
     this.emitPeers();
-    if (this.isHost) this.broadcastPeerList();
+    if (this.isHost) this.broadcastDiscoveryRoster();
     // Only announce leave when we previously had a real session with this peer.
     if (!this.lastAlive.has(peerId)) return;
     this.lastAlive.delete(peerId);
@@ -588,6 +604,7 @@ export class LanRoom {
 
   private scheduleRedial(peerId: string, immediate = false) {
     if (this.closed || !this.peer || !peerId || peerId === this.localId) return;
+    if (peerId !== roomHostId(this.room) && !shouldInitiateMesh(this.localId, peerId)) return;
     if (this.connections.get(peerId)?.open) return;
     if (this.redialTimers.has(peerId)) {
       if (!immediate) return;
@@ -614,6 +631,7 @@ export class LanRoom {
     this.stopHeartbeat();
     this.clearLanIceFallbackTimer();
     this.clearAllDialOpenTimers();
+    this.clearDiscoveryOpenTimer();
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -630,16 +648,28 @@ export class LanRoom {
     this.softOnlineUntil.clear();
     this.iceForceLanOnly = false;
     this.lanIceFallbackInFlight = false;
-    for (const conn of this.connections.values()) {
+    const meshConnections = Array.from(this.connections.values());
+    this.connections.clear();
+    for (const conn of meshConnections) {
       try {
         conn.close();
       } catch {
         // ignore
       }
     }
-    this.connections.clear();
+    const bootstrapConnections = Array.from(this.discoveryClients.values());
+    this.discoveryClients.clear();
+    for (const conn of bootstrapConnections) {
+      try {
+        conn.close();
+      } catch {
+        // ignore
+      }
+    }
     this.peerNames.clear();
     this.e2eSessions.clear();
+    this.e2eSessionPromises.clear();
+    this.e2eEpoch++;
     this.incoming.clear();
     try {
       this.broadcast?.close();
@@ -653,12 +683,13 @@ export class LanRoom {
       // ignore
     }
     this.peer = null;
+    const discoveryBootstrap = this.discoveryBootstrap;
+    this.discoveryBootstrap = null;
     try {
-      this.discoveryBootstrap?.close();
+      discoveryBootstrap?.close();
     } catch {
       // ignore
     }
-    this.discoveryBootstrap = null;
     try {
       this.discoveryPeer?.destroy();
     } catch {
@@ -737,7 +768,9 @@ export class LanRoom {
     if (this.closed || this.iceForceLanOnly || this.lanIceFallbackInFlight) return;
     if (!hasRemoteIce(this.iceConfig)) return;
     // Already have a live channel — STUN path is fine (or host already won).
-    for (const conn of this.connections.values()) {
+    const meshConnections = Array.from(this.connections.values());
+    this.connections.clear();
+    for (const conn of meshConnections) {
       if (conn.open) return;
     }
     if (this.lanIceFallbackTimer !== null) return;
@@ -757,6 +790,30 @@ export class LanRoom {
   private clearAllDialOpenTimers() {
     for (const timer of this.dialOpenTimers.values()) window.clearTimeout(timer);
     this.dialOpenTimers.clear();
+  }
+
+  private clearDiscoveryOpenTimer(conn?: DataConnection) {
+    if (conn && this.discoveryBootstrap !== conn) return;
+    if (this.discoveryOpenTimer !== null) {
+      window.clearTimeout(this.discoveryOpenTimer);
+      this.discoveryOpenTimer = null;
+    }
+  }
+
+  private armDiscoveryOpenWatchdog(hostId: string, conn: DataConnection) {
+    this.clearDiscoveryOpenTimer();
+    this.discoveryOpenTimer = window.setTimeout(() => {
+      this.discoveryOpenTimer = null;
+      if (this.closed || this.isHost || this.discoveryBootstrap !== conn || conn.open) return;
+      this.discoveryBootstrap = null;
+      try {
+        conn.close();
+      } catch {
+        // ignore
+      }
+      this.scheduleReconnect(hostId, false);
+      this.armLanIceFallback();
+    }, DISCOVERY_OPEN_TIMEOUT_MS);
   }
 
   private armDialOpenWatchdog(peerId: string, conn: DataConnection) {
@@ -809,6 +866,7 @@ export class LanRoom {
     const savedNames = new Map(this.peerNames);
 
     this.clearAllDialOpenTimers();
+    this.clearDiscoveryOpenTimer();
     for (const timer of this.redialTimers.values()) window.clearTimeout(timer);
     this.redialTimers.clear();
     if (this.reconnectTimer !== null) {
@@ -823,14 +881,25 @@ export class LanRoom {
         // ignore
       }
     }
-    this.connections.clear();
     this.e2eSessions.clear();
+    this.e2eSessionPromises.clear();
+    this.e2eEpoch++;
+    const bootstrapConnections = Array.from(this.discoveryClients.values());
+    this.discoveryClients.clear();
+    for (const conn of bootstrapConnections) {
+      try {
+        conn.close();
+      } catch {
+        // ignore
+      }
+    }
+    const discoveryBootstrap = this.discoveryBootstrap;
+    this.discoveryBootstrap = null;
     try {
-      this.discoveryBootstrap?.close();
+      discoveryBootstrap?.close();
     } catch {
       // ignore
     }
-    this.discoveryBootstrap = null;
     try {
       this.peer?.destroy();
     } catch {
@@ -943,11 +1012,6 @@ export class LanRoom {
     const safeName = sanitizeFileName(file.name, "file.bin");
 
     const id = uid();
-    const buffer = await file.arrayBuffer();
-    const b64 = toBase64(buffer);
-    const chunks: string[] = [];
-    for (let i = 0; i < b64.length; i += CHUNK_CHARS) chunks.push(b64.slice(i, i + CHUNK_CHARS));
-
     this.handlers.onTransfer({
       id,
       name: safeName,
@@ -958,55 +1022,81 @@ export class LanRoom {
       peerId: target,
     });
 
-    await this.sendSecure(target, {
-      v: 1,
-      t: "file-start",
-      id,
-      name: safeName,
-      size: file.size,
-      mime: "application/octet-stream",
-      chunks: chunks.length,
-      ts: Date.now(),
-      from: this.localName,
-      fromId: this.localId,
-    });
+    try {
+      const buffer = await file.arrayBuffer();
+      const b64 = toBase64(buffer);
+      const chunks: string[] = [];
+      for (let i = 0; i < b64.length; i += CHUNK_CHARS) {
+        chunks.push(b64.slice(i, i + CHUNK_CHARS));
+      }
+      if (chunks.length !== fileChunkCount(file.size, CHUNK_CHARS)) {
+        throw new Error("Could not prepare file transfer.");
+      }
 
-    for (let index = 0; index < chunks.length; index++) {
-      await this.sendSecure(target, { v: 1, t: "file-chunk", id, index, data: chunks[index] });
+      await this.sendSecure(target, {
+        v: 1,
+        t: "file-start",
+        id,
+        name: safeName,
+        size: file.size,
+        mime: "application/octet-stream",
+        chunks: chunks.length,
+        ts: Date.now(),
+        from: this.localName,
+        fromId: this.localId,
+      });
+
+      for (let index = 0; index < chunks.length; index++) {
+        await this.sendSecure(target, { v: 1, t: "file-chunk", id, index, data: chunks[index]! });
+        await this.waitForSendCapacity(target);
+        this.handlers.onTransfer({
+          id,
+          name: safeName,
+          direction: "send",
+          received: Math.min(file.size, Math.floor(((index + 1) / chunks.length) * file.size)),
+          total: file.size,
+          done: false,
+          peerId: target,
+        });
+        // Yield so UI can paint progress.
+        if (index % 4 === 0) await new Promise((r) => window.setTimeout(r, 0));
+      }
+
+      await this.sendSecure(target, { v: 1, t: "file-end", id });
       this.handlers.onTransfer({
         id,
         name: safeName,
         direction: "send",
-        received: Math.min(file.size, Math.floor(((index + 1) / chunks.length) * file.size)),
+        received: file.size,
         total: file.size,
-        done: false,
+        done: true,
         peerId: target,
       });
-      // Yield so UI can paint progress.
-      if (index % 4 === 0) await new Promise((r) => window.setTimeout(r, 0));
+      this.handlers.onMessage({
+        id,
+        kind: "file",
+        from: this.localName,
+        fromId: this.localId,
+        peerId: target,
+        text: `Sent file ${safeName}`,
+        ts: Date.now(),
+        fileName: safeName,
+        fileSize: file.size,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "File transfer failed.";
+      this.handlers.onTransfer({
+        id,
+        name: safeName,
+        direction: "send",
+        received: 0,
+        total: file.size,
+        done: true,
+        error: message,
+        peerId: target,
+      });
+      throw err;
     }
-
-    await this.sendSecure(target, { v: 1, t: "file-end", id });
-    this.handlers.onTransfer({
-      id,
-      name: safeName,
-      direction: "send",
-      received: file.size,
-      total: file.size,
-      done: true,
-      peerId: target,
-    });
-    this.handlers.onMessage({
-      id,
-      kind: "file",
-      from: this.localName,
-      fromId: this.localId,
-      peerId: target,
-      text: `Sent file ${safeName}`,
-      ts: Date.now(),
-      fileName: safeName,
-      fileSize: file.size,
-    });
   }
 
   /**
@@ -1073,7 +1163,7 @@ export class LanRoom {
         }
         this.handlers.onStatus(this.statusForMode("You are online. Waiting for others…"));
         this.startLocalAnnounce();
-        this.broadcastPeerList();
+        this.broadcastDiscoveryRoster();
         this.emitPeers();
         resolve();
       });
@@ -1194,6 +1284,23 @@ export class LanRoom {
         }
         return;
       }
+      const existing = this.discoveryClients.get(remoteId);
+      if (existing && existing !== conn) {
+        if (existing.open) {
+          try {
+            conn.close();
+          } catch {
+            // ignore
+          }
+          return;
+        }
+        try {
+          existing.close();
+        } catch {
+          // ignore
+        }
+      }
+      this.discoveryClients.set(remoteId, conn);
       this.rememberPeer(remoteId, this.peerNames.get(remoteId) || "User");
       this.enterSoftOnline(remoteId, DIALING_SOFT_ONLINE_MS);
 
@@ -1214,6 +1321,7 @@ export class LanRoom {
         }
         // Real encrypted chat on personal Peers (user key ↔ user key).
         this.ensureMeshConnection(remoteId);
+        this.broadcastDiscoveryRoster();
         this.emitPeers();
       };
 
@@ -1226,6 +1334,22 @@ export class LanRoom {
           this.handleDiscoveryWire(msg, remoteId);
         } catch {
           // ignore malformed discovery traffic
+        }
+      });
+
+      conn.on("close", () => {
+        if (this.discoveryClients.get(remoteId) !== conn) return;
+        this.discoveryClients.delete(remoteId);
+        if (this.connections.get(remoteId)?.open) return;
+        this.enterSoftOnline(remoteId, SOFT_ONLINE_GRACE_MS);
+        this.broadcastDiscoveryRoster();
+      });
+
+      conn.on("error", () => {
+        if (this.discoveryClients.get(remoteId) !== conn) return;
+        this.discoveryClients.delete(remoteId);
+        if (!this.connections.get(remoteId)?.open) {
+          this.enterSoftOnline(remoteId, SOFT_ONLINE_GRACE_MS);
         }
       });
     });
@@ -1243,7 +1367,13 @@ export class LanRoom {
   private rosterForDiscovery(): Array<{ id: string; name: string }> {
     const discoveryId = roomHostId(this.room);
     const peers = Array.from(this.peerNames.entries())
-      .filter(([id]) => id && id !== this.localId && id !== discoveryId)
+      .filter(
+        ([id]) =>
+          id &&
+          id !== this.localId &&
+          id !== discoveryId &&
+          this.isPeerActiveForRoster(id),
+      )
       .map(([id, name]) => ({ id, name }));
     if (this.localId) peers.push({ id: this.localId, name: this.localName });
     const unique = new Map(peers.map((p) => [p.id, p]));
@@ -1285,30 +1415,38 @@ export class LanRoom {
   }
 
   private broadcastDiscoveryRoster() {
-    // Fan-out on personal mesh is handled by broadcastPeerList; discovery clients
-    // get updates when they re-hello. Also push on any open bootstrap if we are host.
-    if (this.isHost) this.broadcastPeerList();
+    if (!this.isHost) return;
+    const msg: WireMessage = { v: 1, t: "peers", peers: this.rosterForDiscovery() };
+    for (const [peerId, conn] of this.discoveryClients) {
+      if (!conn.open) continue;
+      try {
+        this.send(conn, msg);
+      } catch {
+        if (this.discoveryClients.get(peerId) === conn) this.discoveryClients.delete(peerId);
+      }
+    }
+    this.broadcastPeerList();
   }
 
   /** Guest: connect to room host id for peer list only (no E2E). */
   private dialDiscovery(hostId: string) {
     if (this.closed || !this.peer || this.isHost) return;
     if (this.localId && this.localId === hostId) return;
-    if (this.discoveryBootstrap?.open) return;
+    // Do not replace a valid half-open offer. ICE often needs more than the old
+    // two-second reconnect interval; a watchdog below owns the timeout.
+    if (this.discoveryBootstrap) return;
     try {
-      if (this.discoveryBootstrap) {
-        try {
-          this.discoveryBootstrap.close();
-        } catch {
-          // ignore
-        }
-        this.discoveryBootstrap = null;
-      }
       const conn = this.peer.connect(hostId, { reliable: true, serialization: "json" });
       this.discoveryBootstrap = conn;
+      this.armDiscoveryOpenWatchdog(hostId, conn);
 
       const onOpen = () => {
-        if (this.closed || !conn.open) return;
+        if (this.closed || this.discoveryBootstrap !== conn || !conn.open) return;
+        this.clearDiscoveryOpenTimer(conn);
+        if (this.reconnectTimer !== null) {
+          window.clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = null;
+        }
         try {
           this.send(conn, {
             v: 1,
@@ -1334,13 +1472,23 @@ export class LanRoom {
       });
 
       conn.on("close", () => {
-        if (this.discoveryBootstrap === conn) this.discoveryBootstrap = null;
+        if (this.discoveryBootstrap !== conn) return;
+        this.clearDiscoveryOpenTimer(conn);
+        this.discoveryBootstrap = null;
         if (!this.closed && !this.isHost) {
           this.scheduleReconnect(hostId, false);
         }
       });
 
       conn.on("error", () => {
+        if (this.discoveryBootstrap !== conn) return;
+        this.clearDiscoveryOpenTimer(conn);
+        this.discoveryBootstrap = null;
+        try {
+          conn.close();
+        } catch {
+          // ignore
+        }
         if (!this.closed && !this.isHost) {
           this.scheduleReconnect(hostId, false);
         }
@@ -1364,9 +1512,7 @@ export class LanRoom {
       if (anyChat && this.discoveryBootstrap?.open) return;
       this.handlers.onStatus(this.statusForMode("Searching for nearby users…"));
       this.dialDiscovery(hostId);
-      if (!this.discoveryBootstrap?.open) {
-        this.scheduleReconnect(hostId, false);
-      }
+      // The discovery channel's open/close/error/watchdog events own retries.
     }, delay);
   }
 
@@ -1409,6 +1555,9 @@ export class LanRoom {
       this.dialDiscovery(target);
       return;
     }
+    // Exactly one side originates each personal mesh connection. This removes
+    // offer glare while the other side still accepts the matching inbound link.
+    if (outgoing && !shouldInitiateMesh(this.localId, target)) return;
     const existing = this.connections.get(target);
     if (existing?.open) return;
     // Show in online list while ICE/DataChannel negotiates.
@@ -1436,6 +1585,16 @@ export class LanRoom {
   }
 
   private wireConnection(conn: DataConnection, peerId: string, outgoing: boolean) {
+    const preferOutgoing = shouldInitiateMesh(this.localId, peerId);
+    if (outgoing !== preferOutgoing) {
+      try {
+        conn.close();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     const existing = this.connections.get(peerId);
     if (existing && existing !== conn) {
       if (existing.open) {
@@ -1462,6 +1621,14 @@ export class LanRoom {
     if (!conn.open) this.armDialOpenWatchdog(peerId, conn);
 
     conn.on("open", () => {
+      if (this.closed || this.connections.get(peerId) !== conn) {
+        try {
+          conn.close();
+        } catch {
+          // ignore
+        }
+        return;
+      }
       this.clearDialOpenTimer(peerId);
       this.clearLanIceFallbackTimer();
       this.touchPeer(peerId);
@@ -1469,58 +1636,57 @@ export class LanRoom {
       this.send(conn, { v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
       // E2E only on personal user-key channels (never room host id).
       void this.beginE2eHandshake(peerId);
-      if (this.isHost) this.broadcastPeerList();
+      if (this.isHost) this.broadcastDiscoveryRoster();
       this.handlers.onStatus(this.statusForMode("Connected."));
       this.emitPeers();
     });
 
     conn.on("data", (data) => {
+      if (this.connections.get(peerId) !== conn) return;
       this.touchPeer(peerId);
       try {
         const msg = (typeof data === "string" ? JSON.parse(data) : data) as WireMessage;
-        void this.handleWire(msg, peerId);
+        void this.handleWire(msg, peerId, conn).catch(() => {
+          if (!this.closed && this.connections.get(peerId) === conn) {
+            this.handlers.onError("Could not process an incoming secure message.");
+          }
+        });
       } catch {
         this.handlers.onError("Could not read an incoming message.");
       }
     });
 
     conn.on("close", () => {
+      if (this.connections.get(peerId) !== conn) return;
       this.clearDialOpenTimer(peerId);
-      if (this.connections.get(peerId) === conn) {
-        this.connections.delete(peerId);
-      }
+      this.connections.delete(peerId);
       // Drop E2E for this transport — re-handshake on next open.
       this.e2eSessions.delete(peerId);
       // Soft-online grace: stay in the contact list while we redial (tab switch / brief drop).
       this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
       this.scheduleRedial(peerId, true);
-      if (this.isHost) this.broadcastPeerList();
+      if (this.isHost) this.broadcastDiscoveryRoster();
       this.armLanIceFallback();
     });
 
     conn.on("error", () => {
+      if (this.connections.get(peerId) !== conn) return;
       this.clearDialOpenTimer(peerId);
       this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
       this.scheduleRedial(peerId, false);
       this.armLanIceFallback();
     });
 
-    void outgoing;
   }
 
   private async beginE2eHandshake(peerId: string) {
     if (this.closed || !this.localId) return;
     // Never E2E against the room discovery id.
     if (peerId === roomHostId(this.room)) return;
-    let session = this.e2eSessions.get(peerId);
-    if (!session) {
-      const localPair = await generateE2eKeyPair();
-      session = { localPair, remotePub: null, key: null, ready: false, offered: false, pending: [] };
-      this.e2eSessions.set(peerId, session);
-    }
-    const conn = this.connections.get(peerId);
-    if (!conn?.open) return;
     try {
+      const session = await this.getOrCreateE2eSession(peerId);
+      const conn = this.connections.get(peerId);
+      if (!conn?.open) return;
       // Re-send offer if we still have no remote key (lost first hello).
       if (!session.offered || !session.remotePub) {
         const pub = await exportPublicJwk(session.localPair.publicKey);
@@ -1537,8 +1703,43 @@ export class LanRoom {
         await this.finalizeE2e(peerId);
       }
     } catch {
-      this.handlers.onError("Could not start encrypted session.");
+      if (!this.closed) this.handlers.onError("Could not start encrypted session.");
     }
+  }
+
+  private async getOrCreateE2eSession(peerId: string): Promise<E2eSession> {
+    const existing = this.e2eSessions.get(peerId);
+    if (existing) return existing;
+    const pending = this.e2eSessionPromises.get(peerId);
+    if (pending) return pending;
+
+    const epoch = this.e2eEpoch;
+    let creating!: Promise<E2eSession>;
+    creating = generateE2eKeyPair()
+      .then((localPair) => {
+        if (this.closed || this.e2eEpoch !== epoch) {
+          throw new Error("Encrypted session was cancelled.");
+        }
+        const wonRace = this.e2eSessions.get(peerId);
+        if (wonRace) return wonRace;
+        const session: E2eSession = {
+          localPair,
+          remotePub: null,
+          key: null,
+          ready: false,
+          offered: false,
+          pending: [],
+        };
+        this.e2eSessions.set(peerId, session);
+        return session;
+      })
+      .finally(() => {
+        if (this.e2eSessionPromises.get(peerId) === creating) {
+          this.e2eSessionPromises.delete(peerId);
+        }
+      });
+    this.e2eSessionPromises.set(peerId, creating);
+    return creating;
   }
 
   private async finalizeE2e(peerId: string) {
@@ -1618,11 +1819,27 @@ export class LanRoom {
     this.send(conn, { v: 1, t: "e2e", iv: sealed.iv, ct: sealed.ct });
   }
 
-  private async handleWire(msg: WireMessage, viaPeerId: string) {
+  /** Keep large transfers from filling the browser/PeerJS send queues. */
+  private async waitForSendCapacity(peerId: string, timeoutMs = 15_000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const conn = this.connections.get(peerId);
+      if (!conn?.open || conn.dataChannel?.readyState !== "open") {
+        throw new Error("Connection closed during file transfer.");
+      }
+      const peerBuffer = (conn as DataConnection & { bufferSize?: number }).bufferSize || 0;
+      if (conn.dataChannel.bufferedAmount <= 2 * 1024 * 1024 && peerBuffer <= 8) return;
+      await new Promise((resolve) => window.setTimeout(resolve, 25));
+    }
+    throw new Error("File transfer timed out while waiting for the connection.");
+  }
+
+  private async handleWire(msg: WireMessage, viaPeerId: string, sourceConn: DataConnection) {
     // Structural guard — drop anything that is not a plain object with a type.
     if (!msg || typeof msg !== "object" || typeof (msg as { t?: unknown }).t !== "string") return;
     const transportId = this.transportPeerId(viaPeerId);
     if (!transportId || transportId === this.localId) return;
+    if (this.connections.get(transportId) !== sourceConn) return;
 
     if (msg.t === "ping") {
       this.touchPeer(transportId);
@@ -1653,12 +1870,8 @@ export class LanRoom {
       if (claimed && claimed !== transportId) return;
 
       // One session per transport peer id only (no cross-peer aliasing).
-      let session = this.e2eSessions.get(transportId);
-      if (!session) {
-        const localPair = await generateE2eKeyPair();
-        session = { localPair, remotePub: null, key: null, ready: false, offered: false, pending: [] };
-        this.e2eSessions.set(transportId, session);
-      }
+      const session = await this.getOrCreateE2eSession(transportId);
+      if (this.connections.get(transportId) !== sourceConn) return;
       session.remotePub = msg.pub;
       // Offer our public key once (handles the case where the peer dialed first).
       const conn = this.connections.get(transportId);
@@ -1686,6 +1899,7 @@ export class LanRoom {
       if (!session?.key || typeof msg.iv !== "string" || typeof msg.ct !== "string") return;
       try {
         const inner = (await decryptPayload(session.key, msg.iv, msg.ct)) as SecurePayload;
+        if (this.connections.get(transportId) !== sourceConn) return;
         if (!inner || typeof inner !== "object" || typeof (inner as { t?: unknown }).t !== "string") return;
         this.handleSecurePayload(inner, transportId);
       } catch {
@@ -1713,7 +1927,7 @@ export class LanRoom {
         });
       }
       // Host redistributes full roster so every guest can mesh.
-      if (this.isHost) this.broadcastPeerList();
+      if (this.isHost) this.broadcastDiscoveryRoster();
       // Dial mesh path to this peer when needed.
       this.ensureMeshConnection(peerId);
       return;
@@ -1790,8 +2004,16 @@ export class LanRoom {
 
     if (msg.t === "file-start") {
       if (typeof msg.size !== "number" || !Number.isFinite(msg.size) || msg.size < 0) return;
+      if (!Number.isSafeInteger(msg.size)) return;
       if (msg.size > MAX_LAN_FILE_BYTES) return;
-      if (typeof msg.chunks !== "number" || msg.chunks < 1 || msg.chunks > 50_000) return;
+      const expectedChunks = fileChunkCount(msg.size, CHUNK_CHARS);
+      if (
+        typeof msg.chunks !== "number" ||
+        !Number.isSafeInteger(msg.chunks) ||
+        msg.chunks !== expectedChunks
+      ) {
+        return;
+      }
       const name = sanitizeFileName(msg.name, "file.bin");
       const transferId = typeof msg.id === "string" ? msg.id.slice(0, 80) : uid();
       if (this.incoming.size >= 8) return;
@@ -1804,6 +2026,7 @@ export class LanRoom {
         mime: "application/octet-stream",
         parts: new Map(),
         expected: msg.chunks,
+        encodedChars: 0,
         from: sanitizeDisplayName(msg.from, "Peer"),
         fromId: peerId,
       });
@@ -1824,11 +2047,17 @@ export class LanRoom {
       const scopedId = `${peerId}:${msg.id.slice(0, 80)}`;
       const entry = this.incoming.get(scopedId);
       if (!entry || entry.fromId !== peerId) return;
-      if (typeof msg.index !== "number" || msg.index < 0 || msg.index >= entry.expected) return;
+      if (!Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= entry.expected) return;
       if (typeof msg.data !== "string") return;
-      if (msg.data.length > CHUNK_CHARS + 64) return;
+      const exactLength = fileChunkLength(entry.size, CHUNK_CHARS, msg.index);
+      if (exactLength < 0 || msg.data.length !== exactLength) return;
       if (entry.parts.size >= entry.expected && !entry.parts.has(msg.index)) return;
+      const previousLength = entry.parts.get(msg.index)?.length || 0;
+      const nextEncodedChars = entry.encodedChars - previousLength + msg.data.length;
+      const maxEncodedChars = Math.ceil(entry.size / 3) * 4;
+      if (nextEncodedChars > maxEncodedChars) return;
       entry.parts.set(msg.index, msg.data);
+      entry.encodedChars = nextEncodedChars;
       this.handlers.onTransfer({
         id: entry.wireId,
         name: entry.name,
@@ -1855,7 +2084,7 @@ export class LanRoom {
           b64 += part;
         }
         const bytes = fromBase64(b64);
-        if (bytes.byteLength > MAX_LAN_FILE_BYTES) throw new Error("File too large.");
+        if (bytes.byteLength !== entry.size) throw new Error("File size did not match its metadata.");
         const copy = new Uint8Array(bytes.byteLength);
         copy.set(bytes);
         const blob = new Blob([copy], { type: "application/octet-stream" });
@@ -1906,14 +2135,24 @@ export class LanRoom {
       return;
     }
     if (this.connections.get(target)?.open) return;
-    // Both sides may dial; half-open collisions are dropped in wireConnection.
-    this.dialPeer(target, true);
+    if (shouldInitiateMesh(this.localId, target)) this.dialPeer(target, true);
+  }
+
+  private isPeerActiveForRoster(peerId: string): boolean {
+    return (
+      this.connections.get(peerId)?.open === true ||
+      this.discoveryClients.get(peerId)?.open === true ||
+      this.isSoftOnline(peerId)
+    );
   }
 
   private broadcastPeerList() {
     const discoveryId = roomHostId(this.room);
     const peers = Array.from(this.peerNames.entries())
-      .filter(([id]) => id && id !== discoveryId)
+      .filter(
+        ([id]) =>
+          id && id !== discoveryId && (id === this.localId || this.isPeerActiveForRoster(id)),
+      )
       .map(([id, name]) => ({ id, name }));
     if (this.localId) peers.push({ id: this.localId, name: this.localName });
     const unique = new Map(peers.map((p) => [p.id, p]));
