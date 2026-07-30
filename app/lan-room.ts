@@ -68,7 +68,10 @@ type ClearWireMessage =
   | { v: 1; t: "hello"; id: string; name: string; room: string }
   | { v: 1; t: "peers"; peers: Array<{ id: string; name: string }> }
   | { v: 1; t: "e2e-hello"; alg: typeof E2E_ALG; fromId: string; pub: JsonWebKey }
-  | { v: 1; t: "e2e"; iv: string; ct: string };
+  | { v: 1; t: "e2e"; iv: string; ct: string }
+  /** Lightweight keepalive — not encrypted so it still works mid-handshake. */
+  | { v: 1; t: "ping"; ts: number }
+  | { v: 1; t: "pong"; ts: number };
 
 /** Payloads sealed inside AES-GCM envelopes. */
 type SecurePayload =
@@ -103,6 +106,12 @@ type E2eSession = {
 export const MAX_LAN_FILE_BYTES = 40 * 1024 * 1024;
 const CHUNK_CHARS = 12_000;
 const BC_PREFIX = "tcptun-lan-room:";
+/** DataChannel keepalive interval (foreground). Background tabs throttle timers. */
+const HEARTBEAT_INTERVAL_MS = 6_000;
+/** How long a peer stays "online" after channel drop while we redial (tab switch / brief blip). */
+const SOFT_ONLINE_GRACE_MS = 45_000;
+/** If an open channel has no traffic for this long, force redial. */
+const STALE_CHANNEL_MS = 28_000;
 
 export type LanRoomHandlers = {
   onStatus: (status: string) => void;
@@ -181,6 +190,22 @@ export class LanRoom {
     }
   >();
   private reconnectTimer: number | null = null;
+  /** Last time we saw activity (open/data/ping/pong) from a peer. */
+  private lastAlive = new Map<string, number>();
+  /** Peers in soft-online grace after a channel drop (tab switch, brief ICE blip). */
+  private softOnlineUntil = new Map<string, number>();
+  private softOfflineTimers = new Map<string, number>();
+  private redialTimers = new Map<string, number>();
+  private heartbeatTimer: number | null = null;
+  private presenceBound = false;
+  private onVisibilityChange = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "visible") {
+      this.resumePresence("visible");
+    }
+  };
+  private onPageShow = () => this.resumePresence("pageshow");
+  private onOnline = () => this.resumePresence("online");
+  private onFocus = () => this.resumePresence("focus");
 
   constructor(handlers: LanRoomHandlers) {
     this.handlers = handlers;
@@ -255,6 +280,8 @@ export class LanRoom {
 
     await this.claimOrJoinHost(hostId);
     this.startLocalAnnounce();
+    this.bindPresenceLifecycle();
+    this.startHeartbeat();
   }
 
   private startLocalAnnounce() {
@@ -280,8 +307,247 @@ export class LanRoom {
     this.announceTimer = window.setInterval(tick, 4000);
   }
 
+  private bindPresenceLifecycle() {
+    if (this.presenceBound || typeof window === "undefined") return;
+    this.presenceBound = true;
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
+    // Page Lifecycle: resume after OS freezes a background tab.
+    document.addEventListener("resume", this.onPageShow as EventListener);
+    window.addEventListener("pageshow", this.onPageShow);
+    window.addEventListener("online", this.onOnline);
+    window.addEventListener("focus", this.onFocus);
+  }
+
+  private unbindPresenceLifecycle() {
+    if (!this.presenceBound || typeof window === "undefined") return;
+    this.presenceBound = false;
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    document.removeEventListener("resume", this.onPageShow as EventListener);
+    window.removeEventListener("pageshow", this.onPageShow);
+    window.removeEventListener("online", this.onOnline);
+    window.removeEventListener("focus", this.onFocus);
+  }
+
+  /**
+   * Tab switches / OS sleep throttle PeerJS timers and can drop data channels.
+   * On resume: rejoin signaling, redial known peers, keep soft-online presence.
+   */
+  private resumePresence(_reason: string) {
+    if (this.closed || !this.peer || !this.localId) return;
+    try {
+      // PeerJS socket may be disconnected after a long background period.
+      if (this.peer.disconnected && !this.peer.destroyed) {
+        this.handlers.onStatus("Reconnecting…");
+        this.peer.reconnect();
+      }
+    } catch {
+      // ignore
+    }
+
+    // Refresh same-origin announce immediately.
+    try {
+      this.broadcast?.postMessage({
+        v: 1,
+        t: "bc-announce",
+        id: this.localId,
+        name: this.localName,
+      });
+    } catch {
+      // ignore
+    }
+
+    // Refresh soft-online grace for peers already mid-reconnect; redial everyone else quietly.
+    for (const peerId of this.peerNames.keys()) {
+      if (!peerId || peerId === this.localId) continue;
+      const conn = this.connections.get(peerId);
+      if (conn?.open) {
+        this.touchPeer(peerId);
+        this.sendPing(peerId);
+        continue;
+      }
+      // Only extend grace if we already marked them soft-online (real channel drop).
+      if (this.isSoftOnline(peerId)) {
+        this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
+      } else if ((this.lastAlive.get(peerId) || 0) > Date.now() - SOFT_ONLINE_GRACE_MS) {
+        // Recently alive channel may have died while we were backgrounded.
+        this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
+      }
+      this.scheduleRedial(peerId, true);
+    }
+
+    // Guest: ensure discovery host is dialed.
+    if (!this.isHost) {
+      const hostId = roomHostId(this.room);
+      if (hostId && hostId !== this.localId) {
+        this.rememberPeer(hostId, this.peerNames.get(hostId) || "User");
+        this.scheduleRedial(hostId, true);
+      }
+    }
+
+    this.emitPeers();
+  }
+
+  private startHeartbeat() {
+    if (this.heartbeatTimer !== null) {
+      window.clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    this.heartbeatTimer = window.setInterval(() => this.heartbeatTick(), HEARTBEAT_INTERVAL_MS);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer !== null) {
+      window.clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  private heartbeatTick() {
+    if (this.closed || !this.localId) return;
+    const now = Date.now();
+
+    // Keep PeerJS signaling alive after long throttle.
+    try {
+      if (this.peer && this.peer.disconnected && !this.peer.destroyed) {
+        this.peer.reconnect();
+      }
+    } catch {
+      // ignore
+    }
+
+    for (const peerId of this.peerNames.keys()) {
+      if (!peerId || peerId === this.localId) continue;
+      const conn = this.connections.get(peerId);
+      if (conn?.open) {
+        const last = this.lastAlive.get(peerId) || 0;
+        // Proactive ping keeps the DataChannel warm (helps some browsers while backgrounded).
+        this.sendPing(peerId);
+        if (last > 0 && now - last > STALE_CHANNEL_MS) {
+          // Channel looks stuck — replace it.
+          try {
+            conn.close();
+          } catch {
+            // ignore
+          }
+          this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
+          this.scheduleRedial(peerId, true);
+        }
+        continue;
+      }
+
+      // No open channel: keep redialing while soft-online or recently seen.
+      if (this.isSoftOnline(peerId) || (this.lastAlive.get(peerId) || 0) > now - SOFT_ONLINE_GRACE_MS) {
+        this.scheduleRedial(peerId, false);
+      }
+    }
+  }
+
+  private touchPeer(peerId: string) {
+    const id = sanitizePeerId(peerId);
+    if (!id || id === this.localId) return;
+    this.lastAlive.set(id, Date.now());
+    // Successful traffic ends soft-offline grace.
+    this.clearSoftOnline(id);
+  }
+
+  private isSoftOnline(peerId: string): boolean {
+    const until = this.softOnlineUntil.get(peerId) || 0;
+    return until > Date.now();
+  }
+
+  private enterSoftOnline(peerId: string, graceMs: number) {
+    const id = sanitizePeerId(peerId);
+    if (!id || id === this.localId) return;
+    const until = Date.now() + graceMs;
+    const prev = this.softOnlineUntil.get(id) || 0;
+    if (until > prev) this.softOnlineUntil.set(id, until);
+
+    const existing = this.softOfflineTimers.get(id);
+    if (existing !== undefined) {
+      window.clearTimeout(existing);
+    }
+    const delay = Math.max(500, until - Date.now());
+    const timer = window.setTimeout(() => {
+      this.softOfflineTimers.delete(id);
+      this.finalizeSoftOffline(id);
+    }, delay);
+    this.softOfflineTimers.set(id, timer);
+    this.emitPeers();
+  }
+
+  private clearSoftOnline(peerId: string) {
+    this.softOnlineUntil.delete(peerId);
+    const timer = this.softOfflineTimers.get(peerId);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      this.softOfflineTimers.delete(peerId);
+    }
+  }
+
+  private finalizeSoftOffline(peerId: string) {
+    if (this.closed) return;
+    // Still live? Cancel offline.
+    if (this.connections.get(peerId)?.open) {
+      this.clearSoftOnline(peerId);
+      this.touchPeer(peerId);
+      this.emitPeers();
+      return;
+    }
+    this.softOnlineUntil.delete(peerId);
+    // Drop e2e leftovers if channel never recovered.
+    this.e2eSessions.delete(peerId);
+    this.emitPeers();
+    if (this.isHost) this.broadcastPeerList();
+    // Only announce leave when we previously had a real session with this peer.
+    if (!this.lastAlive.has(peerId)) return;
+    this.lastAlive.delete(peerId);
+    const leftName = this.peerNames.get(peerId) || "User";
+    this.handlers.onMessage({
+      id: uid(),
+      kind: "system",
+      from: "system",
+      peerId,
+      text: `${leftName} left.`,
+      ts: Date.now(),
+    });
+  }
+
+  private sendPing(peerId: string) {
+    const conn = this.connections.get(peerId);
+    if (!conn?.open) return;
+    try {
+      this.send(conn, { v: 1, t: "ping", ts: Date.now() });
+    } catch {
+      // ignore
+    }
+  }
+
+  private scheduleRedial(peerId: string, immediate = false) {
+    if (this.closed || !this.peer || !peerId || peerId === this.localId) return;
+    if (this.connections.get(peerId)?.open) return;
+    if (this.redialTimers.has(peerId)) {
+      if (!immediate) return;
+      window.clearTimeout(this.redialTimers.get(peerId));
+      this.redialTimers.delete(peerId);
+    }
+    const delay = immediate ? 200 : 1_500 + Math.floor(Math.random() * 800);
+    const timer = window.setTimeout(() => {
+      this.redialTimers.delete(peerId);
+      if (this.closed || !this.peer) return;
+      if (this.connections.get(peerId)?.open) return;
+      this.dialPeer(peerId, true);
+      // Keep trying while soft-online.
+      if (!this.connections.get(peerId)?.open && this.isSoftOnline(peerId)) {
+        this.scheduleRedial(peerId, false);
+      }
+    }, delay);
+    this.redialTimers.set(peerId, timer);
+  }
+
   leave() {
     this.closed = true;
+    this.unbindPresenceLifecycle();
+    this.stopHeartbeat();
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -290,6 +556,12 @@ export class LanRoom {
       window.clearInterval(this.announceTimer);
       this.announceTimer = null;
     }
+    for (const timer of this.softOfflineTimers.values()) window.clearTimeout(timer);
+    this.softOfflineTimers.clear();
+    for (const timer of this.redialTimers.values()) window.clearTimeout(timer);
+    this.redialTimers.clear();
+    this.lastAlive.clear();
+    this.softOnlineUntil.clear();
     for (const conn of this.connections.values()) {
       try {
         conn.close();
@@ -333,10 +605,13 @@ export class LanRoom {
       if (!id || id === this.localId) continue;
       const conn = this.connections.get(id);
       const e2e = this.e2eSessions.get(id);
+      const live = conn?.open === true;
+      // Soft-online: stay in the contact list during brief tab-switch drops.
+      const connected = live || this.isSoftOnline(id);
       peers.push({
         id,
         name,
-        connected: conn?.open === true,
+        connected,
         encrypted: Boolean(e2e?.ready && e2e.key),
       });
     }
@@ -596,6 +871,8 @@ export class LanRoom {
           } catch {
             // ignore
           }
+          // Keep peers soft-online while signaling reconnects (common on tab switch).
+          this.resumePresence("peer-disconnected");
         });
 
         // Never dial yourself if preferred id somehow collides with host.
@@ -679,6 +956,7 @@ export class LanRoom {
       } catch {
         // ignore
       }
+      this.resumePresence("peer-disconnected");
     });
   }
 
@@ -725,6 +1003,8 @@ export class LanRoom {
     this.rememberPeer(peerId, this.peerNames.get(peerId) || "User");
 
     conn.on("open", () => {
+      this.touchPeer(peerId);
+      this.clearSoftOnline(peerId);
       this.send(conn, { v: 1, t: "hello", id: this.localId, name: this.localName, room: this.room });
       void this.beginE2eHandshake(peerId);
       if (this.isHost) this.broadcastPeerList();
@@ -738,6 +1018,7 @@ export class LanRoom {
     });
 
     conn.on("data", (data) => {
+      this.touchPeer(peerId);
       try {
         const msg = (typeof data === "string" ? JSON.parse(data) : data) as WireMessage;
         void this.handleWire(msg, peerId);
@@ -750,25 +1031,21 @@ export class LanRoom {
       if (this.connections.get(peerId) === conn) {
         this.connections.delete(peerId);
       }
+      // Drop E2E for this transport — re-handshake on next open.
       this.e2eSessions.delete(peerId);
-      const leftName = this.peerNames.get(peerId) || "User";
-      // Keep name in directory for a moment so UI can show offline; mark disconnected via listPeers.
-      this.emitPeers();
+      // Soft-online grace: stay in the contact list while we redial (tab switch / brief drop).
+      this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
+      this.scheduleRedial(peerId, true);
       if (this.isHost) this.broadcastPeerList();
-      this.handlers.onMessage({
-        id: uid(),
-        kind: "system",
-        from: "system",
-        peerId,
-        text: `${leftName} left.`,
-        ts: Date.now(),
-      });
+      // Guest always re-dials host as well (discovery anchor).
       if (!this.isHost && peerId === roomHostId(this.room)) {
         this.scheduleReconnect(peerId, true);
       }
     });
 
     conn.on("error", () => {
+      this.enterSoftOnline(peerId, SOFT_ONLINE_GRACE_MS);
+      this.scheduleRedial(peerId, false);
       if (!this.isHost && peerId === roomHostId(this.room)) {
         this.scheduleReconnect(peerId, false);
       }
@@ -858,6 +1135,28 @@ export class LanRoom {
   private async handleWire(msg: WireMessage, viaPeerId: string) {
     // Structural guard — drop anything that is not a plain object with a type.
     if (!msg || typeof msg !== "object" || typeof (msg as { t?: unknown }).t !== "string") return;
+
+    if (msg.t === "ping") {
+      this.touchPeer(viaPeerId);
+      const conn = this.connections.get(viaPeerId);
+      if (conn?.open) {
+        try {
+          this.send(conn, {
+            v: 1,
+            t: "pong",
+            ts: typeof msg.ts === "number" ? msg.ts : Date.now(),
+          });
+        } catch {
+          // ignore
+        }
+      }
+      return;
+    }
+
+    if (msg.t === "pong") {
+      this.touchPeer(viaPeerId);
+      return;
+    }
 
     if (msg.t === "e2e-hello") {
       if (msg.alg !== E2E_ALG || !isPublicJwk(msg.pub)) return;

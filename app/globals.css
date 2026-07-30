@@ -1764,47 +1764,233 @@ html.dark .wx-bubble-row.is-self .lan-md a {
   color: #0f3d99;
 }
 
+/*
+ * Code / JSON display — VS Code default editor chrome.
+ * Dark+ (#1E1E1E) is the classic default; Light+ tracks site light theme.
+ * Stack mirrors VS Code: Menlo/Monaco (macOS), Consolas (Windows).
+ */
+.lan-md {
+  --vscode-editor-bg: #1e1e1e;
+  --vscode-editor-fg: #d4d4d4;
+  --vscode-editor-line: #2b2b2b;
+  --vscode-editor-titlebar: #252526;
+  --vscode-editor-tab: #2d2d2d;
+  --vscode-editor-muted: #858585;
+  --vscode-editor-btn: #0e639c;
+  --vscode-editor-btn-hover: #1177bb;
+  --vscode-editor-btn-ok: #388a34;
+  --vscode-font-mono: "Cascadia Code", "Fira Code", Menlo, Monaco, Consolas, "Courier New",
+    var(--font-jetbrains), ui-monospace, monospace;
+  /* Dark+ tokens */
+  --vscode-comment: #6a9955;
+  --vscode-keyword: #569cd6;
+  --vscode-string: #ce9178;
+  --vscode-number: #b5cea8;
+  --vscode-function: #dcdcaa;
+  --vscode-type: #4ec9b0;
+  --vscode-variable: #9cdcfe;
+  --vscode-regexp: #d16969;
+  --vscode-meta: #c586c0;
+  --vscode-tag: #569cd6;
+  --vscode-attr: #9cdcfe;
+  --vscode-selector: #d7ba7d;
+  --vscode-addition: #b5cea8;
+  --vscode-deletion: #f44747;
+  --vscode-constant: #4fc1ff;
+}
+
+/* Light+ when site is light — still looks like VS Code Light+ */
+html[data-theme="light"] .lan-md {
+  --vscode-editor-bg: #ffffff;
+  --vscode-editor-fg: #000000;
+  --vscode-editor-line: #e5e5e5;
+  --vscode-editor-titlebar: #f3f3f3;
+  --vscode-editor-tab: #ececec;
+  --vscode-editor-muted: #6d6d6d;
+  --vscode-editor-btn: #007acc;
+  --vscode-editor-btn-hover: #0062a3;
+  --vscode-editor-btn-ok: #388a34;
+  --vscode-comment: #008000;
+  --vscode-keyword: #0000ff;
+  --vscode-string: #a31515;
+  --vscode-number: #098658;
+  --vscode-function: #795e26;
+  --vscode-type: #267f99;
+  --vscode-variable: #001080;
+  --vscode-regexp: #811f3f;
+  --vscode-meta: #af00db;
+  --vscode-tag: #800000;
+  --vscode-attr: #e50000;
+  --vscode-selector: #800000;
+  --vscode-addition: #098658;
+  --vscode-deletion: #a31515;
+  --vscode-constant: #0000ff;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]):not([data-theme="light"]) .lan-md {
+    --vscode-editor-bg: #ffffff;
+    --vscode-editor-fg: #000000;
+    --vscode-editor-line: #e5e5e5;
+    --vscode-editor-titlebar: #f3f3f3;
+    --vscode-editor-tab: #ececec;
+    --vscode-editor-muted: #6d6d6d;
+    --vscode-editor-btn: #007acc;
+    --vscode-editor-btn-hover: #0062a3;
+    --vscode-editor-btn-ok: #388a34;
+    --vscode-comment: #008000;
+    --vscode-keyword: #0000ff;
+    --vscode-string: #a31515;
+    --vscode-number: #098658;
+    --vscode-function: #795e26;
+    --vscode-type: #267f99;
+    --vscode-variable: #001080;
+    --vscode-regexp: #811f3f;
+    --vscode-meta: #af00db;
+    --vscode-tag: #800000;
+    --vscode-attr: #e50000;
+    --vscode-selector: #800000;
+    --vscode-addition: #098658;
+    --vscode-deletion: #a31515;
+    --vscode-constant: #0000ff;
+  }
+}
+
 .lan-md-code-inline {
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--vscode-editor-line) 80%, transparent);
+  background: color-mix(in srgb, var(--vscode-editor-bg) 92%, var(--vscode-editor-fg) 8%);
+  color: var(--vscode-editor-fg);
+  padding: 0.1em 0.35em;
+  font-family: var(--vscode-font-mono);
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+/* Fenced code always uses full VS Code editor shell (independent of bubble green). */
+.lan-md-code-wrap {
+  position: relative;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--vscode-editor-line);
+  border-radius: 6px;
+  background: var(--vscode-editor-bg);
+  color: var(--vscode-editor-fg);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.lan-md-code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--vscode-editor-line);
+  background: var(--vscode-editor-titlebar);
+  padding: 5px 10px;
+  pointer-events: auto;
+}
+
+.lan-md-lang-tag {
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--vscode-editor-muted);
+  font-family: var(--vscode-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  opacity: 1;
+  user-select: none;
+}
+
+.wx-bubble-row.is-self .lan-md-lang-tag {
+  background: transparent;
+}
+
+.lan-md-copy-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border: none;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.08);
-  color: inherit;
-  padding: 0.12em 0.4em;
-  font-family: var(--font-jetbrains), ui-monospace, monospace;
-  font-size: 0.92em;
-  font-weight: 650;
+  background: transparent;
+  padding: 0;
+  color: var(--vscode-editor-muted);
+  line-height: 0;
+  cursor: pointer;
+}
+
+.lan-md-copy-btn:hover {
+  background: color-mix(in srgb, var(--vscode-editor-fg) 12%, transparent);
+  color: var(--vscode-editor-fg);
+}
+
+.lan-md-copy-btn.is-copied {
+  background: color-mix(in srgb, var(--vscode-editor-btn-ok) 22%, transparent);
+  color: var(--vscode-editor-btn-ok);
+}
+
+.lan-md-copy-btn.is-copied:hover {
+  background: color-mix(in srgb, var(--vscode-editor-btn-ok) 28%, transparent);
+  color: var(--vscode-editor-btn-ok);
+}
+
+.lan-md-copy-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
 }
 
 .lan-md-pre,
-.lan-md pre {
+.lan-md pre,
+.lan-md .lan-md-code-wrap .lan-md-pre {
   overflow: auto;
   max-width: 100%;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.08);
-  color: inherit;
-  padding: 10px 12px;
-  font-family: var(--font-jetbrains), ui-monospace, monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
+  margin: 0;
+  border-radius: 0;
+  background: var(--vscode-editor-bg) !important;
+  color: var(--vscode-editor-fg) !important;
+  padding: 10px 14px 12px;
+  font-family: var(--vscode-font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  tab-size: 2;
+  -moz-tab-size: 2;
 }
 
-html.dark .wx-bubble .lan-md-pre,
-html.dark .wx-bubble .lan-md pre {
-  background: rgba(0, 0, 0, 0.28);
+/* Bare <pre> without toolbar (rare) still gets editor look */
+.lan-md > pre,
+.lan-md p > pre {
+  border: 1px solid var(--vscode-editor-line);
+  border-radius: 6px;
+  background: var(--vscode-editor-bg);
+  color: var(--vscode-editor-fg);
 }
 
 .wx-bubble-row.is-self .lan-md-pre,
 .wx-bubble-row.is-self .lan-md pre,
 .wx-bubble-row.is-self .lan-md-code-inline {
-  background: rgba(0, 0, 0, 0.1);
-  color: #0b1220;
+  /* Do not inherit green-bubble ink; keep VS Code fg */
+  color: var(--vscode-editor-fg);
 }
 
 .lan-md-code-block {
+  display: block;
   font-family: inherit;
   font-size: inherit;
+  font-weight: inherit;
   color: inherit;
   background: transparent;
   padding: 0;
+  white-space: pre;
 }
 
 .lan-md-table-wrap {
@@ -1869,45 +2055,122 @@ html.dark .wx-bubble .lan-md pre {
   pointer-events: none;
 }
 
-/* highlight.js — high contrast on light bubbles (peer + self green) */
+/*
+ * highlight.js → VS Code Dark+ / Light+ token map
+ * (token colors come from CSS vars above)
+ */
+.lan-md .hljs {
+  color: var(--vscode-editor-fg);
+  background: transparent;
+}
+
 .lan-md .hljs-comment,
 .lan-md .hljs-quote {
-  color: #4b5563;
+  color: var(--vscode-comment);
+  font-style: italic;
 }
+
 .lan-md .hljs-keyword,
 .lan-md .hljs-selector-tag,
+.lan-md .hljs-section,
+.lan-md .hljs-link {
+  color: var(--vscode-keyword);
+  font-weight: 400;
+}
+
+/* HTML/XML tags */
+.lan-md .hljs-name {
+  color: var(--vscode-tag);
+  font-weight: 400;
+}
+
+/* JSON keys, HTML attributes, variables */
+.lan-md .hljs-attr,
+.lan-md .hljs-attribute,
+.lan-md .hljs-variable,
+.lan-md .hljs-template-variable,
+.lan-md .hljs-params {
+  color: var(--vscode-attr);
+}
+
+.lan-md .hljs-string,
+.lan-md .hljs-template-tag {
+  color: var(--vscode-string);
+}
+
+.lan-md .hljs-number {
+  color: var(--vscode-number);
+}
+
+.lan-md .hljs-built_in,
+.lan-md .hljs-builtin-name,
+.lan-md .hljs-type,
+.lan-md .hljs-title.class_,
+.lan-md .hljs-class .hljs-title {
+  color: var(--vscode-type);
+}
+
+.lan-md .hljs-title,
+.lan-md .hljs-title.function_,
+.lan-md .hljs-function,
+.lan-md .hljs-symbol,
+.lan-md .hljs-bullet {
+  color: var(--vscode-function);
+}
+
+.lan-md .hljs-selector-id,
+.lan-md .hljs-selector-class,
+.lan-md .hljs-selector-attr,
+.lan-md .hljs-selector-pseudo {
+  color: var(--vscode-selector);
+}
+
+.lan-md .hljs-meta,
+.lan-md .hljs-meta .hljs-keyword,
+.lan-md .hljs-doctag {
+  color: var(--vscode-meta);
+}
+
+.lan-md .hljs-meta .hljs-string {
+  color: var(--vscode-string);
+}
+
+.lan-md .hljs-regexp {
+  color: var(--vscode-regexp);
+}
+
+/* true / false / null — keyword blue in Dark+ */
 .lan-md .hljs-literal {
-  color: #b91c1c;
+  color: var(--vscode-keyword);
+}
+
+.lan-md .hljs-constant {
+  color: var(--vscode-constant);
+}
+
+.lan-md .hljs-addition {
+  color: var(--vscode-addition);
+  background: transparent;
+}
+
+.lan-md .hljs-deletion {
+  color: var(--vscode-deletion);
+  background: transparent;
+}
+
+.lan-md .hljs-emphasis {
+  font-style: italic;
+}
+
+.lan-md .hljs-strong {
   font-weight: 700;
 }
-.lan-md .hljs-string,
-.lan-md .hljs-attr {
-  color: #0f3d99;
+
+.lan-md .hljs-punctuation,
+.lan-md .hljs-operator {
+  color: var(--vscode-editor-fg);
 }
-.lan-md .hljs-number,
-.lan-md .hljs-built_in {
-  color: #0e4d8a;
-}
-.lan-md .hljs-title,
-.lan-md .hljs-section {
-  color: #6b21a8;
-}
-/* Peer dark bubble only */
-html.dark .wx-bubble-row.is-peer .lan-md .hljs-comment {
-  color: #9ca3af;
-}
-html.dark .wx-bubble-row.is-peer .lan-md .hljs-keyword {
-  color: #fca5a5;
-}
-html.dark .wx-bubble-row.is-peer .lan-md .hljs-string {
-  color: #93c5fd;
-}
-html.dark .wx-bubble-row.is-peer .lan-md .hljs-number {
-  color: #7dd3fc;
-}
-html.dark .wx-bubble-row.is-peer .lan-md .hljs-title {
-  color: #d8b4fe;
-}
+
 
 .page-bg {
   position: fixed;
