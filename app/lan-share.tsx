@@ -89,8 +89,12 @@ export default function LanShare() {
   const [showTools, setShowTools] = useState(false);
   /** Alias editor — opened by tapping your avatar. */
   const [showAlias, setShowAlias] = useState(false);
-  /** Settings panel — network / STUN / TURN and other options. */
+  /** Overflow menu (viewport fill, network settings, …). */
+  const [showMenu, setShowMenu] = useState(false);
+  /** Network settings panel — STUN / TURN. */
   const [showSettings, setShowSettings] = useState(false);
+  /** Fill the browser viewport (not OS display fullscreen). */
+  const [viewportFill, setViewportFill] = useState(false);
   const [discoveryKey, setDiscoveryKey] = useState(0);
   const [iceConfig, setIceConfig] = useState<LanIceConfig>(EMPTY_ICE_CONFIG);
   const [stunText, setStunText] = useState("");
@@ -105,10 +109,16 @@ export default function LanShare() {
   const stablePeerIdRef = useRef(stablePeerId);
   const iceConfigRef = useRef(iceConfig);
   const historyContactsRef = useRef(historyContacts);
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatLogRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const composeRef = useRef<HTMLTextAreaElement | null>(null);
+  const menuBtnRef = useRef<HTMLButtonElement | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
   const saveTimerRef = useRef<number | null>(null);
+  const stickToBottomRef = useRef(true);
+  const prevConversationLenRef = useRef(0);
+  const prevSelectedRef = useRef("");
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
 
   const mode = iceMode(iceConfig);
   const selfId = peerId || stablePeerId;
@@ -247,9 +257,43 @@ export default function LanShare() {
     };
   }, [messages, historyContacts, sessionReady, peerId]);
 
+  // Keep the message list pinned only inside the chat pane — never scroll the page.
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [conversation, transferList]);
+    const el = chatLogRef.current;
+    if (!el) return;
+
+    const selectedChanged = prevSelectedRef.current !== selectedPeerId;
+    prevSelectedRef.current = selectedPeerId;
+
+    if (selectedChanged) {
+      stickToBottomRef.current = true;
+      el.scrollTop = el.scrollHeight;
+      prevConversationLenRef.current = conversation.length;
+      return;
+    }
+
+    const grew = conversation.length !== prevConversationLenRef.current || transferList.length > 0;
+    prevConversationLenRef.current = conversation.length;
+
+    if (grew && stickToBottomRef.current) {
+      // Instant local scroll only — avoids page jump from scrollIntoView.
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [conversation, transferList, selectedPeerId]);
+
+  useEffect(() => {
+    if (viewportFill) {
+      document.documentElement.classList.add("lan-viewport-fill-active");
+      document.body.classList.add("lan-viewport-fill-active");
+    } else {
+      document.documentElement.classList.remove("lan-viewport-fill-active");
+      document.body.classList.remove("lan-viewport-fill-active");
+    }
+    return () => {
+      document.documentElement.classList.remove("lan-viewport-fill-active");
+      document.body.classList.remove("lan-viewport-fill-active");
+    };
+  }, [viewportFill]);
 
   useEffect(() => {
     if (!sessionReady || !stablePeerId) return;
@@ -414,14 +458,78 @@ export default function LanShare() {
   }
 
   function openAliasEditor() {
+    setShowMenu(false);
     setShowSettings(false);
     setShowAlias((v) => !v);
   }
 
-  function openSettings() {
-    setShowAlias(false);
-    setShowSettings((v) => !v);
+  function placeMenu() {
+    const btn = menuBtnRef.current;
+    if (!btn || typeof window === "undefined") return;
+    const rect = btn.getBoundingClientRect();
+    setMenuPos({
+      top: Math.round(rect.bottom + 6),
+      right: Math.round(Math.max(8, window.innerWidth - rect.right)),
+    });
   }
+
+  function openMenu() {
+    setShowAlias(false);
+    setShowSettings(false);
+    setShowMenu((open) => {
+      const next = !open;
+      if (next) placeMenu();
+      return next;
+    });
+  }
+
+  function openNetworkSettings() {
+    setShowMenu(false);
+    setShowAlias(false);
+    setShowSettings(true);
+  }
+
+  function toggleViewportFill() {
+    setShowMenu(false);
+    setViewportFill((v) => !v);
+  }
+
+  // Keep fixed menu aligned + close on outside click / Escape.
+  useEffect(() => {
+    if (!showMenu) return;
+
+    placeMenu();
+
+    function onPointerDown(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (menuBtnRef.current?.contains(target)) return;
+      if (menuPanelRef.current?.contains(target)) return;
+      setShowMenu(false);
+    }
+
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setShowMenu(false);
+    }
+
+    function onReposition() {
+      placeMenu();
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [showMenu]);
 
   async function handleSendChat() {
     if (!selectedPeerId || !canSend) return;
@@ -462,7 +570,10 @@ export default function LanShare() {
   }
 
   return (
-    <section className="section lan-section" id="lan">
+    <section
+      className={`section lan-section ${viewportFill ? "is-viewport-fill" : ""}`}
+      id="lan"
+    >
       <div className="wx-shell" data-online={joined ? "1" : "0"}>
         <aside className="wx-sidebar">
           <header className="wx-sidebar-header">
@@ -487,18 +598,54 @@ export default function LanShare() {
                 </div>
               </button>
               <button
+                ref={menuBtnRef}
                 type="button"
-                className={`wx-settings-btn ${showSettings ? "is-open" : ""}`}
-                onClick={openSettings}
-                aria-expanded={showSettings}
-                aria-label="Settings"
-                title="Settings"
+                className={`wx-settings-btn ${showMenu || showSettings ? "is-open" : ""}`}
+                onClick={openMenu}
+                aria-expanded={showMenu}
+                aria-haspopup="menu"
+                aria-label="Menu"
+                title="Menu"
               >
-                <span className="wx-settings-icon" aria-hidden="true">
-                  ⚙
+                <span className="wx-menu-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
                 </span>
               </button>
             </div>
+
+            {showMenu ? (
+              <div
+                ref={menuPanelRef}
+                className="wx-submenu"
+                role="menu"
+                style={{ top: menuPos.top, right: menuPos.right }}
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="wx-submenu-item"
+                  onClick={toggleViewportFill}
+                >
+                  <span className="wx-submenu-label">
+                    {viewportFill ? "Exit full browser" : "Fill browser"}
+                  </span>
+                  <span className="wx-submenu-hint">
+                    {viewportFill ? "Restore layout" : "Use full window"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="wx-submenu-item"
+                  onClick={openNetworkSettings}
+                >
+                  <span className="wx-submenu-label">Network settings</span>
+                  <span className="wx-submenu-hint">STUN / TURN</span>
+                </button>
+              </div>
+            ) : null}
 
             {showAlias ? (
               <div className="wx-profile-panel">
@@ -588,6 +735,13 @@ export default function LanShare() {
                     <button type="button" className="button ghost" onClick={resetIceToLanOnly}>
                       Use local network only
                     </button>
+                    <button
+                      type="button"
+                      className="button ghost"
+                      onClick={() => setShowSettings(false)}
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
 
@@ -668,7 +822,17 @@ export default function LanShare() {
             )}
           </header>
 
-          <div className="wx-chat-log" aria-live="polite">
+          <div
+            className="wx-chat-log"
+            aria-live="polite"
+            ref={chatLogRef}
+            onScroll={() => {
+              const el = chatLogRef.current;
+              if (!el) return;
+              const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+              stickToBottomRef.current = distance < 72;
+            }}
+          >
             {!selectedPeerId ? (
               <div className="wx-empty">
                 <p>No conversation selected</p>
@@ -737,7 +901,6 @@ export default function LanShare() {
                 );
               })
             )}
-            <div ref={chatEndRef} />
           </div>
 
           {transferList.length > 0 ? (

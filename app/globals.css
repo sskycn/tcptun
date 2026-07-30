@@ -733,6 +733,34 @@ main {
   padding-top: 8px;
 }
 
+/* Fill the browser viewport (not OS display fullscreen). */
+.lan-section.is-viewport-fill {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+}
+
+.lan-section.is-viewport-fill .wx-shell {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html.lan-viewport-fill-active,
+html.lan-viewport-fill-active body {
+  overflow: hidden;
+}
+
 .wx-shell {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
@@ -765,6 +793,80 @@ main {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   align-items: center;
+}
+
+/*
+ * Fixed overlay menu — escapes .wx-shell overflow:hidden clipping.
+ * Position is set inline from the trigger button's getBoundingClientRect().
+ * Theme tokens (not html.dark) so data-theme / system dark mode both work.
+ */
+.wx-submenu {
+  position: fixed;
+  z-index: 200;
+  min-width: 220px;
+  max-width: min(280px, calc(100vw - 16px));
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-elevated);
+  color: var(--text);
+  box-shadow:
+    0 4px 6px rgb(var(--shadow) / 0.08),
+    0 16px 36px rgb(var(--shadow) / 0.18);
+  padding: 6px;
+}
+
+.wx-submenu-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 11px 12px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-submenu-item:hover,
+.wx-submenu-item:focus-visible {
+  background: color-mix(in srgb, var(--primary-soft) 70%, var(--surface));
+  outline: none;
+}
+
+.wx-submenu-label {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.wx-submenu-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.wx-menu-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  color: var(--text);
+}
+
+.wx-menu-dots > span {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.88;
 }
 
 .wx-me {
@@ -801,25 +903,72 @@ main {
   height: 40px;
   place-items: center;
   flex-shrink: 0;
-  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  /* Solid elevated surface — never transparent black mix. */
+  background: var(--surface-elevated);
   color: var(--text);
   font: inherit;
   cursor: pointer;
 }
 
 .wx-settings-btn:hover {
-  background: color-mix(in srgb, var(--primary-soft) 40%, var(--surface));
+  background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface-elevated));
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--line-strong));
+  color: var(--text);
 }
 
 .wx-settings-btn.is-open {
-  border-color: color-mix(in srgb, var(--primary) 35%, var(--line));
-  background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line-strong));
+  background: color-mix(in srgb, var(--primary-soft) 65%, var(--surface-elevated));
   color: var(--cyan-text);
 }
 
+/* Explicit dark chrome (matches data-theme + system preference, not html.dark). */
+html[data-theme="dark"] .wx-settings-btn {
+  background: #1e2f40;
+  border-color: #4a657d;
+  color: #eef6f6;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+html[data-theme="dark"] .wx-settings-btn:hover,
+html[data-theme="dark"] .wx-settings-btn.is-open {
+  background: #2a4156;
+  border-color: #5ed6d6;
+  color: #b4f2ef;
+}
+
+html[data-theme="dark"] .wx-menu-dots > span {
+  background: #eef6f6;
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]):not([data-theme="dark"]) .wx-settings-btn {
+    background: #1e2f40;
+    border-color: #4a657d;
+    color: #eef6f6;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+  }
+
+  html:not([data-theme="light"]):not([data-theme="dark"]) .wx-settings-btn:hover,
+  html:not([data-theme="light"]):not([data-theme="dark"]) .wx-settings-btn.is-open {
+    background: #2a4156;
+    border-color: #5ed6d6;
+    color: #b4f2ef;
+  }
+
+  html:not([data-theme="light"]):not([data-theme="dark"]) .wx-menu-dots > span {
+    background: #eef6f6;
+    opacity: 1;
+  }
+}
+
 .wx-settings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18px;
   line-height: 1;
   opacity: 0.9;
@@ -1136,9 +1285,17 @@ main {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   min-width: 0;
+  min-height: 0;
   /* Solid, high-contrast chat canvas (avoid washed-out gradients). */
   background: #ededed;
   color: #111827;
+}
+
+.lan-section.is-viewport-fill .wx-sidebar,
+.lan-section.is-viewport-fill .wx-chat {
+  min-height: 0;
+  max-height: none;
+  height: 100%;
 }
 
 html.dark .wx-chat {
@@ -1190,8 +1347,12 @@ html.dark .wx-chat-title span {
   flex-direction: column;
   gap: 12px;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 16px 14px 12px;
+  /* Isolate scroll from page layout so sending messages never jumps the document. */
+  overflow-anchor: none;
 }
 
 .wx-empty {
@@ -5755,8 +5916,20 @@ button:focus-visible {
     border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   }
 
+  .lan-section.is-viewport-fill .wx-shell {
+    grid-template-rows: minmax(0, 38%) minmax(0, 1fr);
+  }
+
+  .lan-section.is-viewport-fill .wx-sidebar {
+    max-height: none;
+  }
+
   .wx-chat {
     min-height: 55vh;
+  }
+
+  .lan-section.is-viewport-fill .wx-chat {
+    min-height: 0;
   }
 
   .wx-tools {
