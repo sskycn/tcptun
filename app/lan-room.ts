@@ -9,6 +9,7 @@ import {
   importPublicJwk,
   isPublicJwk,
 } from "./lan-e2e";
+import { createUserKey } from "./lan-identity";
 import {
   EMPTY_ICE_CONFIG,
   hasRemoteIce,
@@ -171,9 +172,16 @@ function fromBase64(b64: string): Uint8Array {
 }
 
 export class LanRoom {
+  /** Personal chat Peer — always registered under the globally unique user key. */
   private peer: Peer | null = null;
+  /**
+   * Optional discovery Peer (room host id only). Used so guests can find the mesh;
+   * chat identity remains `localId` (user key), never the host id.
+   */
+  private discoveryPeer: Peer | null = null;
   private room = "";
   private localName = "User";
+  /** Globally unique user key (PeerJS personal id). */
   private localId = "";
   private isHost = false;
   private handlers: LanRoomHandlers;
@@ -182,6 +190,7 @@ export class LanRoom {
   private broadcast: BroadcastChannel | null = null;
   private closed = false;
   private iceConfig: LanIceConfig = { ...EMPTY_ICE_CONFIG };
+  /** Same as localId once open — preferred globally unique user key. */
   private preferredPeerId = "";
   private announceTimer: number | null = null;
   private e2eSessions = new Map<string, E2eSession>();
@@ -267,7 +276,9 @@ export class LanRoom {
     this.room = options.room.trim().slice(0, 64) || "tcptun-lan";
     this.localName = sanitizeDisplayName(options.displayName, "User");
     this.iceConfig = options.iceConfig ? { ...options.iceConfig } : { ...EMPTY_ICE_CONFIG };
-    this.preferredPeerId = sanitizePeerId(options.preferredPeerId) || "";
+    // Every user gets a globally unique key (UUID-based) used as their chat PeerJS id.
+    this.preferredPeerId =
+      sanitizePeerId(options.preferredPeerId) || createUserKey();
     this.peerNames.clear();
     this.connections.clear();
 
@@ -640,6 +651,12 @@ export class LanRoom {
       // ignore
     }
     this.peer = null;
+    try {
+      this.discoveryPeer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.discoveryPeer = null;
     this.localId = "";
     this.isHost = false;
     this.handlers.onPeers([]);
@@ -647,6 +664,7 @@ export class LanRoom {
   }
 
   listPeers(): RoomPeer[] {
+    const discoveryId = roomHostId(this.room);
     const peers: RoomPeer[] = [
       {
         id: this.localId || "local",
@@ -658,6 +676,8 @@ export class LanRoom {
     ];
     for (const [id, name] of this.peerNames) {
       if (!id || id === this.localId) continue;
+      // Room host id is discovery bootstrap only — not a chat identity.
+      if (id === discoveryId) continue;
       const conn = this.connections.get(id);
       const e2e = this.e2eSessions.get(id);
       const live = conn?.open === true;
@@ -777,8 +797,7 @@ export class LanRoom {
     this.iceForceLanOnly = true;
     this.handlers.onStatus("Public STUN slow/unreachable — using local network ICE…");
 
-    const preferred = this.preferredPeerId || this.localId;
-    const wasHost = this.isHost;
+    const preferred = this.preferredPeerId || this.localId || createUserKey();
     const savedNames = new Map(this.peerNames);
 
     this.clearAllDialOpenTimers();
@@ -804,18 +823,20 @@ export class LanRoom {
       // ignore
     }
     this.peer = null;
+    try {
+      this.discoveryPeer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.discoveryPeer = null;
     this.localId = "";
     this.isHost = false;
+    this.preferredPeerId = preferred;
     this.peerNames = savedNames;
 
     try {
-      if (wasHost) {
-        // Re-claim host id with LAN-only ICE; if taken, join as guest.
-        await this.claimOrJoinHost(hostId);
-      } else {
-        await this.joinAsGuest(hostId, preferred || undefined);
-      }
-      // Re-dial known peers over host candidates.
+      // Rebuild personal user-key peer + optional discovery host under LAN-only ICE.
+      await this.claimOrJoinHost(hostId);
       for (const peerId of this.peerNames.keys()) {
         if (!peerId || peerId === this.localId) continue;
         this.scheduleRedial(peerId, true);
@@ -974,12 +995,26 @@ export class LanRoom {
     });
   }
 
+  /**
+   * 1) Always open a personal Peer under the globally unique user key.
+   * 2) Try to claim room host id as a *separate* discovery Peer (not chat identity).
+   * Guests dial the host id for bootstrap, then mesh to each user key.
+   */
   private async claimOrJoinHost(hostId: string): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
+    const userKey = this.preferredPeerId || createUserKey();
+    this.preferredPeerId = userKey;
+
+    // Personal chat identity first — never use room host id as the user key.
+    await this.openPersonalPeer(userKey, hostId);
+
+    if (this.closed) return;
+
+    // Try discovery host role (optional). Failure ⇒ pure guest discovery.
+    await new Promise<void>((resolve) => {
       const hostPeer = new Peer(hostId, this.peerServerOptions());
       let settled = false;
 
-      const failToGuest = () => {
+      const becomeGuestDiscovery = () => {
         if (settled) return;
         settled = true;
         window.clearTimeout(timeout);
@@ -988,33 +1023,50 @@ export class LanRoom {
         } catch {
           // ignore
         }
-        this.handlers.onStatus(this.statusForMode("Joining…"));
-        void this.joinAsGuest(hostId).then(resolve).catch(reject);
+        this.discoveryPeer = null;
+        this.isHost = false;
+        // Bootstrap: dial room discovery host for peer list / mesh.
+        if (this.localId && this.localId !== hostId) {
+          this.enterSoftOnline(hostId, DIALING_SOFT_ONLINE_MS);
+          this.dialPeer(hostId, true);
+          this.scheduleReconnect(hostId, true);
+        }
+        if (this.localId) {
+          this.handlers.onJoined({ peerId: this.localId, isHost: false, room: this.room });
+        }
+        this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
+        resolve();
       };
 
-      // If host claim hangs (common with flaky signaling), fall through to guest.
-      const timeout = window.setTimeout(() => failToGuest(), 3500);
+      const timeout = window.setTimeout(() => becomeGuestDiscovery(), 3500);
 
-      hostPeer.on("open", (id) => {
-        if (settled) return;
+      hostPeer.on("open", () => {
+        if (settled || this.closed) {
+          try {
+            hostPeer.destroy();
+          } catch {
+            // ignore
+          }
+          return;
+        }
         settled = true;
         window.clearTimeout(timeout);
-        this.peer = hostPeer;
-        this.localId = id;
+        this.discoveryPeer = hostPeer;
         this.isHost = true;
-        this.peerNames.set(id, this.localName);
-        this.handlers.onJoined({ peerId: id, isHost: true, room: this.room });
+        this.bindDiscoveryHost(hostPeer);
+        // Chat identity stays localId (user key); only discovery uses host id.
+        if (this.localId) {
+          this.handlers.onJoined({ peerId: this.localId, isHost: true, room: this.room });
+        }
         this.handlers.onStatus(this.statusForMode("You are online. Waiting for others…"));
-        this.emitPeers();
-        this.bindHost(hostPeer);
         this.startLocalAnnounce();
+        this.broadcastPeerList();
+        this.emitPeers();
         resolve();
       });
 
       hostPeer.on("error", (err) => {
         const type = String((err as { type?: string }).type || "");
-        // unavailable-id → someone else is host; join as guest.
-        // network/server-error → still try guest path (may recover).
         if (
           type === "unavailable-id" ||
           type === "network" ||
@@ -1022,28 +1074,21 @@ export class LanRoom {
           type === "socket-error" ||
           type === "socket-closed"
         ) {
-          failToGuest();
+          becomeGuestDiscovery();
           return;
         }
-        if (!settled) {
-          settled = true;
-          window.clearTimeout(timeout);
-          reject(err instanceof Error ? err : new Error("Failed to join."));
-        } else {
-          this.handlers.onError(err.message || "Connection error");
-        }
+        // Unexpected error — still stay online as personal peer.
+        becomeGuestDiscovery();
+        this.handlers.onError(err.message || "Discovery host error");
       });
     });
   }
 
-  private async joinAsGuest(hostId: string, preferredId?: string, attempt = 0): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      // Reuse a stable peer id so reloads look like the same user to others.
-      const wantId = preferredId || this.preferredPeerId || undefined;
-      const peer = wantId
-        ? new Peer(wantId, this.peerServerOptions())
-        : new Peer(this.peerServerOptions());
-
+  /** Open (or re-open) the personal Peer under a globally unique user key. */
+  private openPersonalPeer(userKey: string, hostId: string, attempt = 0): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const wantId = sanitizePeerId(userKey) || createUserKey();
+      const peer = new Peer(wantId, this.peerServerOptions());
       let settled = false;
 
       const finishOk = () => {
@@ -1053,12 +1098,18 @@ export class LanRoom {
       };
 
       peer.on("open", (id) => {
+        if (this.closed) {
+          try {
+            peer.destroy();
+          } catch {
+            // ignore
+          }
+          return;
+        }
         this.peer = peer;
         this.localId = id;
-        this.isHost = false;
         this.preferredPeerId = id;
-        this.peerNames.set(id, this.localName);
-        this.handlers.onJoined({ peerId: id, isHost: false, room: this.room });
+        this.handlers.onJoined({ peerId: id, isHost: this.isHost, room: this.room });
         this.handlers.onStatus(this.statusForMode("Looking for nearby users…"));
         this.emitPeers();
         this.startLocalAnnounce();
@@ -1072,32 +1123,17 @@ export class LanRoom {
           } catch {
             // ignore
           }
-          // Keep peers soft-online while signaling reconnects (common on tab switch).
           this.resumePresence("peer-disconnected");
         });
 
-        // Never dial yourself if preferred id somehow collides with host.
-        if (id === hostId) {
-          finishOk();
-          return;
-        }
-
-        // Remember the discovery host as a visible peer immediately (show while dialing).
-        this.rememberPeer(hostId, "User");
-        this.enterSoftOnline(hostId, DIALING_SOFT_ONLINE_MS);
-        this.dialPeer(hostId, true);
-        // Keep retrying host until the channel opens (host may still be starting).
-        this.scheduleReconnect(hostId, true);
-        // If STUN is blocked, fall back to host-only ICE so LAN still connects.
+        // Host/guest bootstrap dial happens after claimOrJoinHost settles.
+        void hostId;
         this.armLanIceFallback();
-        // Join succeeds once we are registered with the signaling server;
-        // peer discovery continues in the background.
         finishOk();
       });
 
       peer.on("error", (err) => {
         const type = String((err as { type?: string }).type || "");
-        // Stale tab may still hold our id — mint a new stable id once.
         if (type === "unavailable-id" && attempt < 3) {
           if (settled && this.localId) return;
           try {
@@ -1105,22 +1141,19 @@ export class LanRoom {
           } catch {
             // ignore
           }
-          const fresh =
-            typeof globalThis.crypto?.randomUUID === "function"
-              ? `tcptu${globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`
-              : `tcptu${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+          const fresh = createUserKey();
           this.preferredPeerId = fresh;
           this.handlers.onIdentityRotated?.(fresh);
-          this.handlers.onStatus("Reconnecting with a new session…");
-          void this.joinAsGuest(hostId, fresh, attempt + 1)
+          this.handlers.onStatus("Reconnecting with a new user key…");
+          void this.openPersonalPeer(fresh, hostId, attempt + 1)
             .then(resolve)
             .catch(reject);
           return;
         }
-        // peer-unavailable: host not ready — keep retrying in background.
         if (type === "peer-unavailable") {
-          this.scheduleReconnect(hostId, true);
+          // Host not up yet — personal peer is fine.
           if (!settled && this.localId) finishOk();
+          this.scheduleReconnect(hostId, true);
           return;
         }
         this.handlers.onError(err.message || "Connection error");
@@ -1129,6 +1162,36 @@ export class LanRoom {
           reject(err instanceof Error ? err : new Error(String(err)));
         }
       });
+    });
+  }
+
+  /**
+   * Discovery host only: accept bootstrap connections and fan out the user-key roster.
+   * Chat/E2E stays on the personal Peer (`this.peer` / `localId`).
+   */
+  private bindDiscoveryHost(hostPeer: Peer) {
+    hostPeer.on("connection", (conn) => {
+      const remoteId = sanitizePeerId(conn.peer);
+      if (!remoteId || remoteId === this.localId) {
+        try {
+          conn.close();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      // Also wire as a normal mesh path so the first hop can chat immediately.
+      this.rememberPeer(remoteId, this.peerNames.get(remoteId) || "User");
+      this.enterSoftOnline(remoteId, DIALING_SOFT_ONLINE_MS);
+      this.wireConnection(conn, remoteId, false);
+    });
+    hostPeer.on("disconnected", () => {
+      if (this.closed) return;
+      try {
+        hostPeer.reconnect();
+      } catch {
+        // ignore
+      }
     });
   }
 

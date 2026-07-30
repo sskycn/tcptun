@@ -20,7 +20,12 @@ import {
   urlsToText,
   type LanIceConfig,
 } from "./lan-ice";
-import { loadIdentity, saveDisplayName, saveIdentity } from "./lan-identity";
+import {
+  loadIdentity,
+  saveDisplayName,
+  saveIdentity,
+  shortUserKey,
+} from "./lan-identity";
 import LanMarkdown, { markdownPreview } from "./lan-markdown";
 import {
   LanRoom,
@@ -341,12 +346,10 @@ export default function LanShare() {
         if (!active) return;
         setJoined(true);
         setPeerId(info.peerId);
-        // Host role uses room host id; still keep preferred guest id for next guest join.
-        if (!info.isHost) {
-          setStablePeerId(info.peerId);
-          stablePeerIdRef.current = info.peerId;
-          saveIdentity({ peerId: info.peerId, displayName: localNameRef.current });
-        }
+        // Always the globally unique user key (host discovery uses a separate Peer).
+        setStablePeerId(info.peerId);
+        stablePeerIdRef.current = info.peerId;
+        saveIdentity({ peerId: info.peerId, displayName: localNameRef.current });
       },
       onIdentityRotated: (newId) => {
         if (!active) return;
@@ -646,6 +649,11 @@ export default function LanShare() {
                     {joined ? "Online" : "Connecting…"}
                     <span className="wx-me-mode"> · {iceModeLabel(mode)}</span>
                   </span>
+                  {selfId ? (
+                    <span className="wx-user-key" title={selfId}>
+                      Key {shortUserKey(selfId)}
+                    </span>
+                  ) : null}
                 </div>
               </button>
               <button
@@ -700,6 +708,15 @@ export default function LanShare() {
 
             {showAlias ? (
               <div className="wx-profile-panel">
+                <label className="guide-field">
+                  <span>Your user key</span>
+                  <p className="wx-user-key-full" title={selfId}>
+                    {selfId || "—"}
+                  </p>
+                  <span className="wx-ice-hint">
+                    Globally unique id for this browser. Peers and chat history use this key.
+                  </span>
+                </label>
                 <label className="guide-field">
                   <span>Display name</span>
                   <div className="wx-alias-row">
