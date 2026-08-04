@@ -58,6 +58,7 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
               <Link href="/start/">CLI</Link>
               <Link href="/faq/">FAQ</Link>
               <Link href="/legal/">Legal</Link>
+              <Link href="/privacy/">Privacy</Link>
               <CookieSettingsLink className="footer-text-button" />
             </div>
             <div className="footer-column">
