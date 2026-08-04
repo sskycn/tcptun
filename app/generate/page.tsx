@@ -15,7 +15,7 @@ export default function GeneratePage() {
       <PageHero
         eyebrow="Generate"
         title="Paired configs in the browser."
-        description="Create server.json, client.json, and client.uri locally. Native defaults to v0.2.4 Reality auto carriers; optional resumable streams and forced QUIC."
+        description="Create server.json, client.json, and client.uri locally. Native defaults to v0.2.5 Reality auto carriers; optional resumable streams and forced QUIC."
         actions={[
           { href: "/examples/", label: "Browse examples", variant: "secondary" },
           { href: "/uri/", label: "URI tools", variant: "ghost" },

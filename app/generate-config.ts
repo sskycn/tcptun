@@ -93,7 +93,8 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     users: [serverUser(protocol, credential)],
     transport: { type: "raw" },
     security: {
-      type: quic ? "reality-quic" : "reality",
+      // v0.2.5+: keep security.type=reality and select auto/tcp/quic via carrier.mode.
+      type: "reality",
       private_key: privateKey,
       server_names: [serverName],
       short_ids: [shortId],
@@ -102,14 +103,19 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     },
   };
   if (quic) {
-    serverInbound.mux = { mode: "quic", max_streams_per_session: 128 };
+    serverInbound.carrier = { mode: "quic" };
+    serverInbound.mux = { enabled: true, max_streams_per_session: 128 };
   } else if (protocol === "native" && input.autoReality) {
+    serverInbound.carrier = { mode: "auto" };
     serverInbound.mux = {
-      mode: "group",
+      enabled: true,
       ...(input.resume
         ? { resume: true, resume_timeout: "15s", resume_buffer_size: 4 * 1024 * 1024 }
         : {}),
     };
+  } else {
+    // VLESS / VMess / Trojan generators remain Reality TCP (no dual carriers).
+    serverInbound.carrier = { mode: "tcp" };
   }
 
   const serverConfig = {
@@ -126,30 +132,36 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     network: ["tcp", "udp"],
     transport: { type: "raw" },
     security: {
-      type: quic ? "reality-quic" : "reality",
+      type: "reality",
       server_name: serverName,
       fingerprint: "chrome",
       public_key: publicKey,
       short_id: shortId,
-      ...(quic ? {} : { spider_x: "/" }),
+      spider_x: "/",
     },
     ...clientCredentialFields(protocol, credential),
   };
   if (quic) {
+    clientOutbound.carrier = { mode: "quic", udp_mode: "auto" };
     clientOutbound.mux = {
-      mode: "quic",
-      udp_mode: "auto",
+      enabled: true,
       max_sessions: 4,
       max_streams_per_session: 128,
       warm_spares: 1,
     };
   } else if (protocol === "native" && input.autoReality) {
+    clientOutbound.carrier = { mode: "auto" };
     clientOutbound.mux = {
-      mode: "group",
+      enabled: true,
+      max_sessions: 4,
+      max_streams_per_session: 128,
+      warm_spares: 1,
       ...(input.resume
         ? { resume: true, resume_timeout: "15s", resume_buffer_size: 4 * 1024 * 1024 }
         : {}),
     };
+  } else {
+    clientOutbound.carrier = { mode: "tcp" };
   }
 
   const clientConfig = {

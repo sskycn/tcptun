@@ -156,11 +156,12 @@ export default function Home() {
         <div className="section-heading row-heading">
           <div>
             <p className="eyebrow">What&apos;s new · {displayVersion}</p>
-            <h2>Mux stability, QUIC recovery, and quieter Android diagnostics.</h2>
+            <h2>Carrier control, ECH camouflage, and tougher lossy paths.</h2>
             <p>
-              v0.2.4 hardens native and Xray mux carrier lifecycle, improves QUIC path recovery,
-              keeps <code>native + raw + reality</code> automatic dual carriers, and refreshes
-              Android bridge logging and VMess interop.
+              v0.2.5 separates <code>carrier.mode</code> from mux, adds native TLS passthrough
+              fallback and ECH ClientHello protection, hardens mux failover, and improves QUIC
+              recovery under high loss while keeping <code>native + raw + reality</code> auto
+              dual carriers.
             </p>
           </div>
           <Link className="button secondary" href="/config/#native-carriers">

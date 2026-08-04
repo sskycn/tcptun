@@ -11,7 +11,7 @@ Download from the published npm package instead:
 Example:
 
 ```text
-https://cdn.jsdelivr.net/npm/tcptun@0.2.4/dist/tcptun-linux-amd64
+https://cdn.jsdelivr.net/npm/tcptun@0.2.5/dist/tcptun-linux-amd64
 ```
 
 Or use the one-line installer:

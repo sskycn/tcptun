@@ -41,16 +41,16 @@ const workflows = [
   {
     name: "quic",
     title: "Forced QUIC pair",
-    body: "Generate native reality-quic + mux.mode=quic without TCP fallback.",
+    body: "Generate native Reality with carrier.mode=quic (no TCP fallback).",
     command: "tcptun config native --quic --server proxy.example.com --port 9443",
   },
   {
     name: "resume",
     title: "Resumable Reality auto",
-    body: "After generating a native Reality pair, set mux.resume=true on both ends (v0.2.4+).",
+    body: "After generating a native Reality pair, set mux.resume=true on both ends (v0.2.5+).",
     command: `# on both server inbound and client outbound mux blocks
 "mux": {
-  "mode": "group",
+  "enabled": true,
   "resume": true,
   "resume_timeout": "15s",
   "resume_buffer_size": 4194304
