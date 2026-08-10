@@ -51,6 +51,7 @@ const groups = [
       { href: "/generate/", label: "Config generator", body: "Browser-local key generation." },
       { href: "/uri/", label: "URI / QR tools", body: "Import and export endpoints." },
       { href: "/convert/", label: "Xray convert", body: "Wire configs → tcptun JSON (local)." },
+      { href: "/guide/", label: "Setup wizard", body: "Guided first tunnel." },
     ],
   },
   {

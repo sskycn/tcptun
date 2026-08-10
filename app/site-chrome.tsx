@@ -70,7 +70,6 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
               <Link href="/uri/">URI tools</Link>
               <Link href="/convert/">Xray convert</Link>
               <Link href="/guide/">Setup wizard</Link>
-              <Link href="/lan/">LAN chat</Link>
             </div>
             <div className="footer-column">
               <h3>Source & release</h3>

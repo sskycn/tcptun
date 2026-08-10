@@ -7,7 +7,7 @@ import { releaseVersion } from "../site-data";
 export const metadata: Metadata = {
   title: "Privacy",
   description:
-    "tcptun privacy notice: local browser processing, local storage, cookies, peer-to-peer chat, and third-party infrastructure.",
+    "tcptun privacy notice: local browser processing, local storage, cookies, and third-party infrastructure.",
 };
 
 const privacyItems = [
@@ -15,11 +15,10 @@ const privacyItems = [
     title: "What this notice covers",
     body: (
       <>
-        This notice covers the tcptun website, its browser-based tools, and the optional Chat page. It
-        does not replace the privacy policies of hosting, CDN, package, signaling, STUN/TURN, or other
-        services that you choose to use with tcptun. The tcptun command-line runtime and any server you
-        operate can process network traffic according to your own configuration; this page does not
-        describe those deployments.
+        This notice covers the tcptun website and its browser-based tools. It does not replace the
+        privacy policies of hosting, CDN, package registries, or other services that you choose to use
+        with tcptun. The tcptun command-line runtime and any server you operate can process network
+        traffic according to your own configuration; this page does not describe those deployments.
       </>
     ),
   },
@@ -50,37 +49,19 @@ const privacyItems = [
     title: "Local storage and cookies",
     body: (
       <>
-        The site uses browser storage for operations and preferences. This can include your theme and
-        cookie-consent choice, and on Chat it can include a generated peer identity, display name,
-        connection settings, conversation text, and file/config metadata. Chat history does not store
-        file bytes or blob URLs in local storage. We do not use first-party advertising or marketing
-        tracking cookies. Hosting, CDN, or security providers may use technical cookies or logs under
-        their own policies.
+        The site uses browser storage for operations and preferences, such as theme and cookie-consent
+        choice. We do not use first-party advertising or marketing tracking cookies. Hosting, CDN, or
+        security providers may use technical cookies or logs under their own policies.
       </>
     ),
   },
   {
-    title: "Chat, signaling, and peer connections",
+    title: "Third-party links and infrastructure",
     body: (
       <>
-        Chat uses PeerJS signaling at <code>0.peerjs.com</code> to help browsers find one another. Peer
-        IDs, room and display-name metadata, connection events, and network information may be visible
-        to that service or to the network providers involved. After a connection is established, chat
-        messages, configs, and files are sent over a WebRTC data channel and are encrypted between the
-        peers by the application. Encryption does not hide all connection metadata and is not a promise
-        about the privacy practices of a peer or third-party infrastructure.
-      </>
-    ),
-  },
-  {
-    title: "STUN, TURN, and sharing",
-    body: (
-      <>
-        Chat defaults to local-network candidates and does not enable public STUN or TURN by default.
-        If you add STUN or TURN servers, your browser may send them connection metadata; if a TURN relay
-        is used, peer traffic may pass through that relay. You choose those providers and are responsible
-        for reviewing their terms and privacy policies. The site may also link to third-party websites,
-        package registries, CDNs, and release services that operate independently.
+        The site may link to third-party websites, package registries, CDNs, and release services that
+        operate independently. You choose those providers and are responsible for reviewing their terms
+        and privacy policies.
       </>
     ),
   },
@@ -89,10 +70,8 @@ const privacyItems = [
     body: (
       <>
         Browser-local data remains until it expires, is replaced, or you clear it through your browser
-        or the relevant feature. Session-only file objects are released when the chat session ends; the
-        local history keeps message text and file/config metadata, not file contents. You can block
-        storage, clear site data, disable optional STUN/TURN settings, or stop using Chat. Blocking
-        storage may reset preferences or prevent some features from working.
+        or site settings. You can block storage or clear site data. Blocking storage may reset
+        preferences or prevent some features from working.
       </>
     ),
   },
@@ -337,7 +316,7 @@ export default function PrivacyPage() {
       <PageHero
         eyebrow="Privacy"
         title="Clear boundaries for your data."
-        description="This notice explains what the tcptun website and its browser tools process, what stays on your device, and what changes when you use peer-to-peer Chat."
+        description="This notice explains what the tcptun website and its browser tools process, and what stays on your device."
       />
 
       <section className="section privacy-section" id="privacy">
@@ -366,9 +345,8 @@ export default function PrivacyPage() {
         <div className="privacy-footnote">
           <strong>Quick summary</strong>
           <p>
-            Browser tools process pasted configuration locally. Chat uses a signaling service to find
-            peers, then sends encrypted payloads between peers where possible. Local storage, hosting
-            infrastructure, and any STUN/TURN provider remain separate privacy boundaries.
+            Browser tools process pasted configuration locally. Local storage and hosting/CDN
+            infrastructure remain separate privacy boundaries.
           </p>
           <p>
             See the <Link href="/legal/">disclaimer and cookie details</Link>, or open <Link href="/">the home page</Link>.

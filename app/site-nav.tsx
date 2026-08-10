@@ -46,7 +46,6 @@ const navGroups = [
       { href: "/uri/", label: "URI tools" },
       { href: "/convert/", label: "Xray convert" },
       { href: "/guide/", label: "Setup wizard" },
-      { href: "/lan/", label: "LAN chat" },
     ],
   },
 ] as const;
