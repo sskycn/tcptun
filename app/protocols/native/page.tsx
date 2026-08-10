@@ -5,7 +5,7 @@ import SiteChrome from "../../site-chrome";
 import { releaseVersion } from "../../site-data";
 
 export const metadata: Metadata = {
-  title: `Native protocol · tcptun v${releaseVersion}`,
+  title: "Native protocol",
   description:
     "Native tunnel protocol guide: install, generate, Reality auto carriers, resumable streams, reverse publish, and worked examples.",
 };

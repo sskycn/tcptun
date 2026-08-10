@@ -5,7 +5,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `FAQ · tcptun v${releaseVersion}`,
+  title: "FAQ",
   description: "Frequently asked questions about tcptun configuration, native Reality auto carriers, and install.",
 };
 

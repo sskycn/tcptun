@@ -2,74 +2,73 @@ import Image from "next/image";
 import Link from "next/link";
 import CopyButton from "./copy-button";
 import InstallCommand from "./install-command";
-import ProtocolIcon from "./protocol-icon";
 import SiteChrome from "./site-chrome";
 import { PlatformDownloadButton } from "./platform-download";
 import {
-  binaryDownloads,
-  inboundTypes,
+  githubLinks,
   installCommand,
-  npmLinks,
-  outboundTypes,
+  productDescription,
   releaseHighlights,
   releaseVersion,
-  topologyExample,
-  tunnelProtocols,
 } from "./site-data";
 
 const displayVersion = `v${releaseVersion}`;
 
-const capabilities = [
-  {
-    label: "Runtime",
-    title: "Multi-inbound, multi-outbound",
-    body: "One config describes the full topology. Inbounds can pin an outbound or let route decide.",
-  },
-  {
-    label: "Config",
-    title: "Strict JSON",
-    body: "address uses host:port arrays; unknown fields are rejected; tags, refs, auth, TLS, REALITY, and mux are validated before start.",
-  },
-  {
-    label: "Network",
-    title: "Adaptive carriers and resumable TCP",
-    body: "Reality auto prefers QUIC and falls back to TCP; opt-in logical streams can resume across carrier replacement.",
-  },
-  {
-    label: "Reverse",
-    title: "Reverse publish",
-    body: "native mux / QUIC supports publish and expose to hang NAT-side TCP/UDP services on edge ports.",
-  },
-];
-
-const featureLinks = [
+const paths = [
   {
     href: "/guide/",
-    label: "Wizard",
-    title: "Guided first tunnel",
-    body: "Step-by-step setup for native + raw + reality: install, generate, validate, run, and test.",
+    label: "Run",
+    title: "CLI runtime",
+    body: "Install the binary, generate a strict JSON topology, validate, and serve inbounds together.",
   },
   {
-    href: "/examples/",
-    label: "Examples",
-    title: "Copy-ready topologies",
-    body: "Worked server/client pairs for native auto Reality, resumable streams, reverse publish, VLESS, VMess, and Trojan.",
+    href: "/embed/",
+    label: "Embed",
+    title: "Go SDK",
+    body: "Import pkg.tcptun.com/net and compose dialers, listeners, packet devices, and routing in process.",
   },
   {
-    href: "/protocols/native/",
-    label: "Native guide",
-    title: "Deep native tutorial",
-    body: "Concepts, fields, and long-form notes for the private tunnel protocol.",
+    href: "/use-cases/#android",
+    label: "Integrate",
+    title: "Android & platforms",
+    body: "Use the runtime as an application-aware VPN engine with TUN, DNS, and outbound switching.",
   },
-  {
-    href: "/lan/",
-    label: "Chat",
-    title: "Nearby chat & file share",
-    body: "Discover users on the same network and exchange messages, configs, and files privately.",
-  },
-];
+] as const;
 
-const pipeline = ["Load", "Validate", "Compile", "Start"] as const;
+const coreCapabilities = [
+  {
+    title: "Compiled topology",
+    body: "FileConfig is validated and compiled before any listener opens. Unknown fields fail closed.",
+  },
+  {
+    title: "Multi-inbound / multi-outbound",
+    body: "One process hosts mixed proxies, tunnels, reverse publish, balance groups, and rule routing.",
+  },
+  {
+    title: "Native TCP/QUIC path",
+    body: "tcptun-to-tcptun Native protocol with mux, carrier.mode selection, and optional resumable streams.",
+  },
+  {
+    title: "Resource-bounded runtime",
+    body: "Mux pools, resume buffers, and packet paths are budgeted so long-lived services stay predictable.",
+  },
+  {
+    title: "Platform networking",
+    body: "TUN, DNS interception / fake-IP, and Android bridge hooks for device-level integration.",
+  },
+  {
+    title: "Wire interoperability",
+    body: "VLESS, VMess, and Trojan for Xray-compatible wire paths — not Xray config compatibility.",
+  },
+] as const;
+
+const differentiators = [
+  "Programmable networking runtime — not a single-purpose proxy app",
+  "Embeddable Go engine with net.Conn / PacketConn / Listener contracts",
+  "Deterministic compile-before-serve routing model",
+  "Native protocol architecture for controlled tcptun-to-tcptun deployments",
+  "Platform integration surface for CLI, Android, and gateways",
+] as const;
 
 const terminalSnippet = `$ ${installCommand}
 
@@ -79,59 +78,45 @@ $ tcptun --config config.json
 
 $ tcptun config check --config config.json
 
-$ tcptun config native \\
-    --server proxy.example.com \\
-    --port 9443`;
+# Go module
+import "pkg.tcptun.com/net"`;
 
 export default function Home() {
   return (
     <SiteChrome>
-      <section className="hero" id="top">
+      <section className="hero hero-runtime" id="top">
         <div className="hero-copy">
           <div className="release-line">
             <span className="version-badge">
               <span className="pulse-dot" aria-hidden="true" />
               {displayVersion}
             </span>
-            <span className="release-tagline">proxy runtime</span>
+            <span className="release-tagline">networking runtime</span>
           </div>
           <h1>
-            One config,
+            Programmable networking runtime
             <br />
-            <span className="title-accent">orchestrate all proxy traffic.</span>
+            <span className="title-accent">for applications and devices</span>
           </h1>
-          <p className="lede">
-            tcptun is a config-driven multi-inbound, multi-outbound proxy runtime. Describe
-            inbounds, outbounds, and routes in strict JSON, then start TCP/UDP services together.
-          </p>
+          <p className="lede">{productDescription}</p>
           <div className="hero-actions">
             <Link className="button primary" href="/guide/">
-              Start wizard
+              Get started
             </Link>
-            <Link className="button secondary" href="/download/">
-              Download {displayVersion}
+            <Link className="button secondary" href="/docs/">
+              Documentation
             </Link>
-            <Link className="button ghost" href="/generate/">
-              Generate config
+            <a className="button ghost" href={githubLinks.runtime} target="_blank" rel="noreferrer">
+              GitHub
+            </a>
+            <Link className="button ghost" href="/download/">
+              Download
             </Link>
           </div>
-
-          <InstallCommand variant="hero" />
-
-          <div className="release-facts" aria-label="Capability overview">
-            <div className="fact">
-              <strong>{inboundTypes.length}</strong>
-              <span>inbound types</span>
-            </div>
-            <div className="fact">
-              <strong>{outboundTypes.length}</strong>
-              <span>outbound types</span>
-            </div>
-            <div className="fact">
-              <strong>{binaryDownloads.length}</strong>
-              <span>platform builds</span>
-            </div>
-          </div>
+          <p className="hero-run-modes">
+            Run as <strong>CLI runtime</strong>, <strong>Android VPN client</strong>,{" "}
+            <strong>embedded Go library</strong>, or <strong>platform networking engine</strong>.
+          </p>
         </div>
 
         <div className="terminal" aria-label="tcptun command preview">
@@ -141,9 +126,7 @@ export default function Home() {
               <span />
               <span />
             </div>
-            <span className="terminal-title">
-              tcptun · {displayVersion}
-            </span>
+            <span className="terminal-title">tcptun · {displayVersion}</span>
             <CopyButton value={terminalSnippet} label="Copy" className="copy-button-ghost" />
           </div>
           <pre className="terminal-body">
@@ -152,21 +135,164 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="section" id="what-is">
+        <div className="section-heading">
+          <p className="eyebrow">What is tcptun?</p>
+          <h2>A compiled networking runtime — not a protocol catalog.</h2>
+          <p>
+            tcptun loads a strict JSON topology, compiles outbounds and routes, prepares every
+            inbound, then serves them together. The same engine powers the CLI, Go embeddings, and
+            Android integrations. Protocol count is secondary; the model is primary.
+          </p>
+        </div>
+        <ul className="diff-list">
+          {differentiators.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="section" id="paths">
+        <div className="section-heading">
+          <p className="eyebrow">Choose your path</p>
+          <h2>Run, embed, or integrate.</h2>
+        </div>
+        <div className="path-grid">
+          {paths.map((path) => (
+            <Link className="path-card" href={path.href} key={path.href}>
+              <span className="capability-label">{path.label}</span>
+              <h3>{path.title}</h3>
+              <p>{path.body}</p>
+              <span className="path-card-cta">Continue →</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="section" id="capabilities">
+        <div className="section-heading row-heading">
+          <div>
+            <p className="eyebrow">Core capabilities</p>
+            <h2>What the runtime actually does.</h2>
+            <p>
+              Capability list after positioning — so new readers already know tcptun is an engine,
+              not a single-purpose tunnel utility.
+            </p>
+          </div>
+          <Link className="button secondary" href="/architecture/">
+            Architecture
+          </Link>
+        </div>
+        <div className="capability-grid">
+          {coreCapabilities.map((item, index) => (
+            <article className="capability-card" key={item.title} data-tone={index % 3}>
+              <div className="capability-meta">
+                <span className="capability-label">Core</span>
+                <span className="capability-index">{String(index + 1).padStart(2, "0")}</span>
+              </div>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section architecture-section" id="architecture-preview">
+        <div className="section-heading row-heading">
+          <div>
+            <p className="eyebrow">Architecture</p>
+            <h2>Validate → compile → serve.</h2>
+            <p>
+              FileConfig is decoded with unknown-field rejection, compiled into RuntimeConfig, then
+              bound. Fail closed before traffic is accepted.
+            </p>
+          </div>
+          <Link className="button secondary" href="/architecture/">
+            Full architecture
+          </Link>
+        </div>
+        <div className="arch-flow" aria-label="Runtime compile pipeline">
+          <div className="arch-flow-step">
+            <span>01</span>
+            <strong>FileConfig</strong>
+            <p>Strict JSON topology</p>
+          </div>
+          <div className="arch-flow-arrow" aria-hidden="true">
+            →
+          </div>
+          <div className="arch-flow-step">
+            <span>02</span>
+            <strong>Validate</strong>
+            <p>Tags, refs, auth, caps</p>
+          </div>
+          <div className="arch-flow-arrow" aria-hidden="true">
+            →
+          </div>
+          <div className="arch-flow-step">
+            <span>03</span>
+            <strong>RuntimeConfig</strong>
+            <p>Compiled graph</p>
+          </div>
+          <div className="arch-flow-arrow" aria-hidden="true">
+            →
+          </div>
+          <div className="arch-flow-step">
+            <span>04</span>
+            <strong>Serve</strong>
+            <p>TCP · UDP · TUN · routes</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="section protocol-section" id="native-vs-compat">
+        <div className="section-heading row-heading">
+          <div>
+            <p className="eyebrow">Protocols</p>
+            <h2>Native first. Compatibility second.</h2>
+            <p>
+              Compatibility means wire interoperability with VLESS / VMess / Trojan — not Xray{" "}
+              <code>-c</code> config files.
+            </p>
+          </div>
+          <Link className="button secondary" href="/protocols/">
+            Protocol docs
+          </Link>
+        </div>
+        <div className="split-panels">
+          <article className="split-panel">
+            <p className="capability-label">Native</p>
+            <h3>tcptun Native protocol</h3>
+            <p>
+              Optimized for TCP/QUIC carriers, mux, resumable streams, reverse publishing, resource
+              control, and tcptun-to-tcptun deployments.
+            </p>
+            <Link href="/protocols/native/">Native guide →</Link>
+          </article>
+          <article className="split-panel">
+            <p className="capability-label">Compatibility</p>
+            <h3>Wire interop layer</h3>
+            <p>
+              VLESS, VMess, and Trojan for mixed ecosystems. Same runtime topology; different wire
+              credentials and security combinations.
+            </p>
+            <Link href="/protocols/">Compare protocols →</Link>
+          </article>
+        </div>
+      </section>
+
       <section className="section" id="release">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">What&apos;s new · {displayVersion}</p>
-            <h2>Carrier control, ECH camouflage, and tougher lossy paths.</h2>
+            <p className="eyebrow">Latest · {displayVersion}</p>
+            <h2>What shipped in this runtime.</h2>
             <p>
-              v0.2.5 separates <code>carrier.mode</code> from mux, adds native TLS passthrough
-              fallback and ECH ClientHello protection, hardens mux failover, and improves QUIC
-              recovery under high loss while keeping <code>native + raw + reality</code> auto
-              dual carriers.
+              Release notes stay technical: carrier control, camouflage options, mux failover, and
+              lossy-path recovery. Version lives here — not in the document title for SEO.
             </p>
           </div>
-          <Link className="button secondary" href="/config/#native-carriers">
-            Explore native + raw + reality
-          </Link>
+          <a className="button secondary" href={githubLinks.runtimeReleaseTag} target="_blank" rel="noreferrer">
+            GitHub release
+          </a>
         </div>
         <div className="capability-grid">
           {releaseHighlights.map((item, index) => (
@@ -182,149 +308,31 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section" id="features">
-        <div className="section-heading">
-          <p className="eyebrow">Capabilities</p>
-          <h2>Config defines the topology; the runtime validates and runs it.</h2>
-          <p>
-            From inbound to outbound, one model covers local proxies, tunnels, rule routing,
-            load balancing, and outbound chains.
-          </p>
-        </div>
-        <div className="capability-grid">
-          {capabilities.map((item, index) => (
-            <article className="capability-card" key={item.title} data-tone={index % 3}>
-              <div className="capability-meta">
-                <span className="capability-label">{item.label}</span>
-                <span className="capability-index">{String(index + 1).padStart(2, "0")}</span>
-              </div>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="section architecture-section" id="architecture">
+      <section className="section" id="trust">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">Architecture</p>
-            <h2>Inbounds, routes, and outbounds are explicit.</h2>
-            <p>Every component has a unique tag; references are compiled and checked before start.</p>
+            <p className="eyebrow">Security & trust</p>
+            <h2>Source, install, and fail-closed defaults.</h2>
+            <p>
+              Inspect installers, verify package provenance, and read how the runtime validates
+              config before binding ports.
+            </p>
           </div>
-          <ol className="pipeline" aria-label="Startup pipeline">
-            {pipeline.map((step, index) => (
-              <li key={step}>
-                <span className="pipeline-step">{step}</span>
-                {index < pipeline.length - 1 ? (
-                  <span className="pipeline-connector" aria-hidden="true" />
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        <div className="architecture-grid">
-          <div className="topology-panel">
-            <div className="topology-column">
-              <p>Inbounds</p>
-              {inboundTypes.map((type) => (
-                <span key={type}>{type}</span>
-              ))}
-            </div>
-            <div className="topology-router">
-              <span className="topology-router-label">Route</span>
-              <small>rules + default_outbound</small>
-              <div className="topology-flow" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-            <div className="topology-column">
-              <p>Outbounds</p>
-              {outboundTypes.map((type) => (
-                <span key={type}>{type}</span>
-              ))}
-            </div>
-          </div>
-          <div className="config-model">
-            <div className="config-model-heading">
-              <div className="terminal-dots" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-              <span>config.json</span>
-              <div className="config-heading-actions">
-                <span className="config-badge">strict schema</span>
-                <CopyButton value={topologyExample} label="Copy" className="copy-button-ghost" />
-              </div>
-            </div>
-            <pre>
-              <code>{topologyExample}</code>
-            </pre>
-          </div>
-        </div>
-      </section>
-
-      <section className="section protocol-section">
-        <div className="section-heading row-heading">
-          <div>
-            <p className="eyebrow">Protocols</p>
-            <h2>Four tunnel protocols, one topology.</h2>
-            <p>Xray compatibility is for wire protocols, not config file format.</p>
-          </div>
-          <Link className="button secondary" href="/protocols/">
-            All protocols
+          <Link className="button secondary" href="/security/">
+            Security page
           </Link>
         </div>
-        <div className="protocol-grid">
-          {tunnelProtocols.map((protocol, index) => (
-            <article className="protocol-card" key={protocol.name}>
-              <div className="protocol-card-heading">
-                <div className="protocol-title-row">
-                  <ProtocolIcon name={protocol.name} />
-                  <div>
-                    <span className="protocol-index">{String(index + 1).padStart(2, "0")}</span>
-                    <h3>{protocol.name}</h3>
-                  </div>
-                </div>
-                <span className="security-badge">{protocol.credential}</span>
-              </div>
-              <p className="protocol-description">{protocol.description}</p>
-              <div className="protocol-command-row">
-                <pre className="protocol-command">
-                  <code>{protocol.command}</code>
-                </pre>
-                <CopyButton value={protocol.command} label="Copy" className="copy-button-on-dark" />
-              </div>
-              <Link
-                className="protocol-doc-link"
-                href={protocol.name === "native" ? "/protocols/native/" : "/examples/"}
-              >
-                {protocol.name === "native" ? "Native guide →" : "Use cases →"}
-              </Link>
-            </article>
-          ))}
+        <div className="trust-strip">
+          <a href={githubLinks.runtime} target="_blank" rel="noreferrer">
+            Source · tcptun-go
+          </a>
+          <a href={githubLinks.runtimeReleaseTag} target="_blank" rel="noreferrer">
+            Release tag {displayVersion}
+          </a>
+          <a href="/install.sh">install.sh (inspect first)</a>
+          <Link href="/download/">Binaries + verify</Link>
         </div>
-      </section>
-
-      <section className="section">
-        <div className="section-heading">
-          <p className="eyebrow">Explore</p>
-          <h2>Jump into tools and docs.</h2>
-        </div>
-        <div className="home-link-grid">
-          {featureLinks.map((item, index) => (
-            <Link className="home-link-card" href={item.href} key={item.href}>
-              <span className="capability-label">{item.label}</span>
-              <span className="home-link-index">{String(index + 1).padStart(2, "0")}</span>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </Link>
-          ))}
-        </div>
+        <InstallCommand variant="panel" />
       </section>
 
       <section className="section quickstart-section">
@@ -333,7 +341,7 @@ export default function Home() {
           <Image src="/tcptun-logo.png" alt="" width={64} height={64} />
           <div>
             <p className="eyebrow">tcptun {displayVersion}</p>
-            <h2>Download and run.</h2>
+            <h2>Download the runtime and start from a validated config.</h2>
           </div>
           <PlatformDownloadButton />
         </div>

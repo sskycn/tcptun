@@ -5,7 +5,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Examples · tcptun v${releaseVersion}`,
+  title: "Examples",
   description:
     "Worked tcptun examples for native Reality auto, resumable streams, reverse publish, balance, route split, VLESS, VMess, and Trojan.",
 };

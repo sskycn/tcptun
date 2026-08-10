@@ -5,7 +5,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Setup wizard · tcptun v${releaseVersion}`,
+  title: "Setup wizard",
   description:
     "Interactive wizard supporting native, VLESS, VMess, and Trojan. native + raw + reality is recommended first; generates runnable server/client configs and a runbook.",
 };

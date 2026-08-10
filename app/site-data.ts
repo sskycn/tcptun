@@ -1,5 +1,22 @@
 export const releaseVersion = "0.2.5";
 
+/** Product positioning — keep language consistent across the site. */
+export const productTagline = "Programmable networking runtime for applications and devices";
+
+export const productDescription =
+  "tcptun compiles routing, tunnels, transports, and platform networking into one strict, observable runtime. Run it as a CLI, embed it in Go, or integrate it into Android VPN clients.";
+
+/** Source and release provenance. */
+export const githubLinks = {
+  org: "https://github.com/sskycn",
+  site: "https://github.com/sskycn/tcptun",
+  runtime: "https://github.com/sskycn/tcptun-go",
+  runtimeReleases: "https://github.com/sskycn/tcptun-go/releases",
+  runtimeReleaseTag: `https://github.com/sskycn/tcptun-go/releases/tag/v${releaseVersion}`,
+  issues: "https://github.com/sskycn/tcptun-go/issues",
+  npmModule: "pkg.tcptun.com/net",
+} as const;
+
 /** Download and package links for the published npm package `tcptun`. */
 export const npmLinks = {
   package: "https://www.npmjs.com/package/tcptun",

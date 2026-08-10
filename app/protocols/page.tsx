@@ -7,7 +7,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion, tunnelProtocols } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Protocols · tcptun v${releaseVersion}`,
+  title: "Protocols",
   description: "native, VLESS, VMess, and Trojan tunnel protocols in one tcptun topology model.",
 };
 

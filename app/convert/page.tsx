@@ -5,7 +5,7 @@ import XrayConverter from "../xray-converter";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Xray convert · tcptun v${releaseVersion}`,
+  title: "Xray convert",
   description: "Convert Xray JSON or vless/vmess/trojan share links into tcptun configs in the browser.",
 };
 

@@ -5,7 +5,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Config · tcptun v${releaseVersion}`,
+  title: "Config",
   description:
     "tcptun JSON topology docs: native, REALITY auto carriers, resumable streams, reverse publish, and protocol comparison.",
 };

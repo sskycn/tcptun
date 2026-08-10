@@ -5,7 +5,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Generate config · tcptun v${releaseVersion}`,
+  title: "Generate config",
   description: "Generate matching tcptun server/client configs and URIs in the browser with local Web Crypto keys.",
 };
 

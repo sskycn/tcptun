@@ -3,19 +3,52 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useState } from "react";
+import { githubLinks } from "./site-data";
 
-const links = [
-  { href: "/guide/", label: "Wizard" },
-  { href: "/lan/", label: "Chat" },
-  { href: "/protocols/", label: "Protocols" },
-  { href: "/examples/", label: "Examples" },
-  { href: "/config/", label: "Config" },
-  { href: "/generate/", label: "Generate" },
-  { href: "/uri/", label: "URI" },
-  { href: "/convert/", label: "Convert" },
+/** Primary destinations — short, product-path oriented. */
+const primaryLinks = [
+  { href: "/guide/", label: "Get started" },
+  { href: "/docs/", label: "Docs" },
+  { href: "/embed/", label: "Embed" },
+  { href: "/architecture/", label: "Architecture" },
   { href: "/download/", label: "Download" },
-  { href: "/start/", label: "CLI" },
-  { href: "/faq/", label: "FAQ" },
+] as const;
+
+/** Mobile / overflow groups for the rest of the site. */
+const navGroups = [
+  {
+    title: "Product",
+    links: [
+      { href: "/guide/", label: "Get started" },
+      { href: "/embed/", label: "Go SDK" },
+      { href: "/use-cases/", label: "Use cases" },
+      { href: "/download/", label: "Download" },
+      { href: "/start/", label: "CLI" },
+    ],
+  },
+  {
+    title: "Documentation",
+    links: [
+      { href: "/docs/", label: "Docs hub" },
+      { href: "/architecture/", label: "Architecture" },
+      { href: "/config/", label: "Configuration" },
+      { href: "/protocols/", label: "Protocols" },
+      { href: "/protocols/native/", label: "Native protocol" },
+      { href: "/examples/", label: "Examples" },
+      { href: "/security/", label: "Security & trust" },
+      { href: "/faq/", label: "FAQ" },
+    ],
+  },
+  {
+    title: "Tools",
+    links: [
+      { href: "/generate/", label: "Config generator" },
+      { href: "/uri/", label: "URI tools" },
+      { href: "/convert/", label: "Xray convert" },
+      { href: "/guide/", label: "Setup wizard" },
+      { href: "/lan/", label: "LAN chat" },
+    ],
+  },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -58,7 +91,7 @@ export default function SiteNav() {
   return (
     <div className="site-nav">
       <nav className="nav nav-desktop" aria-label="Primary navigation">
-        {links.map((link) => (
+        {primaryLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
@@ -68,6 +101,14 @@ export default function SiteNav() {
             {link.label}
           </Link>
         ))}
+        <a
+          href={githubLinks.runtime}
+          target="_blank"
+          rel="noreferrer"
+          className="nav-external"
+        >
+          GitHub
+        </a>
       </nav>
 
       <button
@@ -98,22 +139,41 @@ export default function SiteNav() {
         aria-hidden={!open}
       >
         <div className="nav-mobile-panel">
-          <p className="nav-mobile-label">Navigation</p>
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={isActive(pathname, link.href) ? "is-active" : undefined}
-              aria-current={isActive(pathname, link.href) ? "page" : undefined}
+          {navGroups.map((group) => (
+            <div className="nav-mobile-group" key={group.title}>
+              <p className="nav-mobile-label">{group.title}</p>
+              {group.links.map((link) => (
+                <Link
+                  key={link.href + link.label}
+                  href={link.href}
+                  className={isActive(pathname, link.href) ? "is-active" : undefined}
+                  aria-current={isActive(pathname, link.href) ? "page" : undefined}
+                  tabIndex={open ? 0 : -1}
+                  onClick={() => setOpen(false)}
+                >
+                  <span>{link.label}</span>
+                  <span className="nav-mobile-hash" aria-hidden="true">
+                    {link.href}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ))}
+          <div className="nav-mobile-group">
+            <p className="nav-mobile-label">Source</p>
+            <a
+              href={githubLinks.runtime}
+              target="_blank"
+              rel="noreferrer"
               tabIndex={open ? 0 : -1}
               onClick={() => setOpen(false)}
             >
-              <span>{link.label}</span>
+              <span>GitHub · runtime</span>
               <span className="nav-mobile-hash" aria-hidden="true">
-                {link.href}
+                sskycn/tcptun-go
               </span>
-            </Link>
-          ))}
+            </a>
+          </div>
         </div>
       </nav>
     </div>

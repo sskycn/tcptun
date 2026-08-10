@@ -5,7 +5,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Chat · tcptun v${releaseVersion}`,
+  title: "Chat",
   description: "Discover nearby users and chat privately. Optional STUN/TURN for connections beyond the local network.",
 };
 

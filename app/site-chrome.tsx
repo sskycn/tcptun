@@ -4,7 +4,7 @@ import CookieBanner from "./cookie-banner";
 import CookieSettingsLink from "./cookie-settings-link";
 import SiteNav from "./site-nav";
 import ThemeToggle from "./theme-toggle";
-import { npmLinks, releaseVersion, tunnelProtocols } from "./site-data";
+import { githubLinks, npmLinks, productTagline, releaseVersion } from "./site-data";
 
 const displayVersion = `v${releaseVersion}`;
 
@@ -37,8 +37,9 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
             <div className="footer-brand">
               <Image src="/tcptun-logo.png" alt="" width={36} height={36} />
               <div>
-                <strong>tcptun {displayVersion}</strong>
-                <p>Config-driven proxy runtime</p>
+                <strong>tcptun</strong>
+                <p>{productTagline}</p>
+                <p className="footer-version">Latest runtime {displayVersion}</p>
               </div>
             </div>
           </div>
@@ -46,48 +47,54 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
           <div className="footer-columns">
             <div className="footer-column">
               <h3>Product</h3>
-              <Link href="/">Home</Link>
-              <Link href="/guide/">Wizard</Link>
-              <Link href="/lan/">Chat</Link>
-              <Link href="/config/">Config</Link>
-              <Link href="/generate/">Generate</Link>
-              <Link href="/uri/">URI</Link>
-              <Link href="/convert/">Convert</Link>
-              <Link href="/protocols/">Protocols</Link>
-              <Link href="/examples/">Examples</Link>
+              <Link href="/guide/">Get started</Link>
+              <Link href="/embed/">Go SDK</Link>
+              <Link href="/use-cases/">Use cases</Link>
+              <Link href="/download/">Download</Link>
               <Link href="/start/">CLI</Link>
+            </div>
+            <div className="footer-column">
+              <h3>Documentation</h3>
+              <Link href="/docs/">Docs hub</Link>
+              <Link href="/architecture/">Architecture</Link>
+              <Link href="/config/">Configuration</Link>
+              <Link href="/protocols/">Protocols</Link>
+              <Link href="/protocols/native/">Native protocol</Link>
+              <Link href="/examples/">Examples</Link>
+              <Link href="/security/">Security & trust</Link>
               <Link href="/faq/">FAQ</Link>
+            </div>
+            <div className="footer-column">
+              <h3>Tools</h3>
+              <Link href="/generate/">Config generator</Link>
+              <Link href="/uri/">URI tools</Link>
+              <Link href="/convert/">Xray convert</Link>
+              <Link href="/guide/">Setup wizard</Link>
+              <Link href="/lan/">LAN chat</Link>
+            </div>
+            <div className="footer-column">
+              <h3>Source & release</h3>
+              <a href={githubLinks.runtime} target="_blank" rel="noreferrer">
+                GitHub · runtime
+              </a>
+              <a href={githubLinks.runtimeReleaseTag} target="_blank" rel="noreferrer">
+                Release {displayVersion}
+              </a>
+              <a href={npmLinks.package} target="_blank" rel="noreferrer">
+                npm · tcptun
+              </a>
+              <a href="/install.sh">install.sh</a>
               <Link href="/legal/">Legal</Link>
               <Link href="/privacy/">Privacy</Link>
               <CookieSettingsLink className="footer-text-button" />
-            </div>
-            <div className="footer-column">
-              <h3>Download</h3>
-              <Link href="/download/">Binaries</Link>
-              <a href={npmLinks.package} target="_blank" rel="noreferrer">
-                npm
-              </a>
-              <a href={npmLinks.tarball}>tarball</a>
-              <a href="/install.sh">install.sh</a>
-            </div>
-            <div className="footer-column">
-              <h3>Protocols</h3>
-              {tunnelProtocols.map((protocol) => (
-                <Link href="/protocols/" key={protocol.name}>
-                  {protocol.name}
-                </Link>
-              ))}
-              <Link href="/protocols/native/">Native guide</Link>
-              <Link href="/examples/">Use cases</Link>
-              <Link href="/config/#protocol-compare">Compare</Link>
             </div>
           </div>
         </div>
 
         <div className="footer-bottom">
           <span>
-            tcptun {displayVersion} ·{" "}
-            <strong>Lawful use only · You bear all consequences · No warranty or promise.</strong>{" "}
+            tcptun {displayVersion} · programmable networking runtime ·{" "}
+            <strong>Lawful use only · You bear all consequences · No warranty.</strong>{" "}
             <Link href="/legal/">Disclaimer</Link>
             {" · "}
             <CookieSettingsLink className="footer-text-button" />

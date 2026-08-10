@@ -5,7 +5,7 @@ import UriConverter from "../uri-converter";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `URI tools · tcptun v${releaseVersion}`,
+  title: "URI tools",
   description: "Convert tcptun configs, share URIs, and QR codes for native, VLESS, VMess, and Trojan.",
 };
 

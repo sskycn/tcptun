@@ -5,7 +5,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Privacy · tcptun v${releaseVersion}`,
+  title: "Privacy",
   description:
     "tcptun privacy notice: local browser processing, local storage, cookies, peer-to-peer chat, and third-party infrastructure.",
 };

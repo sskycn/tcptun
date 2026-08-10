@@ -5,7 +5,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `Legal · tcptun v${releaseVersion}`,
+  title: "Legal",
   description: "tcptun disclaimer: lawful use only, you bear all consequences, no warranty or promise.",
 };
 

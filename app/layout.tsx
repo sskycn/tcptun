@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { releaseVersion } from "./site-data";
+import { productDescription, productTagline } from "./site-data";
 
 const sans = Inter({
   subsets: ["latin"],
@@ -33,8 +33,27 @@ const themeInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: `tcptun v${releaseVersion} · Config-driven proxy runtime`,
-  description: `tcptun is a multi-inbound, multi-outbound proxy runtime with Native, VLESS, VMess, Trojan, QUIC-first REALITY auto carriers, resumable TCP streams, mux, reverse publish, balance, and rule-based routing.`,
+  title: {
+    default: "tcptun · Programmable Networking Runtime",
+    template: "%s · tcptun",
+  },
+  description: productDescription,
+  keywords: [
+    "programmable networking runtime",
+    "Go networking library",
+    "TCP UDP tunnel runtime",
+    "embedded VPN engine",
+    "reverse TCP tunnel",
+    "application aware VPN routing",
+    "QUIC tunnel runtime",
+    "tcptun",
+  ],
+  openGraph: {
+    title: "tcptun · Programmable Networking Runtime",
+    description: productTagline,
+    type: "website",
+    url: "https://tcptun.com",
+  },
   icons: {
     icon: "/tcptun-logo.png",
     apple: "/tcptun-logo.png",

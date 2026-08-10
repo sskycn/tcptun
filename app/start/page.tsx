@@ -7,7 +7,7 @@ import SiteChrome from "../site-chrome";
 import { releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
-  title: `CLI quickstart · tcptun v${releaseVersion}`,
+  title: "CLI quickstart",
   description: "Run, check, generate, and import tcptun configs from the command line.",
 };
 
