@@ -58,7 +58,7 @@ export default function ConfigGenerator() {
           <p className="eyebrow">Generate</p>
           <h2>Generate paired configs in the browser.</h2>
           <p>
-            Builds v0.2.5 server/client pairs: Native auto mode uses raw + REALITY with{" "}
+            Builds v0.3.0 server/client pairs: Native auto mode uses raw + REALITY with{" "}
             <code>carrier.mode=auto</code> and mux for QUIC-first/TCP fallback, optional
             resumable TCP streams, or forced QUIC via <code>carrier.mode=quic</code>. Keys stay
             local.
@@ -193,7 +193,7 @@ export default function ConfigGenerator() {
                   }
                 />
                 <span>
-                  v0.2.5 Reality auto — QUIC-first with TCP fallback (carrier.mode=auto)
+                  v0.3.0 Reality auto — QUIC-first with TCP fallback (carrier.mode=auto)
                 </span>
               </label>
               {form.autoReality && !form.quic ? (
@@ -338,7 +338,7 @@ export default function ConfigGenerator() {
                 <li>Generates an X25519 key pair and short id</li>
                 <li>Creates token / UUID / password by protocol</li>
                 <li>vless enables Vision flow by default</li>
-                <li>Native defaults to v0.2.5 automatic QUIC/TCP Reality carriers (carrier.mode=auto)</li>
+                <li>Native defaults to v0.3.0 automatic QUIC/TCP Reality carriers (carrier.mode=auto)</li>
                 <li>Resumable TCP streams add matching bounded settings to both peers</li>
                 <li>Forced QUIC emits carrier.mode=quic with mux enabled</li>
               </ul>

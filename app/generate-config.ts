@@ -93,7 +93,7 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     users: [serverUser(protocol, credential)],
     transport: { type: "raw" },
     security: {
-      // v0.2.5+: keep security.type=reality and select auto/tcp/quic via carrier.mode.
+      // v0.3.0+: keep security.type=reality and select auto/tcp/quic via carrier.mode.
       type: "reality",
       private_key: privateKey,
       server_names: [serverName],

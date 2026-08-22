@@ -286,8 +286,9 @@ export default function Home() {
             <p className="eyebrow">Latest · {displayVersion}</p>
             <h2>What shipped in this runtime.</h2>
             <p>
-              Release notes stay technical: carrier control, camouflage options, mux failover, and
-              lossy-path recovery. Version lives here — not in the document title for SEO.
+              Release notes stay technical: cross-platform TUN, fail-closed DNS pinning, runtime
+              snapshots and diagnostics, actionable error classes, and Android/QR integrations.
+              Version lives here — not in the document title for SEO.
             </p>
           </div>
           <a className="button secondary" href={githubLinks.runtimeReleaseTag} target="_blank" rel="noreferrer">

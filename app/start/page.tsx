@@ -47,7 +47,7 @@ const workflows = [
   {
     name: "resume",
     title: "Resumable Reality auto",
-    body: "After generating a native Reality pair, set mux.resume=true on both ends (v0.2.5+).",
+    body: "After generating a native Reality pair, set mux.resume=true on both ends (v0.3.0+).",
     command: `# on both server inbound and client outbound mux blocks
 "mux": {
   "enabled": true,
