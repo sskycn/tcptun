@@ -47,14 +47,27 @@ export type TcptunSecurity = {
 };
 
 export type TcptunMux = {
+  /** @deprecated Prefer carrier.mode — kept for legacy URI/T3 decode. */
   mode?: string;
+  /** @deprecated Prefer carrier.udp_mode. */
   udp_mode?: string;
+  enabled?: boolean;
   resume?: boolean;
   resume_timeout?: string | number;
   resume_buffer_size?: number;
   max_sessions?: number;
   max_streams_per_session?: number;
   warm_spares?: number;
+  initial_stream_receive_window?: number;
+  max_stream_receive_window?: number;
+  initial_connection_receive_window?: number;
+  max_connection_receive_window?: number;
+};
+
+/** v0.2.5+ / v0.3.0 carrier selection (separate from mux pooling). */
+export type TcptunCarrier = {
+  mode?: string;
+  udp_mode?: string;
   initial_stream_receive_window?: number;
   max_stream_receive_window?: number;
   initial_connection_receive_window?: number;
@@ -74,6 +87,7 @@ export type TcptunOutbound = {
   network?: string[];
   transport?: TcptunTransport;
   security?: TcptunSecurity;
+  carrier?: TcptunCarrier;
   mux?: TcptunMux | null;
   discover?: boolean;
   members?: Array<{ outbound: string; weight?: number }>;
@@ -97,6 +111,7 @@ type TcptunInbound = {
   users?: TcptunUser[];
   transport?: TcptunTransport;
   security?: TcptunSecurity;
+  carrier?: TcptunCarrier;
   mux?: TcptunMux | null;
 };
 
@@ -119,6 +134,10 @@ const NATIVE_URI_PARAMETERS = new Set([
   "spx",
   "flow",
   "mux",
+  // v0.3.0 carrier selection (replaces mux_mode / mux_udp_mode for new URIs)
+  "carrier_mode",
+  "carrier_udp_mode",
+  // Legacy aliases still accepted when importing older URIs
   "mux_mode",
   "mux_udp_mode",
   "mux_max_sessions",
@@ -217,6 +236,17 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
   };
 }
 
+function resolvedCarrierMode(carrier: TcptunCarrier, mux: TcptunMux, securityType = ""): string {
+  const fromCarrier = (carrier.mode || "").trim().toLowerCase();
+  if (fromCarrier) return fromCarrier === "group" ? "tcp" : fromCarrier;
+  const fromMux = (mux.mode || "").trim().toLowerCase();
+  if (fromMux === "quic") return "quic";
+  if (fromMux === "group" || fromMux === "tcp") return "tcp";
+  if (securityType === "reality-quic") return "quic";
+  if (securityType === "reality-tcp") return "tcp";
+  return "";
+}
+
 export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): string {
   const protocol = normalizedProtocol(outbound.type);
   validateRepresentable(outbound, protocol);
@@ -224,7 +254,13 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   const transport = outbound.transport || {};
   const security = outbound.security || {};
   const mux = outbound.mux || {};
+  const carrier = outbound.carrier || {};
   const muxEnabled = outbound.mux != null;
+  const securityType = (security.type || "").trim().toLowerCase();
+  const carrierMode = resolvedCarrierMode(carrier, mux, securityType);
+  const carrierUdpMode = (carrier.udp_mode || mux.udp_mode || "").trim().toLowerCase();
+  const isReality =
+    securityType === "reality" || securityType === "reality-tcp" || securityType === "reality-quic";
 
   if (protocol === "vmess") {
     const payload = {
@@ -239,27 +275,22 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
       type: "none",
       host: "",
       path: transport.path || "",
-      tls:
-        security.type === "reality"
-          ? "reality"
-          : security.type === "tls"
-            ? "tls"
-            : "",
-      ...(security.type === "reality"
+      tls: isReality ? "reality" : securityType === "tls" ? "tls" : "",
+      ...(isReality
         ? {
             sni: security.server_name || "",
             fp: security.fingerprint || "",
             pbk: security.public_key || "",
             sid: security.short_id || "",
-            spx: security.spider_x || "",
+            ...(carrierMode !== "quic" ? { spx: security.spider_x || "" } : {}),
           }
-        : security.type === "tls" && security.server_name
+        : securityType === "tls" && security.server_name
           ? { sni: security.server_name }
           : {}),
       ...(security.insecure ? { allowInsecure: true } : {}),
       ...(muxEnabled ? { tcptun_mux: true } : {}),
-      ...(mux.mode ? { tcptun_mux_mode: mux.mode } : {}),
-      ...(mux.udp_mode ? { tcptun_mux_udp_mode: mux.udp_mode } : {}),
+      ...(carrierMode ? { tcptun_carrier_mode: carrierMode } : {}),
+      ...(carrierUdpMode ? { tcptun_carrier_udp_mode: carrierUdpMode } : {}),
       ...(positiveInteger(mux.max_sessions)
         ? { tcptun_mux_max_sessions: mux.max_sessions }
         : {}),
@@ -293,15 +324,12 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   if (outbound.network?.length) query.set("network", outbound.network.join(","));
   if (transport.path) query.set("path", transport.path);
 
-  if (security.type === "tls") {
+  if (securityType === "tls") {
     query.set("security", "tls");
     if (security.server_name) query.set("sni", security.server_name);
-  } else if (
-    security.type === "reality" ||
-    security.type === "reality-tcp" ||
-    security.type === "reality-quic"
-  ) {
-    query.set("security", security.type);
+  } else if (isReality) {
+    // v0.3.0: always emit security=reality; physical path goes in carrier_mode.
+    query.set("security", "reality");
     query.set("sni", security.server_name || "");
     query.set("fp", security.fingerprint || "");
     query.set("pbk", security.public_key || "");
@@ -311,8 +339,9 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   if (security.insecure) query.set("insecure", "true");
   if (outbound.flow) query.set("flow", outbound.flow);
   if (protocol === "native" || muxEnabled) query.set("mux", String(muxEnabled));
-  if (mux.mode) query.set("mux_mode", mux.mode);
-  if (mux.udp_mode) query.set("mux_udp_mode", mux.udp_mode);
+  // v0.3.0 URI: carrier_mode / carrier_udp_mode (not mux_mode).
+  if (carrierMode) query.set("carrier_mode", carrierMode);
+  if (carrierUdpMode) query.set("carrier_udp_mode", carrierUdpMode);
   if (positiveInteger(mux.max_sessions)) query.set("mux_max_sessions", String(mux.max_sessions));
   if (positiveInteger(mux.max_streams_per_session)) {
     query.set("mux_max_streams_per_session", String(mux.max_streams_per_session));
@@ -384,8 +413,6 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
 
   const mux = optionalBoolean(query.get("mux"), "mux");
   const muxConfig: TcptunMux = {};
-  setOptionalText(muxConfig, "mode", query.get("mux_mode"));
-  setOptionalText(muxConfig, "udp_mode", query.get("mux_udp_mode"));
   setOptionalInteger(muxConfig, "max_sessions", query.get("mux_max_sessions"));
   setOptionalInteger(muxConfig, "max_streams_per_session", query.get("mux_max_streams_per_session"));
   setOptionalInteger(muxConfig, "warm_spares", query.get("mux_warm_spares"));
@@ -394,12 +421,27 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   setOptionalInteger(muxConfig, "resume_buffer_size", query.get("mux_resume_buffer_size"));
   const hasMuxFields = Object.keys(muxConfig).length > 0;
   if (mux === true || (mux === undefined && hasMuxFields)) {
-    outbound.mux = muxConfig;
+    outbound.mux = { enabled: true, ...muxConfig };
   } else if (mux === false) {
     // omit mux
   } else if (hasMuxFields) {
-    outbound.mux = muxConfig;
+    outbound.mux = { enabled: true, ...muxConfig };
   }
+
+  const carrier: TcptunCarrier = {};
+  const carrierMode =
+    (query.get("carrier_mode") || query.get("mux_mode") || "").trim().toLowerCase();
+  const carrierUdpMode =
+    (query.get("carrier_udp_mode") || query.get("mux_udp_mode") || "").trim().toLowerCase();
+  if (carrierMode) {
+    if (carrierMode !== "auto" && carrierMode !== "tcp" && carrierMode !== "quic" && carrierMode !== "group") {
+      throw new Error(`Unsupported carrier_mode ${carrierMode}`);
+    }
+    // Legacy mux_mode=group maps to carrier tcp mux pool naming in v0.3 docs.
+    carrier.mode = carrierMode === "group" ? "tcp" : carrierMode;
+  }
+  if (carrierUdpMode) carrier.udp_mode = carrierUdpMode;
+  if (Object.keys(carrier).length > 0) outbound.carrier = carrier;
 
   const insecure = optionalBoolean(query.get("insecure"), "insecure");
   const securityType = (query.get("security") || "none").trim().toLowerCase();
@@ -415,15 +457,26 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
     securityType === "reality-tcp" ||
     securityType === "reality-quic"
   ) {
+    // Prefer explicit carrier_mode; legacy reality-tcp / reality-quic remain representable.
+    let resolvedSecurity = securityType;
+    if (securityType === "reality-tcp" || securityType === "reality-quic") {
+      resolvedSecurity = "reality";
+      if (!outbound.carrier?.mode) {
+        outbound.carrier = {
+          ...(outbound.carrier || {}),
+          mode: securityType === "reality-quic" ? "quic" : "tcp",
+        };
+      }
+    }
+    const includeSpider =
+      resolvedSecurity === "reality" && (outbound.carrier?.mode || "auto") !== "quic";
     outbound.security = {
-      type: securityType,
+      type: resolvedSecurity,
       server_name: sni,
       fingerprint: query.get("fp") || "",
       public_key: query.get("pbk") || "",
       short_id: query.get("sid") || "",
-      ...(securityType === "reality" || securityType === "reality-tcp"
-        ? { spider_x: query.get("spx") || "" }
-        : {}),
+      ...(includeSpider ? { spider_x: query.get("spx") || "" } : {}),
       ...(insecure ? { insecure: true } : {}),
     };
   } else if (securityType !== "none" && securityType !== "") {
@@ -467,8 +520,6 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
     },
   };
   const muxConfig: TcptunMux = {};
-  if (source.tcptun_mux_mode) muxConfig.mode = String(source.tcptun_mux_mode);
-  if (source.tcptun_mux_udp_mode) muxConfig.udp_mode = String(source.tcptun_mux_udp_mode);
   setSourceInteger(muxConfig, "max_sessions", source.tcptun_mux_max_sessions);
   setSourceInteger(muxConfig, "max_streams_per_session", source.tcptun_mux_max_streams_per_session);
   setSourceInteger(muxConfig, "warm_spares", source.tcptun_mux_warm_spares);
@@ -479,7 +530,25 @@ function parseVmessUri(text: string, tag: string): TcptunOutbound {
   setSourceInteger(muxConfig, "resume_buffer_size", source.tcptun_mux_resume_buffer_size);
   const muxEnabled = optionalSourceBoolean(source.tcptun_mux, "tcptun_mux");
   if (muxEnabled === true || (muxEnabled === undefined && Object.keys(muxConfig).length > 0)) {
-    outbound.mux = muxConfig;
+    outbound.mux = { enabled: true, ...muxConfig };
+  }
+  const carrierMode = String(
+    source.tcptun_carrier_mode || source.tcptun_mux_mode || "",
+  )
+    .trim()
+    .toLowerCase();
+  const carrierUdpMode = String(
+    source.tcptun_carrier_udp_mode || source.tcptun_mux_udp_mode || "",
+  )
+    .trim()
+    .toLowerCase();
+  if (carrierMode || carrierUdpMode) {
+    outbound.carrier = {
+      ...(carrierMode
+        ? { mode: carrierMode === "group" ? "tcp" : carrierMode }
+        : {}),
+      ...(carrierUdpMode ? { udp_mode: carrierUdpMode } : {}),
+    };
   }
   if (source.tcptun_network) outbound.network = parseNetworkList(String(source.tcptun_network));
   if (source.tcptun_flow) outbound.flow = String(source.tcptun_flow);
@@ -574,6 +643,7 @@ async function outboundFromInbound(
       type: inbound.transport?.type,
       path: inbound.transport?.path,
     },
+    ...(inbound.carrier ? { carrier: { ...inbound.carrier } } : {}),
     ...(inbound.mux != null ? { mux: { ...(inbound.mux || {}) } } : {}),
   };
   if (user.flow) outbound.flow = user.flow;
@@ -727,8 +797,11 @@ function asOutbound(value: JsonObject, index: number): TcptunOutbound {
     } else {
       const { enabled: _enabled, ...rest } = value.mux as JsonObject;
       void _enabled;
-      outbound.mux = rest as TcptunMux;
+      outbound.mux = { enabled: true, ...(rest as TcptunMux) };
     }
+  }
+  if (isObject(value.carrier)) {
+    outbound.carrier = { ...(value.carrier as TcptunCarrier) };
   }
   return outbound;
 }
@@ -766,8 +839,11 @@ function asInbound(value: JsonObject, index: number): TcptunInbound {
     } else {
       const { enabled: _enabled, ...rest } = value.mux as JsonObject;
       void _enabled;
-      inbound.mux = rest as TcptunMux;
+      inbound.mux = { enabled: true, ...(rest as TcptunMux) };
     }
+  }
+  if (isObject(value.carrier)) {
+    inbound.carrier = { ...(value.carrier as TcptunCarrier) };
   }
   return inbound;
 }

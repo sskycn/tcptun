@@ -1,4 +1,4 @@
-import type { TcptunMux, TcptunOutbound, TcptunSecurity } from "./uri-convert";
+import type { TcptunCarrier, TcptunMux, TcptunOutbound, TcptunSecurity } from "./uri-convert";
 
 const PREFIX_T3 = "T3:";
 const PREFIX_T2 = "T2:";
@@ -126,7 +126,20 @@ function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): Com
   const flowSource = outbound.flow?.trim() || "";
   const flowExplicitEmpty =
     protocol === "vless" && (security === "reality" || security === "reality-tcp") && flowSource === "";
-  const mux = normalizeMux(outbound.mux);
+  const mux = normalizeMux(outbound.mux, outbound.carrier);
+  // Compact profile still encodes carrier selection in the historical muxMode slot
+  // (1=tcp/group, 2=quic) — align with Go profileuri after carrier.mode split.
+  const carrierMode = (outbound.carrier?.mode || "").trim().toLowerCase();
+  let muxMode = mux.mode;
+  if (!muxMode) {
+    if (carrierMode === "quic" || security === "reality-quic") muxMode = "quic";
+    else if (carrierMode === "tcp" || carrierMode === "group" || security === "reality-tcp") {
+      muxMode = "group";
+    } else if (carrierMode === "auto" && outbound.mux != null && security === "reality") {
+      // T3 cannot encode auto; require explicit tcp/quic or share JSON.
+      throw new Error("T3 cannot represent carrier.mode=auto; share the complete JSON config instead");
+    }
+  }
 
   return {
     protocol,
@@ -136,7 +149,7 @@ function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): Com
     mux: outbound.mux != null,
     networkCode,
     upstreamMixed: false,
-    muxMode: mux.mode,
+    muxMode,
     path,
     sni,
     name: name.trim(),
@@ -200,7 +213,7 @@ function validateSecurity(config: TcptunSecurity, security: string) {
   }
 }
 
-function normalizeMux(value: TcptunMux | null | undefined) {
+function normalizeMux(value: TcptunMux | null | undefined, carrier?: TcptunCarrier) {
   if (value == null) {
     return {
       mode: "", udpMode: "", maxSessions: 0, maxStreams: 0, warmSpare: 0,
@@ -211,22 +224,35 @@ function normalizeMux(value: TcptunMux | null | undefined) {
   if (value.resume || hasDuration(value.resume_timeout) || value.resume_buffer_size) {
     throw new Error("T3 cannot represent resumable mux settings; share the complete JSON config instead");
   }
-  const mode = (value.mode || "").trim().toLowerCase();
+  let mode = (value.mode || "").trim().toLowerCase();
+  if (mode === "tcp") mode = "group";
   if (mode && mode !== "group" && mode !== "quic") {
     throw new Error(`T3 does not support mux mode ${value.mode}`);
   }
-  const udpMode = (value.udp_mode || "").trim().toLowerCase();
+  const udpMode = (carrier?.udp_mode || value.udp_mode || "").trim().toLowerCase();
   if (udpMode && !["reliable", "auto", "datagram"].includes(udpMode)) {
-    throw new Error(`T3 does not support mux UDP mode ${value.udp_mode}`);
+    throw new Error(`T3 does not support carrier UDP mode ${udpMode}`);
   }
   const fields = [
     ["max_sessions", value.max_sessions || 0],
     ["max_streams_per_session", value.max_streams_per_session || 0],
     ["warm_spares", value.warm_spares || 0],
-    ["initial_stream_receive_window", value.initial_stream_receive_window || 0],
-    ["max_stream_receive_window", value.max_stream_receive_window || 0],
-    ["initial_connection_receive_window", value.initial_connection_receive_window || 0],
-    ["max_connection_receive_window", value.max_connection_receive_window || 0],
+    [
+      "initial_stream_receive_window",
+      carrier?.initial_stream_receive_window || value.initial_stream_receive_window || 0,
+    ],
+    [
+      "max_stream_receive_window",
+      carrier?.max_stream_receive_window || value.max_stream_receive_window || 0,
+    ],
+    [
+      "initial_connection_receive_window",
+      carrier?.initial_connection_receive_window || value.initial_connection_receive_window || 0,
+    ],
+    [
+      "max_connection_receive_window",
+      carrier?.max_connection_receive_window || value.max_connection_receive_window || 0,
+    ],
   ] as const;
   for (const [field, number] of fields) {
     if (!Number.isInteger(number) || number < 0 || number > MAX_INT32) {
@@ -461,24 +487,48 @@ function outboundFromProfile(profile: CompactProfile, tag: string): TcptunOutbou
   }
   if (profile.mux) {
     outbound.mux = {
-      ...(profile.muxMode ? { mode: profile.muxMode } : {}),
-      ...(profile.muxUDPMode ? { udp_mode: profile.muxUDPMode } : {}),
+      enabled: true,
       ...(profile.muxMaxSessions ? { max_sessions: profile.muxMaxSessions } : {}),
       ...(profile.muxMaxStreamsPerSession
         ? { max_streams_per_session: profile.muxMaxStreamsPerSession }
         : {}),
       ...(profile.muxWarmSpare ? { warm_spares: profile.muxWarmSpare } : {}),
-      ...(profile.initialStreamWindow
-        ? { initial_stream_receive_window: profile.initialStreamWindow }
-        : {}),
-      ...(profile.maxStreamWindow ? { max_stream_receive_window: profile.maxStreamWindow } : {}),
-      ...(profile.initialConnectionWindow
-        ? { initial_connection_receive_window: profile.initialConnectionWindow }
-        : {}),
-      ...(profile.maxConnectionWindow
-        ? { max_connection_receive_window: profile.maxConnectionWindow }
-        : {}),
     };
+    const carrierMode =
+      profile.muxMode === "quic"
+        ? "quic"
+        : profile.muxMode === "group"
+          ? "tcp"
+          : profile.security === "reality-quic"
+            ? "quic"
+            : profile.security === "reality-tcp"
+              ? "tcp"
+              : "";
+    if (carrierMode || profile.muxUDPMode || profile.initialStreamWindow || profile.maxStreamWindow) {
+      outbound.carrier = {
+        ...(carrierMode ? { mode: carrierMode } : {}),
+        ...(profile.muxUDPMode ? { udp_mode: profile.muxUDPMode } : {}),
+        ...(profile.initialStreamWindow
+          ? { initial_stream_receive_window: profile.initialStreamWindow }
+          : {}),
+        ...(profile.maxStreamWindow
+          ? { max_stream_receive_window: profile.maxStreamWindow }
+          : {}),
+        ...(profile.initialConnectionWindow
+          ? { initial_connection_receive_window: profile.initialConnectionWindow }
+          : {}),
+        ...(profile.maxConnectionWindow
+          ? { max_connection_receive_window: profile.maxConnectionWindow }
+          : {}),
+      };
+    }
+    // Prefer security.type=reality + carrier.mode over legacy reality-tcp/quic aliases.
+    if (
+      outbound.security &&
+      (outbound.security.type === "reality-tcp" || outbound.security.type === "reality-quic")
+    ) {
+      outbound.security = { ...outbound.security, type: "reality" };
+    }
   }
   return outbound;
 }

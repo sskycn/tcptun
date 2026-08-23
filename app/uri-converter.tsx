@@ -343,7 +343,10 @@ export default function UriConverter() {
           {mode === "qrcode" ? (
             <ul className="converter-notes">
               <li>New QR codes use the denser T3 Base45 profile</li>
-              <li>T3 preserves v0.3.0 reality-tcp; resumable mux requires sharing complete JSON</li>
+              <li>
+                Native URIs use <code>carrier_mode</code> / <code>carrier_udp_mode</code> (v0.3.0);
+                resumable mux still requires sharing complete JSON
+              </li>
               <li>Upload recognition accepts T3, legacy T2, and plain URIs</li>
               <li>Each URI becomes its own 512 × 512 PNG</li>
               <li>Recognition and generation run entirely in the browser</li>
