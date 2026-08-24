@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PageHero from "../page-hero";
 import SiteChrome from "../site-chrome";
-import { releaseVersion } from "../site-data";
+import { androidAppLinks, releaseVersion } from "../site-data";
 
 export const metadata: Metadata = {
   title: "Privacy",
@@ -359,8 +359,12 @@ export default function PrivacyPage() {
           <p className="eyebrow">Android client</p>
           <h2>tcptun-kotlin privacy boundary</h2>
           <p>
-            These additional disclosures apply to the tcptun-kotlin Android application. The app is a
-            client for endpoints you choose, not an operator-owned VPN service.
+            These additional disclosures apply to the tcptun-kotlin Android application (
+            <a href={androidAppLinks.playStore} target="_blank" rel="noreferrer">
+              Google Play
+            </a>
+            , package <code>{androidAppLinks.packageId}</code>). The app is a client for endpoints
+            you choose, not an operator-owned VPN service.
           </p>
         </div>
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PageHero from "../page-hero";
 import SiteChrome from "../site-chrome";
+import { androidAppLinks } from "../site-data";
 
 export const metadata: Metadata = {
   title: "Use cases",
@@ -27,9 +28,9 @@ const cases = [
   {
     id: "android",
     title: "Android VPN runtime",
-    body: "Build application-aware VPN routing with TUN, DNS, and outbound switching. The Android bridge exposes control and diagnostics around the same runtime.",
-    href: "/embed/",
-    cta: "Embed / integrate",
+    body: "Build application-aware VPN routing with TUN, DNS, and outbound switching. Get the client on Google Play, or embed the same runtime bridge in your own Android VPN product.",
+    href: androidAppLinks.playStore,
+    cta: "Google Play",
   },
   {
     id: "embed",
@@ -54,6 +55,10 @@ const cases = [
   },
 ] as const;
 
+function isExternalHref(href: string) {
+  return /^https?:\/\//i.test(href);
+}
+
 export default function UseCasesPage() {
   return (
     <SiteChrome>
@@ -64,7 +69,7 @@ export default function UseCasesPage() {
         actions={[
           { href: "/guide/", label: "Get started", variant: "primary" },
           { href: "/architecture/", label: "Architecture", variant: "secondary" },
-          { href: "/embed/", label: "Go SDK", variant: "ghost" },
+          { href: androidAppLinks.playStore, label: "Android app", variant: "ghost" },
         ]}
       />
 
@@ -78,9 +83,15 @@ export default function UseCasesPage() {
               </div>
               <h3>{item.title}</h3>
               <p>{item.body}</p>
-              <Link className="protocol-doc-link" href={item.href}>
-                {item.cta} →
-              </Link>
+              {isExternalHref(item.href) ? (
+                <a className="protocol-doc-link" href={item.href} target="_blank" rel="noreferrer">
+                  {item.cta} →
+                </a>
+              ) : (
+                <Link className="protocol-doc-link" href={item.href}>
+                  {item.cta} →
+                </Link>
+              )}
             </article>
           ))}
         </div>

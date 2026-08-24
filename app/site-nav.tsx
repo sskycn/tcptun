@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useState } from "react";
-import { githubLinks } from "./site-data";
+import { androidAppLinks, githubLinks } from "./site-data";
 
 /** Primary destinations — short, product-path oriented. */
 const primaryLinks = [
@@ -23,6 +23,7 @@ const navGroups = [
       { href: "/embed/", label: "Go SDK" },
       { href: "/use-cases/", label: "Use cases" },
       { href: "/download/", label: "Download" },
+      { href: "/download/#android", label: "Android app" },
       { href: "/start/", label: "CLI" },
     ],
   },
@@ -170,6 +171,18 @@ export default function SiteNav() {
               <span>GitHub · runtime</span>
               <span className="nav-mobile-hash" aria-hidden="true">
                 sskycn/tcptun-go
+              </span>
+            </a>
+            <a
+              href={androidAppLinks.playStore}
+              target="_blank"
+              rel="noreferrer"
+              tabIndex={open ? 0 : -1}
+              onClick={() => setOpen(false)}
+            >
+              <span>Android · Google Play</span>
+              <span className="nav-mobile-hash" aria-hidden="true">
+                {androidAppLinks.packageId}
               </span>
             </a>
           </div>

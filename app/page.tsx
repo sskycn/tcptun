@@ -28,7 +28,7 @@ const paths = [
     body: "Import pkg.tcptun.com/net and compose dialers, listeners, packet devices, and routing in process.",
   },
   {
-    href: "/use-cases/#android",
+    href: "/download/#android",
     label: "Integrate",
     title: "Android & platforms",
     body: "Use the runtime as an application-aware VPN engine with TUN, DNS, and outbound switching.",

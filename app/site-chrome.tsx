@@ -4,7 +4,7 @@ import CookieBanner from "./cookie-banner";
 import CookieSettingsLink from "./cookie-settings-link";
 import SiteNav from "./site-nav";
 import ThemeToggle from "./theme-toggle";
-import { githubLinks, npmLinks, productTagline, releaseVersion } from "./site-data";
+import { androidAppLinks, githubLinks, npmLinks, productTagline, releaseVersion } from "./site-data";
 
 const displayVersion = `v${releaseVersion}`;
 
@@ -51,6 +51,9 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
               <Link href="/embed/">Go SDK</Link>
               <Link href="/use-cases/">Use cases</Link>
               <Link href="/download/">Download</Link>
+              <a href={androidAppLinks.playStore} target="_blank" rel="noreferrer">
+                Android · Google Play
+              </a>
               <Link href="/start/">CLI</Link>
             </div>
             <div className="footer-column">

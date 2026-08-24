@@ -27,6 +27,12 @@ export const npmLinks = {
   latestBinaryBase: "https://cdn.jsdelivr.net/npm/tcptun@latest/dist",
 };
 
+/** Android client distribution. */
+export const androidAppLinks = {
+  packageId: "com.tcptun.client",
+  playStore: "https://play.google.com/store/apps/details?id=com.tcptun.client",
+} as const;
+
 /** @deprecated Prefer npmLinks.binaryBase — binaries are no longer hosted on Pages. */
 export const releaseBasePath = npmLinks.binaryBase;
 
