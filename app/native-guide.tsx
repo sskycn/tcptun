@@ -16,8 +16,8 @@ type ProtocolFilter = "all" | "native" | "vless" | "vmess" | "trojan";
 
 export default function NativeGuide() {
   const nativeProtocol = tunnelProtocols.find((item) => item.name === "native") ?? tunnelProtocols[0];
-  const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>("all");
-  const [useCaseId, setUseCaseId] = useState<(typeof protocolUseCases)[number]["id"]>("native-basic");
+  const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>("native");
+  const [useCaseId, setUseCaseId] = useState<(typeof protocolUseCases)[number]["id"]>("native-reality");
   const [side, setSide] = useState<SideTab>("server");
 
   const filteredCases = useMemo(

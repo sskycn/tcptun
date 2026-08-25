@@ -657,7 +657,7 @@ export const nativeServerExample = `{
       "network": ["tcp", "udp"],
       "users": [{ "id": "change-me" }],
       "transport": { "type": "raw" },
-      "mux": {}
+      "mux": { "enabled": true }
     }
   ],
   "outbounds": [
@@ -685,7 +685,7 @@ export const nativeClientExample = `{
       "address": ["proxy.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "mux": {}
+      "mux": { "enabled": true }
     },
     { "tag": "direct", "type": "direct" }
   ],
@@ -693,7 +693,7 @@ export const nativeClientExample = `{
   "dns": {}
 }`;
 
-/** Native + REALITY QUIC pair produced by `tcptun config native --quic`. */
+/** Native + Reality forced QUIC (`carrier.mode=quic`) from `tcptun config native --quic`. */
 export const nativeQuicClientExample = `{
   "log": { "level": "info" },
   "inbounds": [
@@ -713,15 +713,16 @@ export const nativeQuicClientExample = `{
       "network": ["tcp", "udp"],
       "transport": { "type": "raw" },
       "security": {
-        "type": "reality-quic",
+        "type": "reality",
         "server_name": "example.com",
         "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
-        "short_id": "abcd1234"
+        "short_id": "abcd1234",
+        "spider_x": "/"
       },
+      "carrier": { "mode": "quic", "udp_mode": "auto" },
       "mux": {
-        "mode": "quic",
-        "udp_mode": "auto",
+        "enabled": true,
         "max_sessions": 4,
         "max_streams_per_session": 128,
         "warm_spares": 1
@@ -744,15 +745,16 @@ export const nativeQuicServerExample = `{
       "users": [{ "id": "change-me" }],
       "transport": { "type": "raw" },
       "security": {
-        "type": "reality-quic",
+        "type": "reality",
         "private_key": "REPLACE_WITH_SERVER_PRIVATE_KEY",
         "server_names": ["example.com"],
         "short_ids": ["abcd1234"],
         "dest": "example.com:443",
         "max_time_diff": "30s"
       },
+      "carrier": { "mode": "quic" },
       "mux": {
-        "mode": "quic",
+        "enabled": true,
         "max_streams_per_session": 128
       }
     }
@@ -774,7 +776,7 @@ export const nativeReverseServerExample = `{
       "network": ["tcp"],
       "users": [{ "id": "replace-with-a-long-random-token" }],
       "transport": { "type": "raw" },
-      "mux": {},
+      "mux": { "enabled": true },
       "publish": [
         { "service": "web", "address": ["0.0.0.0:8080"] }
       ]
@@ -804,7 +806,7 @@ export const nativeReverseClientExample = `{
       "address": ["server.example.com:9443"],
       "token": "replace-with-a-long-random-token",
       "transport": { "type": "raw" },
-      "mux": {},
+      "mux": { "enabled": true },
       "expose": [
         { "service": "web", "target": "127.0.0.1:3000" }
       ]
@@ -1588,14 +1590,15 @@ export const nativeRealityTcpServerExample = `{
       "users": [{ "id": "change-me" }],
       "transport": { "type": "raw" },
       "security": {
-        "type": "reality-tcp",
+        "type": "reality",
         "private_key": "REPLACE_WITH_SERVER_PRIVATE_KEY",
         "server_names": ["example.com"],
         "short_ids": ["abcd1234"],
         "dest": "example.com:443",
         "max_time_diff": "30s"
       },
-      "mux": { "mode": "group" }
+      "carrier": { "mode": "tcp" },
+      "mux": { "enabled": true }
     }
   ],
   "outbounds": [{ "tag": "direct", "type": "direct" }],
@@ -1621,14 +1624,15 @@ export const nativeRealityTcpClientExample = `{
       "network": ["tcp", "udp"],
       "transport": { "type": "raw" },
       "security": {
-        "type": "reality-tcp",
+        "type": "reality",
         "server_name": "example.com",
         "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
       },
-      "mux": { "mode": "group" }
+      "carrier": { "mode": "tcp" },
+      "mux": { "enabled": true }
     }
   ],
   "route": { "default_outbound": "proxy", "rules": [] }
@@ -1664,7 +1668,8 @@ export const nativeMultiAddressClientExample = `{
         "short_id": "abcd1234",
         "spider_x": "/"
       },
-      "mux": { "mode": "group" }
+      "carrier": { "mode": "auto" },
+      "mux": { "enabled": true }
     }
   ],
   "route": { "default_outbound": "proxy", "rules": [] }
@@ -1687,7 +1692,8 @@ export const balanceFailoverExample = `{
       "address": ["edge-a.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "mux": { "mode": "group" },
+      "carrier": { "mode": "auto" },
+      "mux": { "enabled": true },
       "security": {
         "type": "reality",
         "server_name": "example.com",
@@ -1703,7 +1709,8 @@ export const balanceFailoverExample = `{
       "address": ["edge-b.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "mux": { "mode": "group" },
+      "carrier": { "mode": "auto" },
+      "mux": { "enabled": true },
       "security": {
         "type": "reality",
         "server_name": "example.com",
@@ -1752,7 +1759,8 @@ export const routeSplitExample = `{
       "address": ["proxy.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "mux": { "mode": "group" },
+      "carrier": { "mode": "auto" },
+      "mux": { "enabled": true },
       "security": {
         "type": "reality",
         "server_name": "example.com",
@@ -1775,35 +1783,204 @@ export const routeSplitExample = `{
   }
 }`;
 
+export const nativeReverseUdpServerExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "edge",
+      "type": "native",
+      "address": ["0.0.0.0:9443"],
+      "network": ["udp"],
+      "users": [{ "id": "replace-with-a-long-random-token" }],
+      "transport": { "type": "raw" },
+      "mux": { "enabled": true },
+      "publish": [
+        { "service": "dns", "network": "udp", "address": ["0.0.0.0:5353"] }
+      ]
+    }
+  ],
+  "outbounds": [
+    { "tag": "direct", "type": "direct", "network": ["udp"] }
+  ],
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": { "strategy": "prefer_ipv4" }
+}`;
 
-export const protocolUseCases = [
+export const nativeReverseUdpClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "edge",
+      "type": "native",
+      "address": ["server.example.com:9443"],
+      "token": "replace-with-a-long-random-token",
+      "network": ["udp"],
+      "transport": { "type": "raw" },
+      "mux": { "enabled": true },
+      "expose": [
+        { "service": "dns", "network": "udp", "target": "127.0.0.1:53" }
+      ]
+    }
+  ],
+  "route": { "default_outbound": "edge", "rules": [] },
+  "dns": { "strategy": "prefer_ipv4" }
+}`;
+
+export const nativeChainClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "edge",
+      "type": "socks5",
+      "address": ["127.0.0.1:1081"],
+      "network": ["tcp"]
+    },
+    {
+      "tag": "proxy",
+      "type": "native",
+      "address": ["proxy.example.com:9443"],
+      "token": "change-me",
+      "via": "edge",
+      "network": ["tcp"],
+      "transport": { "type": "raw" },
+      "mux": { "enabled": true }
+    }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
+}`;
+
+export const nativeRelayExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "relay-in",
+      "type": "native",
+      "address": ["0.0.0.0:9443"],
+      "network": ["tcp", "udp"],
+      "users": [{ "id": "inbound-secret" }],
+      "transport": { "type": "raw" },
+      "mux": { "enabled": true }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "next",
+      "type": "native",
+      "address": ["next.example.com:9443"],
+      "token": "outbound-secret",
+      "transport": { "type": "raw" },
+      "mux": { "enabled": true }
+    }
+  ],
+  "route": { "default_outbound": "next", "rules": [] },
+  "dns": {}
+}`;
+
+export const nativeTlsFallbackServerExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "server",
+      "type": "native",
+      "address": ["0.0.0.0:443"],
+      "network": ["tcp", "udp"],
+      "users": [{ "id": "change-me" }],
+      "transport": { "type": "raw" },
+      "security": { "type": "none" },
+      "carrier": { "mode": "tcp" },
+      "mux": { "enabled": true },
+      "fallback": {
+        "type": "tls_passthrough",
+        "dest": "www.example.com:443",
+        "server_names": ["www.example.com"],
+        "handshake_timeout": "3s"
+      }
+    }
+  ],
+  "outbounds": [{ "tag": "direct", "type": "direct" }],
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": {}
+}`;
+
+export const nativeTlsFallbackClientExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "native",
+      "address": ["proxy.example.com:443"],
+      "token": "change-me",
+      "network": ["tcp", "udp"],
+      "transport": { "type": "raw" },
+      "carrier": { "mode": "tcp" },
+      "mux": { "enabled": true }
+    },
+    { "tag": "direct", "type": "direct" }
+  ],
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
+}`;
+
+
+/** Catalog groups for the /examples sidebar menu (native first). */
+export const exampleCatalogGroups = [
   {
-    id: "native-basic",
-    protocol: "native",
-    title: "native · basic proxy",
-    summary: "tcptun-to-tcptun tunnel with raw + mux for throughput.",
-    when: "Both ends run tcptun and you want low overhead.",
-    steps: [
-      "Generate with tcptun config native.",
-      "Match users[].id and token.",
-      "Start server, then client; use 127.0.0.1:1080.",
-    ],
-    commands: [
-      "tcptun config native --server proxy.example.com --port 9443",
-      "tcptun config check --config server.json",
-      "tcptun --config server.json",
-      "tcptun --config client.json",
-    ],
-    serverCode: nativeServerExample,
-    clientCode: nativeClientExample,
-    serverHint: "server-native.json",
-    clientHint: "client-native.json",
+    id: "native-carriers",
+    label: "Native · carriers",
+    description: "Recommended tcptun-to-tcptun stacks and carrier.mode variants.",
   },
+  {
+    id: "native-topology",
+    label: "Native · topology",
+    description: "Reverse publish, multi-path, balance, routing, chain, and relay.",
+  },
+  {
+    id: "wire-interop",
+    label: "Wire interop",
+    description: "VLESS / VMess / Trojan when an ecosystem requires those wires.",
+  },
+] as const;
+
+export type ExampleCatalogGroupId = (typeof exampleCatalogGroups)[number]["id"];
+
+/**
+ * Full worked-example catalog for /examples.
+ * Ordered native-first; each entry has server/client JSON ready to copy.
+ */
+export const protocolUseCases = [
   {
     id: "native-reality",
     protocol: "native",
-    title: "native · raw + reality auto",
-    summary: "v0.3.0 stack: native + raw + group mux + reality. QUIC-first with TCP fallback on one address.",
+    group: "native-carriers",
+    recommended: true,
+    title: "Reality auto (recommended)",
+    summary:
+      "v0.3.0 default: native + raw + mux + security.type=reality + carrier.mode=auto. QUIC-first with TCP fallback on one address.",
     when: "Both ends run tcptun v0.3.0+ and you want automatic dual carriers without certs or a second port.",
     steps: [
       "Generate with --server-name and --dest (HTTPS + HTTP/3 capable camouflage).",
@@ -1823,18 +2000,67 @@ export const protocolUseCases = [
     clientHint: "client-native-reality-auto.json",
   },
   {
-    id: "native-quic",
+    id: "native-basic",
     protocol: "native",
-    title: "native · QUIC",
-    summary: "native + raw + reality-quic + mux.mode=quic.",
-    when: "You want QUIC streams/DATAGRAMs without managing TLS certs.",
+    group: "native-carriers",
+    recommended: false,
+    title: "Basic raw + mux",
+    summary: "Lowest-friction tcptun-to-tcptun tunnel. Token auth, no camouflage layer.",
+    when: "Both ends are trusted or already on a private path; you mainly need throughput.",
     steps: [
-      "Generate with --quic.",
-      "Open UDP on the listen port.",
-      "Do not use plain reality in place of reality-quic.",
+      "Generate with tcptun config native.",
+      "Match users[].id and token.",
+      "Start server, then client; use 127.0.0.1:1080.",
     ],
     commands: [
-      "tcptun config native --quic --server proxy.example.com --port 9443",
+      "tcptun config native --server proxy.example.com --port 9443",
+      "tcptun config check --config server.json",
+      "tcptun --config server.json",
+      "tcptun --config client.json",
+    ],
+    serverCode: nativeServerExample,
+    clientCode: nativeClientExample,
+    serverHint: "server-native.json",
+    clientHint: "client-native.json",
+  },
+  {
+    id: "native-reality-tcp",
+    protocol: "native",
+    group: "native-carriers",
+    recommended: false,
+    title: "Reality TCP only",
+    summary: "security.type=reality + carrier.mode=tcp. No QUIC fallback.",
+    when: "Paths that drop UDP/QUIC but still allow TCP Reality.",
+    steps: [
+      "Keep security.type=reality and set carrier.mode=tcp on both ends.",
+      "Keep transport raw and mux.enabled if you want mux pooling.",
+      "Do not expect QUIC preference or dual-carrier probing.",
+    ],
+    commands: [
+      "tcptun config check --config server-native-reality-tcp.json",
+      "tcptun --config server-native-reality-tcp.json",
+      "tcptun --config client-native-reality-tcp.json",
+    ],
+    serverCode: nativeRealityTcpServerExample,
+    clientCode: nativeRealityTcpClientExample,
+    serverHint: "server-native-reality-tcp.json",
+    clientHint: "client-native-reality-tcp.json",
+  },
+  {
+    id: "native-quic",
+    protocol: "native",
+    group: "native-carriers",
+    recommended: false,
+    title: "Reality QUIC only",
+    summary: "security.type=reality + carrier.mode=quic. Dedicated QUIC pool, no TCP fallback.",
+    when: "You want forced QUIC streams/DATAGRAMs without managing TLS certificates.",
+    steps: [
+      "Generate with --quic (emits carrier.mode=quic + mux.enabled).",
+      "Open UDP on the listen port end-to-end.",
+      "Keep security.type=reality; do not revive legacy reality-quic aliases in new configs.",
+    ],
+    commands: [
+      "tcptun config native --quic --server proxy.example.com --port 9443 --server-name example.com --dest example.com:443",
       "tcptun --config server.json",
       "tcptun --config client.json",
     ],
@@ -1846,13 +2072,15 @@ export const protocolUseCases = [
   {
     id: "native-resumable",
     protocol: "native",
-    title: "native · resumable auto",
-    summary: "v0.3.0 automatic QUIC/TCP Reality carriers with resumable TCP logical streams.",
+    group: "native-carriers",
+    recommended: false,
+    title: "Resumable Reality auto",
+    summary: "Reality auto carriers plus mux.resume for eligible TCP logical streams.",
     when: "Long-lived TCP flows should survive a physical carrier replacement on one server process.",
     steps: [
       "Use v0.3.0+ on both ends and keep one unique server address.",
-      "Set native + raw + reality + group mux on both endpoints.",
-      "Enable mux.resume with matching timeout and buffer size values.",
+      "Start from Reality auto, then enable mux.resume with matching timeout/buffer.",
+      "Keep resume off during rolling upgrades until both peers are upgraded.",
     ],
     commands: [
       "tcptun config check --config server-native-resumable.json",
@@ -1865,10 +2093,35 @@ export const protocolUseCases = [
     clientHint: "client-native-resumable.json",
   },
   {
+    id: "native-tls-fallback",
+    protocol: "native",
+    group: "native-carriers",
+    recommended: false,
+    title: "TLS passthrough fallback",
+    summary: "Native TCP inbound with tls_passthrough fallback for unmatched handshakes on :443.",
+    when: "You share a public 443 listener and want non-tcptun clients forwarded to a real TLS site.",
+    steps: [
+      "Set fallback.type=tls_passthrough with dest and server_names.",
+      "Use carrier.mode=tcp on this pattern; replace the token before exposing :443.",
+      "Validate with config check, then confirm fallback SNI reaches the real site.",
+    ],
+    commands: [
+      "tcptun config check --config server-native-tls-fallback.json",
+      "tcptun --config server-native-tls-fallback.json",
+      "tcptun --config client-native-tls-fallback.json",
+    ],
+    serverCode: nativeTlsFallbackServerExample,
+    clientCode: nativeTlsFallbackClientExample,
+    serverHint: "server-native-tls-fallback.json",
+    clientHint: "client-native-tls-fallback.json",
+  },
+  {
     id: "native-reverse",
     protocol: "native",
-    title: "native · reverse publish",
-    summary: "Expose a NAT-side service on the edge with publish/expose.",
+    group: "native-topology",
+    recommended: false,
+    title: "Reverse publish (TCP)",
+    summary: "Expose a NAT-side TCP service on the edge with publish/expose.",
     when: "The real service sits behind the client; the VPS should accept public traffic.",
     steps: [
       "Enable mux on both ends.",
@@ -1885,11 +2138,146 @@ export const protocolUseCases = [
     clientHint: "client-reverse.json",
   },
   {
+    id: "native-reverse-udp",
+    protocol: "native",
+    group: "native-topology",
+    recommended: false,
+    title: "Reverse publish (UDP)",
+    summary: "Publish a UDP service (for example DNS) from behind NAT onto the edge.",
+    when: "You need UDP reverse publish with matching service + network=udp.",
+    steps: [
+      "Set network=udp on tunnel, publish, and expose.",
+      "Match service names; point expose.target at the private UDP listener.",
+      "Dial the server publish UDP address externally.",
+    ],
+    commands: [
+      "tcptun --config server-reverse-udp.json",
+      "tcptun --config client-reverse-udp.json",
+    ],
+    serverCode: nativeReverseUdpServerExample,
+    clientCode: nativeReverseUdpClientExample,
+    serverHint: "server-reverse-udp.json",
+    clientHint: "client-reverse-udp.json",
+  },
+  {
+    id: "native-multi-address",
+    protocol: "native",
+    group: "native-topology",
+    recommended: false,
+    title: "Multi-address race",
+    summary: "One outbound with several host:port candidates racing handshakes for the same logical service.",
+    when: "Anycast/DNS or dual-homed edges share credentials and should compete, not load-balance as separate nodes.",
+    steps: [
+      "List multiple addresses on one native outbound.",
+      "Keep identical token, transport, security, and carrier for every candidate.",
+      "Use balance members instead when nodes are independent services.",
+    ],
+    commands: [
+      "tcptun config check --config client-native-multi-address.json",
+      "tcptun --config client-native-multi-address.json",
+    ],
+    serverCode: nativeRealityServerExample,
+    clientCode: nativeMultiAddressClientExample,
+    serverHint: "server-native-reality-auto.json",
+    clientHint: "client-native-multi-address.json",
+  },
+  {
+    id: "balance-failover",
+    protocol: "native",
+    group: "native-topology",
+    recommended: false,
+    title: "Balance · weighted edges",
+    summary: "Independent native edges under a balance outbound with weights and affinity.",
+    when: "You operate more than one complete proxy service and want weighted selection / failover.",
+    steps: [
+      "Declare each edge as its own native outbound.",
+      "Group them under type=balance with weights and affinity_ttl.",
+      "Route default_outbound to the balance tag.",
+    ],
+    commands: [
+      "tcptun config check --config client-balance.json",
+      "tcptun --config client-balance.json",
+    ],
+    serverCode: nativeRealityServerExample,
+    clientCode: balanceFailoverExample,
+    serverHint: "server-native-reality-auto.json",
+    clientHint: "client-balance.json",
+  },
+  {
+    id: "route-split",
+    protocol: "native",
+    group: "native-topology",
+    recommended: false,
+    title: "Route split + blackhole",
+    summary: "Send private/geoip direct, block ads, default everything else through native Reality auto.",
+    when: "You need domain/IP based routing without a second client process.",
+    steps: [
+      "Keep proxy, direct, and optional blackhole outbounds.",
+      "Order rules carefully; first match wins.",
+      "Validate with config check before starting.",
+    ],
+    commands: [
+      "tcptun config check --config client-route-split.json",
+      "tcptun --config client-route-split.json",
+      "curl -x socks5h://127.0.0.1:1080 https://example.com -I",
+    ],
+    serverCode: nativeRealityServerExample,
+    clientCode: routeSplitExample,
+    serverHint: "server-native-reality-auto.json",
+    clientHint: "client-route-split.json",
+  },
+  {
+    id: "native-chain",
+    protocol: "native",
+    group: "native-topology",
+    recommended: false,
+    title: "Outbound via chain",
+    summary: "Reach a native edge through a lower SOCKS5 hop using via.",
+    when: "The path to the public edge must first exit through a local or LAN proxy.",
+    steps: [
+      "Declare the lower hop as its own outbound (socks5/http/…).",
+      "Set via on the native outbound to that hop tag.",
+      "URI export cannot represent chains — keep the full JSON.",
+    ],
+    commands: [
+      "tcptun config check --config client-chain.json",
+      "tcptun --config client-chain.json",
+    ],
+    serverCode: nativeServerExample,
+    clientCode: nativeChainClientExample,
+    serverHint: "server-native.json",
+    clientHint: "client-chain.json",
+  },
+  {
+    id: "native-relay",
+    protocol: "native",
+    group: "native-topology",
+    recommended: false,
+    title: "Native relay hop",
+    summary: "Accept native on one side and forward through another native outbound.",
+    when: "You need an intermediate relay that does not terminate the final exit itself.",
+    steps: [
+      "Use distinct inbound and outbound credentials.",
+      "Route default_outbound to the next native hop.",
+      "Start the far exit first, then the relay, then clients.",
+    ],
+    commands: [
+      "tcptun config check --config relay.json",
+      "tcptun --config relay.json",
+    ],
+    serverCode: nativeRelayExample,
+    clientCode: nativeClientExample,
+    serverHint: "relay.json",
+    clientHint: "client-native.json",
+  },
+  {
     id: "vless-reality",
     protocol: "vless",
-    title: "vless · REALITY + Vision",
+    group: "wire-interop",
+    recommended: false,
+    title: "VLESS · Reality + Vision",
     summary: "Xray-compatible VLESS with Vision flow and REALITY.",
-    when: "You need VLESS wire interop or default generated REALITY + Vision path.",
+    when: "You need VLESS wire interop or the default generated REALITY + Vision path.",
     steps: [
       "Generate with tcptun config vless.",
       "Match uuid / users[].id and REALITY keys.",
@@ -1909,7 +2297,9 @@ export const protocolUseCases = [
   {
     id: "vmess-tls-ws",
     protocol: "vmess",
-    title: "vmess · TLS + WebSocket",
+    group: "wire-interop",
+    recommended: false,
+    title: "VMess · TLS + WebSocket",
     summary: "VMess AEAD behind TLS and a WebSocket path.",
     when: "You need VMess interop or a path-based front behind an existing TLS site.",
     steps: [
@@ -1931,7 +2321,9 @@ export const protocolUseCases = [
   {
     id: "trojan-tls",
     protocol: "trojan",
-    title: "trojan · TLS password auth",
+    group: "wire-interop",
+    recommended: false,
+    title: "Trojan · TLS password",
     summary: "Password-authenticated Trojan tunnel over TLS.",
     when: "You want Trojan wire interop with a simple password credential.",
     steps: [
@@ -1949,88 +2341,6 @@ export const protocolUseCases = [
     clientCode: trojanTlsClientExample,
     serverHint: "server-trojan-tls.json",
     clientHint: "client-trojan-tls.json",
-  },
-  {
-    id: "native-reality-tcp",
-    protocol: "native",
-    title: "native · reality-tcp forced",
-    summary: "Force Reality over TCP only when UDP is intentionally unavailable.",
-    when: "Corporate networks or paths that drop UDP/QUIC but still allow TCP Reality.",
-    steps: [
-      "Set security.type=reality-tcp on both ends with matching keys.",
-      "Keep transport raw and group mux if you still want mux pooling.",
-      "Do not expect QUIC fallback or automatic dual carriers.",
-    ],
-    commands: [
-      "tcptun config check --config server-native-reality-tcp.json",
-      "tcptun --config server-native-reality-tcp.json",
-      "tcptun --config client-native-reality-tcp.json",
-    ],
-    serverCode: nativeRealityTcpServerExample,
-    clientCode: nativeRealityTcpClientExample,
-    serverHint: "server-native-reality-tcp.json",
-    clientHint: "client-native-reality-tcp.json",
-  },
-  {
-    id: "native-multi-address",
-    protocol: "native",
-    title: "native · multi-address race",
-    summary: "One outbound with several host:port candidates racing handshakes for the same logical service.",
-    when: "Anycast/DNS or dual-homed edges share credentials and should compete, not load-balance as separate nodes.",
-    steps: [
-      "List multiple addresses on one native outbound.",
-      "Keep identical token, transport, and security for every candidate.",
-      "Use balance members instead when nodes are independent services.",
-    ],
-    commands: [
-      "tcptun config check --config client-native-multi-address.json",
-      "tcptun --config client-native-multi-address.json",
-    ],
-    serverCode: nativeRealityServerExample,
-    clientCode: nativeMultiAddressClientExample,
-    serverHint: "server-native-reality-auto.json",
-    clientHint: "client-native-multi-address.json",
-  },
-  {
-    id: "balance-failover",
-    protocol: "native",
-    title: "balance · weighted edges",
-    summary: "Independent native edges under a balance outbound with weights and affinity.",
-    when: "You operate more than one complete proxy service and want weighted selection / failover.",
-    steps: [
-      "Declare each edge as its own native outbound.",
-      "Group them under type=balance with weights and affinity_ttl.",
-      "Route default_outbound to the balance tag.",
-    ],
-    commands: [
-      "tcptun config check --config client-balance.json",
-      "tcptun --config client-balance.json",
-    ],
-    serverCode: nativeRealityServerExample,
-    clientCode: balanceFailoverExample,
-    serverHint: "server-native-reality-auto.json",
-    clientHint: "client-balance.json",
-  },
-  {
-    id: "route-split",
-    protocol: "native",
-    title: "route · split + blackhole",
-    summary: "Send private/geoip direct, block ads, default everything else through native Reality auto.",
-    when: "You need domain/IP based routing without a second client process.",
-    steps: [
-      "Keep proxy and direct (and optional blackhole) outbounds.",
-      "Order rules carefully; first match wins.",
-      "Validate with config check before starting.",
-    ],
-    commands: [
-      "tcptun config check --config client-route-split.json",
-      "tcptun --config client-route-split.json",
-      "curl -x socks5h://127.0.0.1:1080 https://example.com -I",
-    ],
-    serverCode: nativeRealityServerExample,
-    clientCode: routeSplitExample,
-    serverHint: "server-native-reality-auto.json",
-    clientHint: "client-route-split.json",
   },
 ] as const;
 

@@ -63,7 +63,8 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
               <Link href="/config/">Configuration</Link>
               <Link href="/protocols/">Protocols</Link>
               <Link href="/protocols/native/">Native protocol</Link>
-              <Link href="/examples/">Examples</Link>
+              <Link href="/examples/">Examples catalog</Link>
+              <Link href="/examples/#native-reality">Reality auto</Link>
               <Link href="/security/">Security & trust</Link>
               <Link href="/faq/">FAQ</Link>
             </div>

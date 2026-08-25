@@ -7,7 +7,7 @@ import { releaseVersion } from "../site-data";
 export const metadata: Metadata = {
   title: "Examples",
   description:
-    "Worked tcptun examples for native Reality auto, resumable streams, reverse publish, balance, route split, VLESS, VMess, and Trojan.",
+    "Catalog of worked tcptun configs: native Reality auto/tcp/quic, resumable streams, reverse publish, balance, routing, chain, relay, VLESS, VMess, and Trojan.",
 };
 
 export default function ExamplesPage() {
@@ -15,11 +15,11 @@ export default function ExamplesPage() {
     <SiteChrome>
       <PageHero
         eyebrow="Examples"
-        title="Worked examples for every tunnel protocol."
-        description="Complete server / client pairs for native Reality auto, resumable streams, reverse publish, balance, route split, VLESS, VMess, and Trojan. Copy, replace placeholders, validate, then start the server first."
+        title="Configuration catalog, native first."
+        description={`Browse every worked server/client pair for tcptun ${releaseVersion}: Reality carriers, reverse publish, topology patterns, then wire-interop protocols. Copy JSON, replace placeholders, validate, start the server first.`}
         actions={[
-          { href: "/generate/", label: "Generate pair", variant: "primary" },
-          { href: "/protocols/native/", label: "Native guide", variant: "secondary" },
+          { href: "/examples/#native-reality", label: "Reality auto", variant: "primary" },
+          { href: "/generate/", label: "Generate pair", variant: "secondary" },
           { href: "/config/", label: "Config reference", variant: "ghost" },
         ]}
       />

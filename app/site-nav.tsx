@@ -9,8 +9,8 @@ import { androidAppLinks, githubLinks } from "./site-data";
 const primaryLinks = [
   { href: "/guide/", label: "Get started" },
   { href: "/docs/", label: "Docs" },
+  { href: "/examples/", label: "Examples" },
   { href: "/embed/", label: "Embed" },
-  { href: "/architecture/", label: "Architecture" },
   { href: "/download/", label: "Download" },
 ] as const;
 
@@ -35,7 +35,9 @@ const navGroups = [
       { href: "/config/", label: "Configuration" },
       { href: "/protocols/", label: "Protocols" },
       { href: "/protocols/native/", label: "Native protocol" },
-      { href: "/examples/", label: "Examples" },
+      { href: "/examples/", label: "Examples catalog" },
+      { href: "/examples/#native-reality", label: "Reality auto" },
+      { href: "/examples/#native-reverse", label: "Reverse publish" },
       { href: "/security/", label: "Security & trust" },
       { href: "/faq/", label: "FAQ" },
     ],
