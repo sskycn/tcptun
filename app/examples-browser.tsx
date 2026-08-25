@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import CopyButton from "./copy-button";
+import {
+  applyExampleSecrets,
+  generateExampleSecrets,
+  secretsSummary,
+  type ExampleSecrets,
+} from "./example-secrets";
 import { exampleCatalogGroups, protocolUseCases } from "./site-data";
 
 type SideTab = "server" | "client";
@@ -23,6 +29,8 @@ export default function ExamplesBrowser() {
   const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>("native");
   const [useCaseId, setUseCaseId] = useState<(typeof protocolUseCases)[number]["id"]>(defaultId);
   const [side, setSide] = useState<SideTab>("server");
+  const [secrets, setSecrets] = useState<ExampleSecrets | null>(null);
+  const [secretsError, setSecretsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fromHash = readHashId();
@@ -31,6 +39,27 @@ export default function ExamplesBrowser() {
     if (!match) return;
     setUseCaseId(match.id);
     setProtocolFilter(match.protocol === "native" ? "native" : "all");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await generateExampleSecrets();
+        if (!cancelled) {
+          setSecrets(next);
+          setSecretsError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSecrets(null);
+          setSecretsError(error instanceof Error ? error.message : "Failed to generate keys");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredCases = useMemo(
@@ -63,9 +92,11 @@ export default function ExamplesBrowser() {
     }
   }, [activeCase]);
 
-  const activeCode = side === "server" ? activeCase.serverCode : activeCase.clientCode;
+  const rawCode = side === "server" ? activeCase.serverCode : activeCase.clientCode;
+  const activeCode = secrets ? applyExampleSecrets(rawCode, secrets) : rawCode;
   const activeHint = side === "server" ? activeCase.serverHint : activeCase.clientHint;
   const commandsText = activeCase.commands.join("\n");
+  const copyReady = Boolean(secrets) && !secretsError;
 
   function selectCase(id: (typeof protocolUseCases)[number]["id"]) {
     setUseCaseId(id);
@@ -80,9 +111,20 @@ export default function ExamplesBrowser() {
           <h2>Browse every worked config.</h2>
           <p>
             Native stacks first. Pick a configuration from the menu, then copy the matching server /
-            client JSON. Replace placeholders, run <code>tcptun config check</code>, start the
-            server, then the client.
+            client JSON. Reality keys, short IDs, tokens, and UUIDs are generated in your browser for
+            this page load — refresh to get a new set. Run <code>tcptun config check</code>, start
+            the server, then the client.
           </p>
+          {secrets ? (
+            <p className="examples-secrets-note">
+              Fresh credentials for this visit: <code>{secretsSummary(secrets)}</code>
+            </p>
+          ) : null}
+          {secretsError ? (
+            <p className="generator-error" role="alert">
+              {secretsError}
+            </p>
+          ) : null}
         </div>
         <div className="examples-filter-tabs" role="tablist" aria-label="Filter by protocol">
           {(
@@ -216,11 +258,15 @@ export default function ExamplesBrowser() {
                   </div>
                   <div className="config-example-meta">
                     <span>{activeHint}</span>
-                    <CopyButton value={activeCode} label="Copy config" className="copy-button-solid" />
+                    <CopyButton
+                      value={copyReady ? activeCode : ""}
+                      label={copyReady ? "Copy config" : "Generating…"}
+                      className="copy-button-solid"
+                    />
                   </div>
                 </div>
                 <pre className="config-example-code" role="tabpanel">
-                  <code>{activeCode}</code>
+                  <code>{copyReady ? activeCode : "Generating Reality keys and credentials…"}</code>
                 </pre>
               </div>
             </div>

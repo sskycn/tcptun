@@ -1,7 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CopyButton from "./copy-button";
+import {
+  applyExampleSecrets,
+  generateExampleSecrets,
+  secretsSummary,
+  type ExampleSecrets,
+} from "./example-secrets";
 import ProtocolIcon from "./protocol-icon";
 import {
   nativeGuideConcepts,
@@ -19,6 +25,29 @@ export default function NativeGuide() {
   const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>("native");
   const [useCaseId, setUseCaseId] = useState<(typeof protocolUseCases)[number]["id"]>("native-reality");
   const [side, setSide] = useState<SideTab>("server");
+  const [secrets, setSecrets] = useState<ExampleSecrets | null>(null);
+  const [secretsError, setSecretsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await generateExampleSecrets();
+        if (!cancelled) {
+          setSecrets(next);
+          setSecretsError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSecrets(null);
+          setSecretsError(error instanceof Error ? error.message : "Failed to generate keys");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredCases = useMemo(
     () =>
@@ -32,9 +61,11 @@ export default function NativeGuide() {
     return filteredCases.find((item) => item.id === useCaseId) ?? filteredCases[0] ?? protocolUseCases[0];
   }, [filteredCases, useCaseId]);
 
-  const activeCode = side === "server" ? activeCase.serverCode : activeCase.clientCode;
+  const rawCode = side === "server" ? activeCase.serverCode : activeCase.clientCode;
+  const activeCode = secrets ? applyExampleSecrets(rawCode, secrets) : rawCode;
   const activeHint = side === "server" ? activeCase.serverHint : activeCase.clientHint;
   const commandsText = activeCase.commands.join("\n");
+  const copyReady = Boolean(secrets) && !secretsError;
 
   return (
     <>
@@ -255,6 +286,16 @@ export default function NativeGuide() {
               <pre><code>{commandsText}</code></pre>
               <CopyButton value={commandsText} label="Copy" className="copy-button-on-dark" />
             </div>
+            {secrets ? (
+              <p className="examples-secrets-note">
+                Fresh credentials for this visit: <code>{secretsSummary(secrets)}</code>
+              </p>
+            ) : null}
+            {secretsError ? (
+              <p className="generator-error" role="alert">
+                {secretsError}
+              </p>
+            ) : null}
             <div className="native-usecase-links">
               <a className="chip-link" href="/generate/">
                 Open generator
@@ -295,11 +336,15 @@ export default function NativeGuide() {
                 </div>
                 <div className="config-example-meta">
                   <span>{activeHint}</span>
-                  <CopyButton value={activeCode} label="Copy config" className="copy-button-solid" />
+                  <CopyButton
+                    value={copyReady ? activeCode : ""}
+                    label={copyReady ? "Copy config" : "Generating…"}
+                    className="copy-button-solid"
+                  />
                 </div>
               </div>
               <pre className="config-example-code" role="tabpanel">
-                <code>{activeCode}</code>
+                <code>{copyReady ? activeCode : "Generating Reality keys and credentials…"}</code>
               </pre>
             </div>
           </div>

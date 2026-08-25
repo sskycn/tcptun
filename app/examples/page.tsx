@@ -16,7 +16,7 @@ export default function ExamplesPage() {
       <PageHero
         eyebrow="Examples"
         title="Configuration catalog, native first."
-        description={`Browse every worked server/client pair for tcptun ${releaseVersion}: Reality carriers, reverse publish, topology patterns, then wire-interop protocols. Copy JSON, replace placeholders, validate, start the server first.`}
+        description={`Browse every worked server/client pair for tcptun ${releaseVersion}: Reality carriers, reverse publish, topology patterns, then wire-interop protocols. Keys and tokens are generated in your browser on each visit. Copy JSON, validate, start the server first.`}
         actions={[
           { href: "/examples/#native-reality", label: "Reality auto", variant: "primary" },
           { href: "/generate/", label: "Generate pair", variant: "secondary" },

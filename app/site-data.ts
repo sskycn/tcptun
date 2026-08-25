@@ -983,7 +983,7 @@ export const configModelNotes = [
   },
 ] as const;
 
-/** VLESS + REALITY server example (keys are placeholders; use config generator in production). */
+/** VLESS + REALITY server example (placeholders filled client-side on /examples). */
 export const vlessRealityServerExample = `{
   "log": { "level": "info" },
   "inbounds": [
@@ -1199,7 +1199,7 @@ export const nativeUseCases = [
     when: "Both ends are trusted or already on a private path; you mainly need throughput and simple token auth.",
     steps: [
       "Generate or copy the minimal server / client pair below.",
-      "Replace change-me with a long random token on both sides.",
+      "Confirm users[].id and token match (examples pages generate them for you).",
       "Set client outbound address to the server’s public host:port.",
       "Run server, then client; use 127.0.0.1:1080 as the local proxy.",
     ],

@@ -2049,11 +2049,22 @@ pre {
   letter-spacing: -0.03em;
 }
 
-.examples-catalog-toolbar > div > p:last-child {
+.examples-catalog-toolbar > div > p {
   margin: 0;
   max-width: 62ch;
   color: var(--muted);
   line-height: 1.65;
+}
+
+.examples-secrets-note {
+  margin: 10px 0 0 !important;
+  color: var(--text) !important;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.examples-secrets-note code {
+  font-size: 12px;
 }
 
 .examples-filter-tabs {
