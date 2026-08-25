@@ -2225,6 +2225,8 @@ pre {
 
 .examples-detail-panel {
   margin: 0;
+  /* Keep the examples page as two columns: menu | detail (not menu | copy | code). */
+  grid-template-columns: 1fr;
 }
 
 .examples-detail .native-usecase-copy h3 {
@@ -2233,6 +2235,10 @@ pre {
   font-size: 22px;
   font-weight: 750;
   letter-spacing: -0.03em;
+}
+
+.examples-detail .native-usecase-code .config-example-code {
+  max-height: min(64vh, 640px);
 }
 
 .native-usecase-tabs {
