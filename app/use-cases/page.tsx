@@ -28,7 +28,7 @@ const cases = [
   {
     id: "android",
     title: "Android VPN runtime",
-    body: "Build application-aware VPN routing with TUN, DNS, and outbound switching. Get the client on Google Play, or embed the same runtime bridge in your own Android VPN product.",
+    body: "Build application-aware VPN routing with TUN, DNS, and outbound switching. The current Play Store app v0.2.52 embeds tcptun v0.2.5 — pair it with a v0.2.5 server, not CLI v0.4.2. Embedders can ship a newer bridge separately.",
     href: androidAppLinks.playStore,
     cta: "Google Play",
   },

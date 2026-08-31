@@ -31,10 +31,10 @@ pnpm build
 curl -fsSL https://tcptun.com/install.sh | sh
 
 # pin a version
-curl -fsSL https://tcptun.com/install.sh | TCPTUN_VERSION=0.3.0 sh
+curl -fsSL https://tcptun.com/install.sh | TCPTUN_VERSION=0.4.2 sh
 
 # or npm
-npm install -g tcptun@0.3.0
+npm install -g tcptun@0.4.2
 ```
 
 After a new `tcptun-go` release is published to npm:

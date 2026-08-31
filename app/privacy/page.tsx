@@ -363,8 +363,10 @@ export default function PrivacyPage() {
             <a href={androidAppLinks.playStore} target="_blank" rel="noreferrer">
               Google Play
             </a>
-            , package <code>{androidAppLinks.packageId}</code>). The app is a client for endpoints
-            you choose, not an operator-owned VPN service.
+            , package <code>{androidAppLinks.packageId}</code>, app v{androidAppLinks.appVersion}).
+            That listing embeds tcptun v{androidAppLinks.runtimeVersion}, not the current CLI v
+            {releaseVersion}. The app is a client for endpoints you choose, not an operator-owned VPN
+            service.
           </p>
         </div>
 

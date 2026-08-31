@@ -31,7 +31,7 @@ const paths = [
     href: "/download/#android",
     label: "Integrate",
     title: "Android & platforms",
-    body: "Use the runtime as an application-aware VPN engine with TUN, DNS, and outbound switching.",
+    body: "Play Store app v0.2.52 embeds tcptun v0.2.5. Pair that listing with a v0.2.5 server — not CLI v0.4.2.",
   },
 ] as const;
 
@@ -57,8 +57,8 @@ const coreCapabilities = [
     body: "TUN, DNS interception / fake-IP, and Android bridge hooks for device-level integration.",
   },
   {
-    title: "Wire interoperability",
-    body: "VLESS, VMess, and Trojan for Xray-compatible wire paths — not Xray config compatibility.",
+    title: "Local proxy authentication",
+    body: "mixed and socks5 hops with users[] and SOCKS5 secure auth v2 (HKDF method 0x80). Tunnel endpoints are native only.",
   },
 ] as const;
 
@@ -248,14 +248,14 @@ export default function Home() {
         <div className="section-heading row-heading">
           <div>
             <p className="eyebrow">Protocols</p>
-            <h2>Native first. Compatibility second.</h2>
+            <h2>Native tunnels. Local mixed hops.</h2>
             <p>
-              Compatibility means wire interoperability with VLESS / VMess / Trojan — not Xray{" "}
-              <code>-c</code> config files.
+              v{releaseVersion} tunnel endpoints are native only. mixed and socks5 remain for
+              authenticated local/LAN proxy hops — not Xray <code>-c</code> config files.
             </p>
           </div>
-          <Link className="button secondary" href="/protocols/">
-            Protocol docs
+          <Link className="button secondary" href="/protocols/native/">
+            Native guide
           </Link>
         </div>
         <div className="split-panels">
@@ -269,13 +269,13 @@ export default function Home() {
             <Link href="/protocols/native/">Native guide →</Link>
           </article>
           <article className="split-panel">
-            <p className="capability-label">Compatibility</p>
-            <h3>Wire interop layer</h3>
+            <p className="capability-label">Local proxy</p>
+            <h3>mixed / SOCKS5</h3>
             <p>
-              VLESS, VMess, and Trojan for mixed ecosystems. Same runtime topology; different wire
-              credentials and security combinations.
+              Authenticated local listeners and LAN hops with users[] and SOCKS5 secure auth v2.
+              VLESS, VMess, and Trojan were removed in v0.4.0 and are not loaded.
             </p>
-            <Link href="/protocols/">Compare protocols →</Link>
+            <Link href="/config/">Config reference →</Link>
           </article>
         </div>
       </section>
@@ -286,9 +286,9 @@ export default function Home() {
             <p className="eyebrow">Latest · {displayVersion}</p>
             <h2>What shipped in this runtime.</h2>
             <p>
-              Release notes stay technical: cross-platform TUN, fail-closed DNS pinning, runtime
-              snapshots and diagnostics, actionable error classes, and Android/QR integrations.
-              Version lives here — not in the document title for SEO.
+              Release notes stay technical: native-only tunnels, carrier.prefer, SOCKS5 secure auth
+              v2, idle power-save probes, and mux stall recovery. Version lives here — not in the
+              document title for SEO.
             </p>
           </div>
           <a className="button secondary" href={githubLinks.runtimeReleaseTag} target="_blank" rel="noreferrer">

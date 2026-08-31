@@ -344,7 +344,7 @@ export default function UriConverter() {
             <ul className="converter-notes">
               <li>New QR codes use the denser T3 Base45 profile</li>
               <li>
-                Native URIs use <code>carrier_mode</code> / <code>carrier_udp_mode</code> (v0.3.0);
+                Native URIs use <code>carrier_mode</code> / <code>carrier_udp_mode</code> (v0.4.2);
                 resumable mux still requires sharing complete JSON
               </li>
               <li>Upload recognition accepts T3, legacy T2, and plain URIs</li>

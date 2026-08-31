@@ -1,4 +1,4 @@
-export const releaseVersion = "0.3.0";
+export const releaseVersion = "0.4.2";
 
 /** Product positioning — keep language consistent across the site. */
 export const productTagline = "Programmable networking runtime for applications and devices";
@@ -31,6 +31,10 @@ export const npmLinks = {
 export const androidAppLinks = {
   packageId: "com.tcptun.client",
   playStore: "https://play.google.com/store/apps/details?id=com.tcptun.client",
+  /** Current Play Store listing. */
+  appVersion: "0.2.52",
+  /** Runtime embedded in that Play listing — not CLI v0.4.2. */
+  runtimeVersion: "0.2.5",
 } as const;
 
 /** @deprecated Prefer npmLinks.binaryBase — binaries are no longer hosted on Pages. */
@@ -44,24 +48,24 @@ export const npmInstallCommand = `npm install -g tcptun@${releaseVersion}`;
 
 export const releaseHighlights = [
   {
-    label: "TUN & platforms",
-    title: "Cross-platform packet devices",
-    body: "v0.3.0 adds a shared packet-device API, Windows Wintun support, bounded TUN flows with runtime stats, dropped-packet classification, and fail-closed TUN DNS pinning to a configured outbound.",
+    label: "Native-only tunnels",
+    title: "VLESS / VMess / Trojan removed",
+    body: "v0.4.x tunnel endpoints are native only. mixed and socks5 remain for local/LAN proxy hops. Stored VLESS, VMess, and Trojan profiles fail closed; they are not converted to native.",
   },
   {
-    label: "Observability",
-    title: "Snapshots, route explanations, diagnostics",
-    body: "Immutable runtime snapshots, routing decision explanations, and redacted diagnostic reports give operators and embedders a stable control-plane view without scraping logs.",
+    label: "Carriers",
+    title: "Auto TCP+QUIC with outbound preference",
+    body: "native + raw + mux can set carrier.mode=auto with TLS or REALITY. Outbound carrier.prefer is adaptive (default), quic, or tcp: strict preferences use the healthy preferred carrier and fall back only while it is unavailable.",
   },
   {
-    label: "Errors & budgets",
-    title: "Actionable failure classes and mux receive budget",
-    body: "A small public error taxonomy classifies config, outbound, network, permission, resource-limit, and stopped failures. Mux adds a per-runtime receive budget for predictable backpressure.",
+    label: "Local proxy auth",
+    title: "SOCKS5 secure auth v2 and mixed users",
+    body: "Credentialed SOCKS5/mixed outbounds default to auth_mode=secure (HKDF method 0x80, no RFC1929 downgrade). Authenticated inbounds use a bounded users[] array across mixed, socks5, and native.",
   },
   {
-    label: "Android & QR",
-    title: "Forced abort and profile QR PNG",
-    body: "The Android bridge gains a forced abort API and profile QR PNG export; T3 QR rendering is tightened for compact payloads.",
+    label: "Runtime health",
+    title: "Idle power profile and mux stall recovery",
+    body: "A low-wakeup power profile parks idle QUIC probes on platform inbounds. Mux retires silently stalled carriers, backpressures elephant streams, and bounds local accept recovery independently of outbound backoff.",
   },
 ] as const;
 
@@ -116,7 +120,7 @@ export const nativeRealityAutoLayers = [
   {
     label: "Carrier",
     value: "mode=auto",
-    body: "v0.3.0 default generator path: QUIC-first Reality with TCP fallback on one address.",
+    body: "v0.4.2 generator path: Reality or TLS with carrier.mode=auto on one address; outbound carrier.prefer is adaptive by default.",
   },
   {
     label: "Multiplexing",
@@ -128,7 +132,8 @@ export const nativeRealityAutoLayers = [
 export const faqItems = [
   {
     question: "Can I use Xray config files directly?",
-    answer: "No. tcptun uses its own JSON topology. Xray compatibility covers wire protocols such as VLESS / VMess / Trojan, not the config format.",
+    answer:
+      "No. tcptun uses its own JSON topology. v0.4.2 tunnel endpoints are native only — VLESS, VMess, and Trojan were removed and are not loaded.",
   },
   {
     question: "What is the native protocol?",
@@ -140,7 +145,8 @@ export const faqItems = [
   },
   {
     question: "How do I choose among the four tunnel protocols?",
-    answer: "Prefer native for tcptun-to-tcptun throughput, mux, QUIC, and reverse publish. Use vless / vmess / trojan when you need wire interop with Xray-compatible clients or servers.",
+    answer:
+      "v0.4.2 has one tunnel protocol: native. Use it for throughput, mux, QUIC, reverse publish, and Reality/TLS carriers. mixed and socks5 remain for local/LAN proxy hops. VLESS, VMess, and Trojan were removed.",
   },
   {
     question: "How do I validate a config?",
@@ -167,7 +173,7 @@ export const faqItems = [
   {
     question: "How do I choose carrier.mode?",
     answer:
-      "carrier.mode=auto (default generators) is QUIC-first with Reality TCP fallback. mode=tcp is Reality TCP only. mode=quic is the dedicated QUIC pool without TCP fallback. security.type stays reality; mux must be enabled for auto and quic.",
+      "carrier.mode=auto (default generators) binds TCP and UDP on one address with TLS or REALITY. Outbound carrier.prefer is adaptive (default), quic, or tcp — strict preferences use the healthy preferred carrier and fall back only while it is unavailable. mode=tcp or mode=quic is a single carrier. Mux must be enabled for auto and quic.",
   },
   {
     question: "When should I enable mux or QUIC?",
@@ -211,7 +217,7 @@ export const faqItems = [
   {
     question: "How do I convert an Xray config to tcptun?",
     answer:
-      "Paste Xray JSON or vless/vmess/trojan links in Convert. REALITY/TLS and raw/ws/h2/h3 are supported; unsupported transports such as gRPC produce warnings.",
+      "The Convert tool can still parse Xray JSON or vless/vmess/trojan links in the browser, but v0.4.2 will not run those tunnel types. Rebuild the path as native (or keep mixed/socks5 for local hops) before deploying.",
   },
   {
     question: "What happens when no config file is provided?",
@@ -222,6 +228,11 @@ export const faqItems = [
     question: "How do I load-balance and switch among outbounds?",
     answer:
       "Use a balance outbound to group members with weights and affinity_ttl. Multiple addresses on one outbound only race as candidate entry points; they are not load balancing. The embeddable Runtime and Android bridge also support start/stop, probing, and atomic switches of declared outbounds.",
+  },
+  {
+    question: "Does the Android app match CLI v0.4.2?",
+    answer:
+      "No. The current Google Play listing (tcptun client v0.2.52) embeds tcptun v0.2.5. Pair that app with a v0.2.5 server. Do not mix it with CLI v0.4.2: the Play app is not Native-only v0.4.x, and the CLI is not the runtime inside v0.2.52.",
   },
 ] as const;
 
@@ -269,16 +280,16 @@ export const cookieNotice = {
 
 /** CLI binaries published inside the npm package `tcptun` under dist/. */
 export const binaryDownloads = [
-  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 21139856),
-  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 19550210),
-  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 20549794),
-  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 18874530),
-  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 19267746),
-  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 21049856),
-  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 19092480),
+  binary("tcptun-darwin-amd64", "darwin", "macOS", "amd64", "x64", 16373712),
+  binary("tcptun-darwin-arm64", "darwin", "macOS", "arm64", "ARM64", 15035906),
+  binary("tcptun-linux-amd64", "linux", "Linux", "amd64", "x64", 15982754),
+  binary("tcptun-linux-arm64", "linux", "Linux", "arm64", "ARM64", 14614690),
+  binary("tcptun-linux-armv7", "linux", "Linux", "armv7", "ARMv7", 15007906),
+  binary("tcptun-windows-amd64.exe", "windows", "Windows", "amd64", "x64", 16406016),
+  binary("tcptun-windows-arm64.exe", "windows", "Windows", "arm64", "ARM64", 14753792),
 ] as const;
 
-export const inboundTypes = ["mixed", "socks5", "native", "vless", "vmess", "trojan"] as const;
+export const inboundTypes = ["mixed", "socks5", "native"] as const;
 export const outboundTypes = [
   "direct",
   "balance",
@@ -286,9 +297,6 @@ export const outboundTypes = [
   "socks5",
   "mixed",
   "native",
-  "vless",
-  "vmess",
-  "trojan",
 ] as const;
 
 export const tunnelProtocols = [
@@ -296,37 +304,11 @@ export const tunnelProtocols = [
     name: "native",
     credential: "Token",
     interoperability: "tcptun ↔ tcptun",
-    generatedSecurity: "REALITY auto / reality-tcp / reality-quic",
-    mux: "Recommended when both ends match",
+    generatedSecurity: "REALITY or TLS, carrier.mode auto/tcp/quic",
+    mux: "Required for auto and QUIC carriers",
     command: "tcptun config native --server proxy.example.com --port 9443",
-    description: "Private low-overhead protocol. raw + mux + reality with carrier.mode=auto prefers QUIC and falls back to TCP; resumable streams can preserve eligible TCP flows across carrier replacement.",
-  },
-  {
-    name: "vless",
-    credential: "UUID",
-    interoperability: "Xray VLESS",
-    generatedSecurity: "raw + REALITY + Vision",
-    mux: "Optional",
-    command: "tcptun config vless --server proxy.example.com --port 9443",
-    description: "Supports TCP/UDP. Generated configs default to Vision + REALITY and can interoperate with Xray.",
-  },
-  {
-    name: "vmess",
-    credential: "UUID",
-    interoperability: "Xray VMess AEAD",
-    generatedSecurity: "raw + REALITY",
-    mux: "Optional",
-    command: "tcptun config vmess --server proxy.example.com --port 9443",
-    description: "VMess AEAD with TCP/UDP support and Xray interop.",
-  },
-  {
-    name: "trojan",
-    credential: "Password",
-    interoperability: "Xray Trojan",
-    generatedSecurity: "raw + REALITY",
-    mux: "Optional",
-    command: "tcptun config trojan --server proxy.example.com --port 9443",
-    description: "Password-authenticated Trojan tunnel with TCP/UDP support.",
+    description:
+      "The only tunnel protocol in v0.4.2. raw + mux + reality or tls with carrier.mode=auto binds TCP and UDP on one address; outbound carrier.prefer selects adaptive, quic, or tcp. Resumable streams can preserve eligible TCP flows across carrier replacement.",
   },
 ] as const;
 
@@ -369,8 +351,8 @@ export const nativeGuideConcepts = [
     body: "raw is the default and best for throughput. ws / h2 / h3 are available when you need path-based fronting; QUIC mode requires raw.",
   },
   {
-    title: "Security (v0.3.0)",
-    body: "With native + raw + mux + security.type=reality + carrier.mode=auto, QUIC is preferred with Reality TCP fallback on one address. carrier.mode=tcp|quic forces a single carrier. TLS still needs cert/key when not using REALITY.",
+    title: "Security (v0.4.2)",
+    body: "With native + raw + mux + security.type=reality or tls + carrier.mode=auto, the inbound binds TCP and UDP on one address. Outbound carrier.prefer selects adaptive/quic/tcp. carrier.mode=tcp|quic forces a single carrier. TLS still needs cert/key when not using REALITY. Browser TLS fingerprints are ignored.",
   },
   {
     title: "Mux & resume",
@@ -379,15 +361,15 @@ export const nativeGuideConcepts = [
 ] as const;
 
 /**
- * Interactive wizard for first-time setup with the recommended v0.3.0 stack:
- * native + raw + group mux + security.type=reality (QUIC-first, TCP fallback).
+ * Interactive wizard for first-time setup with the recommended v0.4.2 stack:
+ * native + raw + mux + security.type=reality (auto TCP/QUIC carriers).
  */
 export const realityAutoWizardSteps = [
   {
     id: "goal",
     title: "What you will build",
     summary: "A private native tunnel with automatic Reality carriers.",
-    body: "This wizard walks through the recommended v0.3.0 path: native + raw + mux + security.type=reality + carrier.mode=auto. One public address carries Reality QUIC (preferred) and Reality TCP (fallback). Your laptop runs a local mixed proxy on 127.0.0.1:1080 and forwards through the tunnel.",
+    body: "This wizard walks through the recommended v0.4.2 path: native + raw + mux + security.type=reality + carrier.mode=auto. One public address carries Reality TCP and QUIC; the client outbound can set carrier.prefer. Your laptop runs a local mixed proxy on 127.0.0.1:1080 and forwards through the tunnel.",
     bullets: [
       "Server: VPS or edge host with a public IP (or DNS name)",
       "Client: laptop / phone / second host that needs a local proxy",
@@ -395,7 +377,8 @@ export const realityAutoWizardSteps = [
       "Outcome: apps use socks5h://127.0.0.1:1080 after both sides start",
     ],
     tips: [
-      "Use the same tcptun version (v0.3.0+) on both ends for auto carriers and optional resume.",
+      "Use the same tcptun version (v0.4.2) on both CLI ends for auto carriers and optional resume.",
+      "The Play Store Android app v0.2.52 still embeds tcptun v0.2.5 — do not mix it with CLI v0.4.2.",
       "Camouflage dest should support HTTPS on TCP and ideally HTTP/3 on UDP.",
     ],
     commands: [] as string[],
@@ -412,7 +395,7 @@ export const realityAutoWizardSteps = [
       "Pin with TCPTUN_VERSION or npm install -g tcptun@x.y.z",
     ],
     tips: [
-      "If you pin a version: TCPTUN_VERSION=0.3.0 sh -c \"$(curl -fsSL https://tcptun.com/install.sh)\"",
+      "If you pin a version: TCPTUN_VERSION=0.4.2 sh -c \"$(curl -fsSL https://tcptun.com/install.sh)\"",
     ],
     commands: [
       "curl -fsSL https://tcptun.com/install.sh | sh",
@@ -1314,7 +1297,7 @@ export const realityRules = [
   },
   {
     title: "Supported endpoints",
-    body: "Works with native / vless / vmess / trojan. mixed and socks5 are unsupported.",
+    body: "Works with native tunnel endpoints. mixed and socks5 are unsupported for URI export.",
   },
   {
     title: "Key pairing",
@@ -1961,8 +1944,8 @@ export const exampleCatalogGroups = [
   },
   {
     id: "wire-interop",
-    label: "Wire interop",
-    description: "VLESS / VMess / Trojan when an ecosystem requires those wires.",
+    label: "Removed in v0.4",
+    description: "Historical VLESS / VMess / Trojan samples. v0.4.2 will not load these tunnel types.",
   },
 ] as const;
 
@@ -1980,8 +1963,8 @@ export const protocolUseCases = [
     recommended: true,
     title: "Reality auto (recommended)",
     summary:
-      "v0.3.0 default: native + raw + mux + security.type=reality + carrier.mode=auto. QUIC-first with TCP fallback on one address.",
-    when: "Both ends run tcptun v0.3.0+ and you want automatic dual carriers without certs or a second port.",
+      "v0.4.2 default: native + raw + mux + security.type=reality + carrier.mode=auto. TCP and QUIC on one address; outbound carrier.prefer defaults to adaptive.",
+    when: "Both ends run tcptun v0.4.2 and you want automatic dual carriers without certs or a second port.",
     steps: [
       "Generate with --server-name and --dest (HTTPS + HTTP/3 capable camouflage).",
       "Ensure mux.enabled and carrier.mode=auto so automatic carriers activate.",

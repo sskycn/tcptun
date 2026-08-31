@@ -74,9 +74,16 @@ export default function DownloadPage() {
             <p className="eyebrow">Android</p>
             <h2>VPN client on Google Play.</h2>
             <p>
-              The Android app wraps the same networking runtime for device-level TUN, DNS, and
-              outbound switching. Install from Play Store package{" "}
+              The Android app wraps the networking runtime for device-level TUN, DNS, and outbound
+              switching. Install from Play Store package{" "}
               <code>{androidAppLinks.packageId}</code>.
+            </p>
+            <p>
+              <strong>
+                Play Store v{androidAppLinks.appVersion} embeds tcptun v{androidAppLinks.runtimeVersion}
+              </strong>
+              , not CLI v{releaseVersion}. Pair that app with a v{androidAppLinks.runtimeVersion}{" "}
+              server. Mixing it with this CLI release will fail or misbehave.
             </p>
           </div>
           <div className="download-heading-actions">
@@ -97,10 +104,11 @@ export default function DownloadPage() {
           <div className="platform-recommend-copy">
             <span className="platform-recommend-badge">Android</span>
             <div>
-              <strong>tcptun client</strong>
+              <strong>tcptun client v{androidAppLinks.appVersion}</strong>
               <p>
-                Application-aware VPN routing on Android. Same compiled runtime model as the CLI and
-                Go embed path — profiles, diagnostics, and outbound control stay local to the device.
+                Application-aware VPN routing on Android. This Play listing ships tcptun v
+                {androidAppLinks.runtimeVersion}. It is not the v{releaseVersion} CLI runtime on this
+                page — keep peers on the same core version.
               </p>
             </div>
           </div>

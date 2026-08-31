@@ -182,9 +182,9 @@ export default function SiteNav() {
               tabIndex={open ? 0 : -1}
               onClick={() => setOpen(false)}
             >
-              <span>Android · Google Play</span>
+              <span>Android v{androidAppLinks.appVersion}</span>
               <span className="nav-mobile-hash" aria-hidden="true">
-                {androidAppLinks.packageId}
+                runtime {androidAppLinks.runtimeVersion}
               </span>
             </a>
           </div>

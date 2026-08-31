@@ -15,7 +15,7 @@ export default function ConvertPage() {
       <PageHero
         eyebrow="Convert"
         title="Xray config → tcptun."
-        description="Paste full Xray JSON, a single inbound/outbound, or share links. Wire protocols and transports convert locally; rebuild route rules in tcptun."
+        description={`Browser conversion still accepts Xray JSON and vless/vmess/trojan links, but tcptun v${releaseVersion} will not run those tunnel types. Rebuild as native before deploying.`}
         actions={[
           { href: "/generate/", label: "Generate fresh pair", variant: "secondary" },
           { href: "/examples/", label: "tcptun examples", variant: "ghost" },

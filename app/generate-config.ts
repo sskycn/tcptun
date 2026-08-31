@@ -30,10 +30,7 @@ export type GeneratedConfigs = {
 };
 
 export const protocols: Array<{ id: TunnelProtocol; label: string; hint: string }> = [
-  { id: "native", label: "native", hint: "tcptun private protocol" },
-  { id: "vless", label: "vless", hint: "Xray interop + Vision" },
-  { id: "vmess", label: "vmess", hint: "Xray VMess AEAD" },
-  { id: "trojan", label: "trojan", hint: "Password auth" },
+  { id: "native", label: "native", hint: "only tunnel protocol in v0.4.2" },
 ];
 
 export function defaultGenerateInput(): GenerateConfigInput {
@@ -53,8 +50,8 @@ export function defaultGenerateInput(): GenerateConfigInput {
 }
 
 export function validateGenerateInput(input: GenerateConfigInput): string | null {
-  if (!["native", "vless", "vmess", "trojan"].includes(input.protocol)) {
-    return "Unsupported protocol";
+  if (input.protocol !== "native") {
+    return "v0.4.2 generates native configs only; VLESS, VMess, and Trojan were removed";
   }
   if (!input.server.trim()) return "Server address is required";
   if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {
@@ -140,7 +137,6 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     security: {
       type: "reality",
       server_name: serverName,
-      fingerprint: "chrome",
       public_key: publicKey,
       short_id: shortId,
       spider_x: "/",

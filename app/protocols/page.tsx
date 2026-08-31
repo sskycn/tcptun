@@ -8,7 +8,7 @@ import { releaseVersion, tunnelProtocols } from "../site-data";
 
 export const metadata: Metadata = {
   title: "Protocols",
-  description: "native, VLESS, VMess, and Trojan tunnel protocols in one tcptun topology model.",
+  description: `tcptun v${releaseVersion} tunnel endpoints are native only. mixed and socks5 remain for local proxy hops.`,
 };
 
 const transports = ["raw", "ws", "h2", "h3"] as const;
@@ -18,12 +18,12 @@ export default function ProtocolsPage() {
     <SiteChrome>
       <PageHero
         eyebrow="Protocols"
-        title="Four tunnel protocols, one topology."
-        description="Xray compatibility is for wire protocols, not config file format. Prefer native for tcptun-to-tcptun; use vless / vmess / trojan for interop."
+        title="Native tunnels in one topology."
+        description={`v${releaseVersion} removed VLESS, VMess, and Trojan. Use native for tcptun-to-tcptun carriers, mux, and reverse publish. mixed / socks5 stay as authenticated local hops.`}
         actions={[
           { href: "/protocols/native/", label: "Native guide", variant: "primary" },
           { href: "/examples/", label: "All examples", variant: "secondary" },
-          { href: "/config/#protocol-compare", label: "Compare table", variant: "ghost" },
+          { href: "/config/", label: "Config reference", variant: "ghost" },
         ]}
       />
 

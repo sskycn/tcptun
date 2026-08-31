@@ -145,7 +145,7 @@ const nativeRealityQuicLayers = [
 
 const nativeCarrierModes = [
   {
-    label: "Automatic · v0.3.0",
+    label: "Automatic · v0.4.2",
     config: 'security.reality + carrier.mode="auto" + mux.enabled',
     body: "Binds TCP and UDP on one address, prefers QUIC, falls back to Reality TCP with backoff, and probes to restore QUIC preference.",
   },
@@ -237,12 +237,12 @@ export default function ConfigSection() {
       <div className="native-reality-quic" id="native-carriers">
         <div className="native-reality-quic-heading">
           <div>
-            <p className="eyebrow">v0.3.0 · native + raw + reality</p>
+            <p className="eyebrow">v0.4.2 · native + raw + reality</p>
             <h3>
               <code>native + raw + reality + carrier.mode=auto</code>
             </h3>
             <p>
-              This is the recommended automatic stack in v0.3.0: one listen address, dual Reality
+              This is the recommended automatic stack in v0.4.2: one listen address, dual Reality
               carriers, QUIC preferred, TCP fallback, and optional resumable TCP streams.{" "}
               <code>carrier.mode</code> selects auto/tcp/quic while <code>security.type</code> stays{" "}
               <code>reality</code>. Without <code>mux</code>, Reality remains TCP-only.

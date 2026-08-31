@@ -52,7 +52,7 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
               <Link href="/use-cases/">Use cases</Link>
               <Link href="/download/">Download</Link>
               <a href={androidAppLinks.playStore} target="_blank" rel="noreferrer">
-                Android · Google Play
+                Android v{androidAppLinks.appVersion} · runtime {androidAppLinks.runtimeVersion}
               </a>
               <Link href="/start/">CLI</Link>
             </div>

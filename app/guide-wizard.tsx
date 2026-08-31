@@ -45,7 +45,7 @@ const profiles: Array<{
     id: "native-reality-auto",
     title: "native + raw + reality",
     stack: "group mux · QUIC-first · TCP fallback",
-    hint: "Recommended for tcptun-to-tcptun on v0.3.0+",
+    hint: "Recommended for tcptun-to-tcptun on v0.4.2",
     recommended: true,
   },
   {
