@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import CopyButton from "./copy-button";
+import { useMessages } from "./locale-context";
 import {
   configModelNotes,
   nativeClientExample,
@@ -171,6 +172,7 @@ type RealityTabId = (typeof realityExampleTabs)[number]["id"];
 type SnippetKey = keyof typeof protocolOutboundSnippets;
 
 export default function ConfigSection() {
+  const t = useMessages();
   const [nativeTab, setNativeTab] = useState<NativeTabId>("server");
   const [realityTab, setRealityTab] = useState<RealityTabId>("native-server");
   const [snippetKey, setSnippetKey] = useState<SnippetKey>("native");
@@ -185,12 +187,9 @@ export default function ConfigSection() {
     <section className="section config-section" id="config">
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">Config</p>
-          <h2>JSON topology, native, and REALITY.</h2>
-          <p>
-            Describe inbounds, outbounds, and security in one config. Start with native, then REALITY
-            and protocol choice.
-          </p>
+          <p className="eyebrow">{t.config.title}</p>
+          <h2>{t.config.heading}</h2>
+          <p>{t.config.lead}</p>
         </div>
         <div className="chip-row">
           <a className="chip-link" href="#config-native">
@@ -200,13 +199,13 @@ export default function ConfigSection() {
             Reality auto
           </a>
           <a className="chip-link" href="#resumable">
-            Resumable
+            {t.config.resumable}
           </a>
           <a className="chip-link" href="#native-reality-quic">
             reality-quic
           </a>
           <a className="chip-link" href="#reverse">
-            Reverse publish
+            {t.config.reverse}
           </a>
           <a className="chip-link" href="#reality">
             REALITY
@@ -661,8 +660,8 @@ export default function ConfigSection() {
         <div className="section-subheading row-heading section-subheading-wide">
           <div>
             <p className="eyebrow">Compare</p>
-            <h3>Native tunnel protocol</h3>
-            <p>Tunnel endpoints are native. mixed and socks5 remain for local proxy hops.</p>
+            <h3>{t.config.compareTitle}</h3>
+            <p>{t.config.compareLead}</p>
           </div>
         </div>
 
@@ -670,12 +669,12 @@ export default function ConfigSection() {
           <table className="compare-table">
             <thead>
               <tr>
-                <th>Protocol</th>
-                <th>Credential</th>
-                <th>Interop</th>
-                <th>Default security</th>
-                <th>Mux</th>
-                <th>Best for</th>
+                <th>{t.config.protocol}</th>
+                <th>{t.config.credential}</th>
+                <th>{t.config.interop}</th>
+                <th>{t.config.defaultSecurity}</th>
+                <th>{t.config.mux}</th>
+                <th>{t.config.bestFor}</th>
               </tr>
             </thead>
             <tbody>

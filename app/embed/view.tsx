@@ -21,22 +21,6 @@ import (
 // Reusable transport sessions can surface as net.Listener.
 // engine.PacketForwarder routes UDP through Direct or SOCKS5 UDP ASSOCIATE.`;
 
-const surfaces = [
-  { title: "net.Conn", body: "Stream tunnels and dialed sessions use the standard stream contract." },
-  { title: "net.PacketConn", body: "Packet sessions adapt to connected or unconnected datagram APIs." },
-  { title: "net.Listener", body: "Reusable transport sessions can be exposed as listeners." },
-  { title: "endpoint.Dialer", body: "TCP and UDP dialing through compiled endpoint policies." },
-  { title: "PacketDevice / TUN", body: "Platform packet devices enter the same compiled router." },
-  { title: "Routing engine", body: "Application-aware route selection over the outbound graph." },
-] as const;
-
-const audiences = [
-  "Go developers building network agents",
-  "VPN and gateway applications",
-  "Embedded systems and CPE-style devices",
-  "Control planes that need in-process tunnels",
-] as const;
-
 export function EmbedView({ locale = "en" }: { locale?: Locale }) {
   const t = getDictionary(locale);
   return (
@@ -46,20 +30,20 @@ export function EmbedView({ locale = "en" }: { locale?: Locale }) {
         title={t.embed.heroTitle}
         description={t.embed.heroLead}
         actions={[
-          { href: githubLinks.runtime, label: "Runtime source", variant: "primary" },
-          { href: "/architecture/", label: "Architecture", variant: "secondary" },
-          { href: "/docs/", label: "Docs hub", variant: "ghost" },
+          { href: githubLinks.runtime, label: t.embed.runtimeSource, variant: "primary" },
+          { href: "/architecture/", label: t.nav.architecture, variant: "secondary" },
+          { href: "/docs/", label: t.nav.docsHub, variant: "ghost" },
         ]}
       />
 
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Module</p>
-          <h2>Import the runtime.</h2>
+          <p className="eyebrow">{t.embed.moduleEyebrow}</p>
+          <h2>{t.embed.moduleTitle}</h2>
         </div>
         <div className="code-panel">
           <div className="code-panel-heading">
-            <span>go.mod module path</span>
+            <span>{t.embed.modulePath}</span>
             <CopyButton value={goImport} label="Copy" className="copy-button-ghost" />
           </div>
           <pre>
@@ -68,7 +52,7 @@ export function EmbedView({ locale = "en" }: { locale?: Locale }) {
         </div>
         <div className="code-panel">
           <div className="code-panel-heading">
-            <span>embedding surface (illustrative)</span>
+            <span>{t.embed.snippetLabel}</span>
             <CopyButton value={goSnippet} label="Copy" className="copy-button-ghost" />
           </div>
           <pre>
@@ -79,15 +63,12 @@ export function EmbedView({ locale = "en" }: { locale?: Locale }) {
 
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Contracts</p>
-          <h2>Standard Go networking shapes.</h2>
-          <p>
-            Prefer composing focused packages. New integrations should not shell out to the binary
-            when they can embed the engine.
-          </p>
+          <p className="eyebrow">{t.embed.contractsEyebrow}</p>
+          <h2>{t.embed.contractsTitle}</h2>
+          <p>{t.embed.contractsLead}</p>
         </div>
         <div className="capability-grid">
-          {surfaces.map((item, index) => (
+          {t.embed.surfaces.map((item, index) => (
             <article className="capability-card" key={item.title} data-tone={index % 3}>
               <h3>
                 <code>{item.title}</code>
@@ -100,17 +81,17 @@ export function EmbedView({ locale = "en" }: { locale?: Locale }) {
 
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Who embeds</p>
-          <h2>Target embedders.</h2>
+          <p className="eyebrow">{t.embed.whoEyebrow}</p>
+          <h2>{t.embed.whoTitle}</h2>
         </div>
         <ul className="diff-list">
-          {audiences.map((item) => (
+          {t.embed.audiences.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
         <div className="hero-actions" style={{ marginTop: 20 }}>
           <a className="button primary" href={githubLinks.runtime} target="_blank" rel="noreferrer">
-            Browse tcptun-go
+            {t.embed.browseSource}
           </a>
           <LocalizedLink className="button secondary" href="/use-cases/">
             {t.nav.useCases}

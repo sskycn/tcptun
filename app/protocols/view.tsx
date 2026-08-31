@@ -40,21 +40,21 @@ export function ProtocolsView({ locale = "en" }: { locale?: Locale }) {
                     <h3>{protocol.name}</h3>
                   </div>
                 </div>
-                <span className="security-badge">{protocol.credential}</span>
+                <span className="security-badge">{t.protocols.nativeCredential}</span>
               </div>
-              <p className="protocol-description">{protocol.description}</p>
+              <p className="protocol-description">{t.protocols.nativeDescription}</p>
               <dl>
                 <div>
-                  <dt>Interop</dt>
-                  <dd>{protocol.interoperability}</dd>
+                  <dt>{t.protocols.interop}</dt>
+                  <dd>{t.protocols.nativeInterop}</dd>
                 </div>
                 <div>
-                  <dt>Default security</dt>
-                  <dd>{protocol.generatedSecurity}</dd>
+                  <dt>{t.protocols.defaultSecurity}</dt>
+                  <dd>{t.protocols.nativeSecurity}</dd>
                 </div>
                 <div className="wide">
-                  <dt>Mux</dt>
-                  <dd>{protocol.mux}</dd>
+                  <dt>{t.protocols.mux}</dt>
+                  <dd>{t.protocols.nativeMux}</dd>
                 </div>
               </dl>
               <div className="protocol-command-row">
@@ -67,7 +67,7 @@ export function ProtocolsView({ locale = "en" }: { locale?: Locale }) {
                 className="protocol-doc-link"
                 href={protocol.name === "native" ? "/protocols/native/" : "/examples/"}
               >
-                {protocol.name === "native" ? "Native guide →" : "Use cases →"}
+                {protocol.name === "native" ? t.protocols.nativeGuideCta : t.protocols.useCasesCta}
               </Link>
             </article>
           ))}

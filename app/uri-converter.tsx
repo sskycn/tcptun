@@ -13,6 +13,7 @@ import {
 } from "react";
 import CopyButton from "./copy-button";
 import { downloadText } from "./generate-config";
+import { useMessages } from "./locale-context";
 import { decodeProfilePayload, encodeT3 } from "./profile-t3";
 import {
   configToUris,
@@ -59,6 +60,7 @@ const SAMPLE_URI =
   "native://replace-with-token@proxy.example.com:9443?v=1&type=raw&network=tcp%2Cudp&mux=false#tcptun";
 
 export default function UriConverter() {
+  const t = useMessages();
   const [mode, setMode] = useState<ConvertMode>("export");
   const [input, setInput] = useState("");
   const [scope, setScope] = useState<UriExportScope>("outbounds");
@@ -168,7 +170,7 @@ export default function UriConverter() {
       }
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : "Conversion failed");
+      setError(err instanceof Error ? err.message : t.uri.failed);
     } finally {
       setBusy(false);
     }
@@ -179,20 +181,17 @@ export default function UriConverter() {
       <div className="section-heading row-heading">
         <div>
           <p className="eyebrow">URI</p>
-          <h2>Convert between configs, share URIs, and QR codes.</h2>
-          <p>
-            Matches <code>tcptun uri export/import</code>: text keeps plain URIs, QR codes default to the denser{" "}
-            <code>T3:</code> Base45 profile, and import accepts T3, legacy T2, and URIs.
-          </p>
+          <h2>{t.uri.heading}</h2>
+          <p>{t.uri.lead}</p>
         </div>
         <div className="chip-row">
-          <span>Config ↔ URI</span>
-          <span>QR Code</span>
-          <span>Local only</span>
+          <span>{t.uri.chipPair}</span>
+          <span>{t.uri.chipQr}</span>
+          <span>{t.uri.chipLocal}</span>
         </div>
       </div>
 
-      <div className="uri-mode-switch" role="tablist" aria-label="URI conversion direction">
+      <div className="uri-mode-switch" role="tablist" aria-label={t.uri.modeAria}>
         <button
           type="button"
           role="tab"
@@ -200,7 +199,7 @@ export default function UriConverter() {
           className={mode === "export" ? "is-active" : undefined}
           onClick={() => switchMode("export")}
         >
-          Config → URI + QR
+          {t.uri.modeExport}
         </button>
         <button
           type="button"
@@ -209,7 +208,7 @@ export default function UriConverter() {
           className={mode === "import" ? "is-active" : undefined}
           onClick={() => switchMode("import")}
         >
-          URI → config
+          {t.uri.modeImport}
         </button>
         <button
           type="button"
@@ -218,21 +217,19 @@ export default function UriConverter() {
           className={mode === "qrcode" ? "is-active" : undefined}
           onClick={() => switchMode("qrcode")}
         >
-          Share endpoints ↔ QR
+          {t.uri.modeQr}
         </button>
       </div>
 
       <div className="converter-grid">
         <form className="converter-form" onSubmit={handleConvert}>
           <label className="converter-input-label">
-            <span>{mode === "export" ? "tcptun config JSON" : "Share URI / T3 / T2 (one per line)"}</span>
+            <span>{mode === "export" ? t.uri.inputConfig : t.uri.inputShare}</span>
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
               placeholder={
-                mode === "export"
-                  ? "Paste a full config.json, outbound object, or outbound array"
-                  : "Paste T3: / T2: / native://"
+                mode === "export" ? t.uri.placeholderConfig : t.uri.placeholderShare
               }
               spellCheck={false}
               required
@@ -253,22 +250,22 @@ export default function UriConverter() {
                 disabled={busy}
                 onChange={handleQrFileChange}
               />
-              <strong>{busy ? "Reading QR codes…" : "Upload QR images"}</strong>
-              <span>Click to choose or drop PNG / JPEG files; multiple images are supported</span>
+              <strong>{busy ? t.uri.reading : t.uri.uploadTitle}</strong>
+              <span>{t.uri.uploadHint}</span>
             </label>
           ) : null}
 
           {mode === "export" ? (
             <div className="converter-options">
               <label>
-                <span>Export endpoints</span>
+                <span>{t.uri.exportEndpoints}</span>
                 <select value={scope} onChange={(event) => setScope(event.target.value as UriExportScope)}>
-                  <option value="outbounds">outbounds (client config)</option>
-                  <option value="inbounds">inbounds (server config)</option>
+                  <option value="outbounds">{t.uri.outbounds}</option>
+                  <option value="inbounds">{t.uri.inbounds}</option>
                 </select>
               </label>
               <label>
-                <span>Display name</span>
+                <span>{t.uri.displayName}</span>
                 <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" />
               </label>
             </div>
@@ -276,7 +273,7 @@ export default function UriConverter() {
             <>
               <div className="converter-options">
                 <label>
-                  <span>Local listen</span>
+                  <span>{t.uri.localListen}</span>
                   <input
                     value={localListen}
                     onChange={(event) => setLocalListen(event.target.value)}
@@ -285,7 +282,7 @@ export default function UriConverter() {
                   />
                 </label>
                 <label>
-                  <span>Local port</span>
+                  <span>{t.uri.localPort}</span>
                   <input
                     type="number"
                     min={1}
@@ -298,7 +295,7 @@ export default function UriConverter() {
               </div>
               <label className="generator-check">
                 <input type="checkbox" checked={client} onChange={(event) => setClient(event.target.checked)} />
-                <span>Generate a full runnable client config (turn off to output outbounds only)</span>
+                <span>{t.uri.fullClient}</span>
               </label>
             </>
           ) : null}
@@ -306,12 +303,12 @@ export default function UriConverter() {
           <div className="converter-actions">
             <button type="submit" className="button primary" disabled={busy}>
               {busy
-                ? "Converting…"
+                ? t.uri.converting
                 : mode === "export"
-                  ? "Generate URI and QR"
+                  ? t.uri.generateUriQr
                   : mode === "import"
-                    ? "Generate config"
-                    : "Generate QR codes"}
+                    ? t.uri.generateConfig
+                    : t.uri.generateQr}
             </button>
             <button
               type="button"
@@ -322,7 +319,7 @@ export default function UriConverter() {
                 setError(null);
               }}
             >
-              Load sample
+              {t.uri.loadSample}
             </button>
             <button
               type="button"
@@ -334,7 +331,7 @@ export default function UriConverter() {
                 if (qrFileInput.current) qrFileInput.current.value = "";
               }}
             >
-              Clear
+              {t.common.clear}
             </button>
           </div>
 
@@ -342,20 +339,15 @@ export default function UriConverter() {
 
           {mode === "qrcode" ? (
             <ul className="converter-notes">
-              <li>New QR codes use the denser T3 Base45 profile</li>
-              <li>
-                Native URIs use <code>carrier_mode</code> / <code>carrier_udp_mode</code> (v0.4.2);
-                resumable mux still requires sharing complete JSON
-              </li>
-              <li>Upload recognition accepts T3, legacy T2, and plain URIs</li>
-              <li>Each URI becomes its own 512 × 512 PNG</li>
-              <li>Recognition and generation run entirely in the browser</li>
+              {t.uri.notesQr.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           ) : (
             <ul className="converter-notes">
-              <li>Full configs automatically select tunnel inbounds / outbounds that support URIs</li>
-              <li>Multiple endpoints export as one URI per line with separate T3 QR codes</li>
-              <li>URIs cannot carry outbound chains, route rules, server private keys, and similar fields</li>
+              {t.uri.notesConvert.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           )}
         </form>
@@ -368,7 +360,7 @@ export default function UriConverter() {
                 <div className="generator-result-toolbar">
                   <span className="uri-result-label">{result.filename}</span>
                   <div className="generator-result-actions">
-                    <CopyButton value={result.content} label="Copy" className="copy-button-solid" />
+                    <CopyButton value={result.content} label={t.common.copy} className="copy-button-solid" />
                     <button
                       type="button"
                       className="button secondary generator-download"
@@ -380,7 +372,7 @@ export default function UriConverter() {
                         )
                       }
                     >
-                      Download
+                      {t.common.download}
                     </button>
                   </div>
                 </div>
@@ -396,11 +388,11 @@ export default function UriConverter() {
 
               {result.warnings.length ? (
                 <div className="converter-result-warnings" role="status">
-                  <strong>QR export skipped for:</strong>
+                  <strong>{t.uri.qrSkipped}</strong>
                   <ul>
                     {result.warnings.map((warning) => <li key={warning}>{warning}</li>)}
                   </ul>
-                  <p>The standard URI above is still complete. Share full JSON when every resumable field must be preserved.</p>
+                  <p>{t.uri.qrSkippedNote}</p>
                 </div>
               ) : null}
 
@@ -408,15 +400,15 @@ export default function UriConverter() {
                 <div className="uri-qr-panel">
                   <div className="uri-qr-heading">
                     <div>
-                      <span>T3 Profile QR code</span>
-                      <small>{result.qrCodes.length > 1 ? `${qrIndex + 1} / ${result.qrCodes.length}` : "PNG · 512 × 512"}</small>
+                      <span>{t.uri.qrTitle}</span>
+                      <small>{result.qrCodes.length > 1 ? `${qrIndex + 1} / ${result.qrCodes.length}` : t.uri.qrPng}</small>
                     </div>
                     <button
                       type="button"
                       className="button secondary generator-download"
                       onClick={() => downloadDataUrl(`client-${qrIndex + 1}.png`, result.qrCodes[qrIndex])}
                     >
-                      Download QR
+                      {t.uri.downloadQr}
                     </button>
                   </div>
                   {result.qrCodes.length > 1 ? (
@@ -450,25 +442,25 @@ export default function UriConverter() {
             </>
           ) : (
             <div className="generator-empty">
-              <p className="eyebrow">Output</p>
+              <p className="eyebrow">{t.uri.output}</p>
               <h3>
                 {mode === "export"
-                  ? "Paste a config to generate share endpoints"
+                  ? t.uri.emptyExportTitle
                   : mode === "import"
-                    ? "Paste URIs to restore a config"
-                    : "Paste share endpoints to generate T3 QR codes"}
+                    ? t.uri.emptyImportTitle
+                    : t.uri.emptyQrTitle}
               </h3>
               <p>
                 {mode === "export"
-                  ? "Outputs URI text and QR PNGs; export from client outbounds or server inbounds."
+                  ? t.uri.emptyExportLead
                   : mode === "import"
-                    ? "Can generate a single outbound or a full client.json with mixed local inbound and routing."
-                    : "Paste URIs / profiles to generate T3 QR codes, or upload images to recover share endpoints."}
+                    ? t.uri.emptyImportLead
+                    : t.uri.emptyQrLead}
               </p>
               <ul>
-                <li>Supports native URIs and T3 / T2 profiles</li>
-                <li>Preserves raw / ws / h2 / h3, TLS / REALITY / reality-tcp, and URI-safe mux parameters</li>
-                <li>Supports IPv4, IPv6, and domain endpoints</li>
+                {t.uri.emptyBullets.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
               </ul>
             </div>
           )}

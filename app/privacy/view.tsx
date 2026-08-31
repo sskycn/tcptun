@@ -4,6 +4,61 @@ import SiteChrome from "../site-chrome";
 import { getDictionary, interpolate, type Locale } from "../i18n";
 import { androidAppLinks, releaseVersion } from "../site-data";
 
+const androidTitlesZh: Record<string, string> = {
+  "App role and operator backend": "应用角色与运营方后端",
+  "Data kept on the Android device": "保留在 Android 设备上的数据",
+  "Clipboard and QR scanning": "剪贴板与二维码扫描",
+  "VPN traffic and remote endpoints": "VPN 流量与远端端点",
+  "Connectivity diagnostics": "连通性诊断",
+  "Optional flow analysis": "可选流量分析",
+  Permissions: "权限",
+  "Android retention and deletion": "Android 保留与删除",
+  "Android components and security boundary": "Android 组件与安全边界",
+};
+
+const goTitlesZh: Record<string, string> = {
+  "Core role and no automatic reporting": "核心角色且无自动上报",
+  "Traffic forwarding is configuration-driven": "流量转发由配置驱动",
+  "Configuration and credentials": "配置与凭证",
+  "DNS and name resolution": "DNS 与名称解析",
+  "Logs and host callbacks": "日志与宿主回调",
+  "Optional flow observation": "可选流量观测",
+  "Status events are local callbacks": "状态事件是本地回调",
+  "Discovery, probes, and reverse publishing": "发现、探测与反向发布",
+  "Retention and responsibility": "保留与责任",
+};
+
+const websitePrivacyZh = [
+  {
+    title: "本说明覆盖什么",
+    body: "本说明覆盖 tcptun 网站及其浏览器工具。它不替代托管、CDN、软件包仓库或其他你选择与 tcptun 一起使用的服务的隐私政策。命令行运行时以及你自己运营的服务器会按你的配置处理网络流量；本页不描述那些部署。",
+  },
+  {
+    title: "网站处理的信息",
+    body: "浏览器请求页面或资源时，托管、CDN 和安全基础设施可能收到 IP 地址、浏览器与设备信息、请求时间、来源页和请求资源等普通技术信息。这些提供方自行控制日志和保留期限。本站不提供账号、联系表单、邮件列表或第一方广告分析。",
+  },
+  {
+    title: "浏览器本地工具",
+    body: "配置生成和 URI 转换设计为在浏览器内运行。你粘贴进这些工具的值，包括密钥、token、密码和配置文本，不会被 tcptun 应用有意上传。与任何 Web 应用一样，浏览器扩展、网络检查软件和浏览器本身也可能有自己的访问。",
+  },
+  {
+    title: "本地存储与 Cookie",
+    body: "本站使用浏览器存储保存运行与偏好，例如主题和 Cookie 同意选择。我们不使用第一方广告或营销跟踪 Cookie。托管、CDN 或安全提供方可能按其政策使用技术 Cookie 或日志。",
+  },
+  {
+    title: "第三方链接与基础设施",
+    body: "本站可能链接到独立运营的第三方网站、软件包仓库、CDN 和发布服务。你自行选择这些提供方，并有责任查阅其条款和隐私政策。",
+  },
+  {
+    title: "保留期限与你的选择",
+    body: "浏览器本地数据会保留到过期、被替换，或你通过浏览器或站点设置清除为止。你可以阻止存储或清除站点数据。阻止存储可能重置偏好，或导致部分功能无法使用。",
+  },
+  {
+    title: "问题、请求与更新",
+    body: "隐私问题或请求请通过项目的公开网站仓库提出。请不要在公开 issue 中发布密码、私钥、个人文件或其他敏感数据。站点或其数据处理方式变化时，我们可能更新本说明。",
+  },
+] as const;
+
 const privacyItems = [
   {
     title: "What this notice covers",
@@ -316,17 +371,17 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
 
       <section className="section privacy-section" id="privacy">
         <div className="section-heading">
-          <p className="eyebrow">Privacy notice</p>
-          <h2>What happens to information</h2>
+          <p className="eyebrow">{locale === "zh" ? "隐私说明" : "Privacy notice"}</p>
+          <h2>{locale === "zh" ? "信息如何被处理" : "What happens to information"}</h2>
           <p>
-            Last updated August 4, 2026. This is a plain-language project notice, not legal advice. The
-            rules that apply to a particular deployment depend on its operator, providers, and your
-            jurisdiction.
+            {locale === "zh"
+              ? "最近更新于 2026 年 8 月 4 日。这是项目的通俗说明，不是法律建议。具体部署适用的规则取决于运营者、服务提供方和你所在的司法辖区。"
+              : "Last updated August 4, 2026. This is a plain-language project notice, not legal advice. The rules that apply to a particular deployment depend on its operator, providers, and your jurisdiction."}
           </p>
         </div>
 
         <div className="privacy-grid">
-          {privacyItems.map((item, index) => (
+          {(locale === "zh" ? websitePrivacyZh : privacyItems).map((item, index) => (
             <article className="privacy-card" key={item.title}>
               <div className="privacy-meta">
                 <span className="privacy-index">{String(index + 1).padStart(2, "0")}</span>
@@ -338,13 +393,24 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
         </div>
 
         <div className="privacy-footnote">
-          <strong>Quick summary</strong>
+          <strong>{locale === "zh" ? "摘要" : "Quick summary"}</strong>
           <p>
-            Browser tools process pasted configuration locally. Local storage and hosting/CDN
-            infrastructure remain separate privacy boundaries.
+            {locale === "zh"
+              ? "浏览器工具在本地处理粘贴的配置。本地存储与托管/CDN 基础设施是分开的隐私边界。"
+              : "Browser tools process pasted configuration locally. Local storage and hosting/CDN infrastructure remain separate privacy boundaries."}
           </p>
           <p>
-            See the <Link href="/legal/">disclaimer and cookie details</Link>, or open <Link href="/">the home page</Link>.
+            {locale === "zh" ? (
+              <>
+                见 <Link href="/zh/legal/">免责声明与 Cookie 详情</Link>，或打开{" "}
+                <Link href="/zh/">首页</Link>。
+              </>
+            ) : (
+              <>
+                See the <Link href="/legal/">disclaimer and cookie details</Link>, or open{" "}
+                <Link href="/">the home page</Link>.
+              </>
+            )}
           </p>
         </div>
       </section>
@@ -368,7 +434,7 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
             <article className="privacy-card" key={item.title}>
               <div className="privacy-meta">
                 <span className="privacy-index">{String(index + 1).padStart(2, "0")}</span>
-                <h3>{item.title}</h3>
+                <h3>{locale === "zh" ? androidTitlesZh[item.title] ?? item.title : item.title}</h3>
               </div>
               <p>{item.body}</p>
             </article>
@@ -378,12 +444,12 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
 
       <section className="section privacy-section" id="go-core">
         <div className="section-heading">
-          <p className="eyebrow">Go core</p>
-          <h2>tcptun-go privacy boundary</h2>
+          <p className="eyebrow">{locale === "zh" ? "Go 核心" : "Go core"}</p>
+          <h2>{locale === "zh" ? "tcptun-go 隐私边界" : "tcptun-go privacy boundary"}</h2>
           <p>
-            These disclosures apply to the tcptun-go CLI, embeddable runtime, and gomobile bridge. The
-            core is a data-plane component: it acts on the configuration and callbacks supplied by its
-            host and does not operate a project-wide collection service.
+            {locale === "zh"
+              ? "以下披露适用于 tcptun-go CLI、可嵌入运行时和 gomobile bridge。核心是数据面组件：它按宿主提供的配置和回调工作，并不运营面向全项目的采集服务。"
+              : "These disclosures apply to the tcptun-go CLI, embeddable runtime, and gomobile bridge. The core is a data-plane component: it acts on the configuration and callbacks supplied by its host and does not operate a project-wide collection service."}
           </p>
         </div>
 
@@ -392,7 +458,7 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
             <article className="privacy-card" key={item.title}>
               <div className="privacy-meta">
                 <span className="privacy-index">{String(index + 1).padStart(2, "0")}</span>
-                <h3>{item.title}</h3>
+                <h3>{locale === "zh" ? goTitlesZh[item.title] ?? item.title : item.title}</h3>
               </div>
               <p>{item.body}</p>
             </article>

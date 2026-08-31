@@ -8,10 +8,10 @@ import {
   secretsSummary,
   type ExampleSecrets,
 } from "./example-secrets";
+import { exampleCopy } from "./i18n/examples-cases";
+import { useLocale, useMessages } from "./locale-context";
 import ProtocolIcon from "./protocol-icon";
 import {
-  nativeGuideConcepts,
-  nativeGuideIntro,
   nativeTutorialSteps,
   protocolUseCases,
   tunnelProtocols,
@@ -21,6 +21,9 @@ type SideTab = "server" | "client";
 type ProtocolFilter = "all" | "native";
 
 export default function NativeGuide() {
+  const t = useMessages();
+  const locale = useLocale();
+  const n = t.protocols.native;
   const nativeProtocol = tunnelProtocols.find((item) => item.name === "native") ?? tunnelProtocols[0];
   const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>("native");
   const [useCaseId, setUseCaseId] = useState<(typeof protocolUseCases)[number]["id"]>("native-reality");
@@ -72,25 +75,25 @@ export default function NativeGuide() {
       <section className="section protocol-section native-guide-section" id="native-guide">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">{nativeGuideIntro.eyebrow}</p>
-            <h2>{nativeGuideIntro.title}</h2>
-            <p>{nativeGuideIntro.lede}</p>
+            <p className="eyebrow">{n.introEyebrow}</p>
+            <h2>{n.introTitle}</h2>
+            <p>{n.introLede}</p>
           </div>
           <div className="chip-row">
             <a className="chip-link" href="#native-overview">
-              Overview
+              {t.common.overview}
             </a>
             <a className="chip-link" href="#native-tutorial">
-              Tutorial
+              {t.common.tutorial}
             </a>
             <a className="chip-link" href="/examples/">
-              All examples
+              {n.allExamples}
             </a>
             <a className="chip-link" href="/generate/">
-              Generate
+              {n.generate}
             </a>
             <a className="chip-link" href="/config/#config-native">
-              Config fields
+              {n.configFields}
             </a>
           </div>
         </div>
@@ -105,21 +108,21 @@ export default function NativeGuide() {
                   <h3>{nativeProtocol.name}</h3>
                 </div>
               </div>
-              <span className="security-badge">{nativeProtocol.credential}</span>
+              <span className="security-badge">{t.protocols.nativeCredential}</span>
             </div>
-            <p className="protocol-description">{nativeProtocol.description}</p>
+            <p className="protocol-description">{t.protocols.nativeDescription}</p>
             <dl>
               <div>
-                <dt>Interop</dt>
-                <dd>{nativeProtocol.interoperability}</dd>
+                <dt>{t.protocols.interop}</dt>
+                <dd>{t.protocols.nativeInterop}</dd>
               </div>
               <div>
-                <dt>Default security</dt>
-                <dd>{nativeProtocol.generatedSecurity}</dd>
+                <dt>{t.protocols.defaultSecurity}</dt>
+                <dd>{t.protocols.nativeSecurity}</dd>
               </div>
               <div className="wide">
-                <dt>Mux</dt>
-                <dd>{nativeProtocol.mux}</dd>
+                <dt>{t.protocols.mux}</dt>
+                <dd>{t.protocols.nativeMux}</dd>
               </div>
             </dl>
             <div className="protocol-command-row">
@@ -129,7 +132,7 @@ export default function NativeGuide() {
           </article>
 
           <div className="native-guide-points">
-            {nativeGuideIntro.points.map((item, index) => (
+            {n.points.map((item, index) => (
               <article key={item.title}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <h3>{item.title}</h3>
@@ -141,11 +144,11 @@ export default function NativeGuide() {
 
         <div className="native-guide-concepts">
           <div className="section-subheading">
-            <h3>Core concepts</h3>
-            <p>Keep these rules in mind when reading or writing native configs.</p>
+            <h3>{n.conceptsTitle}</h3>
+            <p>{n.conceptsLead}</p>
           </div>
           <div className="highlight-grid">
-            {nativeGuideConcepts.map((item) => (
+            {n.concepts.map((item) => (
               <article key={item.title}>
                 <h4>{item.title}</h4>
                 <p>{item.body}</p>
@@ -168,11 +171,8 @@ export default function NativeGuide() {
 
         <div className="native-guide-tutorial" id="native-tutorial">
           <div className="section-subheading">
-            <h3>Native usage tutorial</h3>
-            <p>
-              Follow these steps for a first working native tunnel. The browser generator and URI tools
-              on this page can replace the CLI generate / export steps if you prefer.
-            </p>
+            <h3>{n.tutorialTitle}</h3>
+            <p>{n.tutorialLead}</p>
           </div>
           <div className="native-tutorial-grid">
             {nativeTutorialSteps.map((item) => {
@@ -180,11 +180,11 @@ export default function NativeGuide() {
               return (
                 <article className="native-tutorial-card" key={item.step}>
                   <div className="native-tutorial-meta">
-                    <span className="mode-name">step</span>
+                    <span className="mode-name">{n.step}</span>
                     <span className="mode-index">{item.step}</span>
                   </div>
-                  <h4>{item.title}</h4>
-                  <p>{item.body}</p>
+                  <h4>{n.tutorial[Number(item.step) - 1]?.title ?? item.title}</h4>
+                  <p>{n.tutorial[Number(item.step) - 1]?.body ?? item.body}</p>
                   <div className="mode-command-row">
                     <pre><code>{commandText}</code></pre>
                     <CopyButton value={commandText} label="Copy" className="copy-button-on-dark" />
@@ -199,19 +199,16 @@ export default function NativeGuide() {
       <section className="section protocol-section" id="protocol-examples">
         <div className="section-heading row-heading">
           <div>
-            <p className="eyebrow">Use cases</p>
-            <h2>Worked native examples.</h2>
-            <p>
-              Complete server / client pairs for native. Copy a pair, replace placeholders, validate,
-              then start the server before the client.
-            </p>
+            <p className="eyebrow">{t.useCases.label}</p>
+            <h2>{n.examplesTitle}</h2>
+            <p>{n.examplesLead}</p>
           </div>
           <div className="chip-row">
             <a className="chip-link" href="/generate/">
-              Generator
+              {n.generator}
             </a>
             <a className="chip-link" href="/config/#protocol-compare">
-              Compare
+              {n.compare}
             </a>
           </div>
         </div>
@@ -219,8 +216,8 @@ export default function NativeGuide() {
         <div className="native-usecase-tabs" role="tablist" aria-label="Filter by protocol">
           {(
             [
-              ["all", "All"],
-              ["native", "native"],
+              ["all", t.examples.filterAll],
+              ["native", t.examples.filterNative],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -258,7 +255,7 @@ export default function NativeGuide() {
                 setSide("server");
               }}
             >
-              {item.title}
+              {exampleCopy(locale, item.id)?.title ?? item.title}
             </button>
           ))}
         </div>
@@ -266,13 +263,16 @@ export default function NativeGuide() {
         <div className="native-usecase-panel">
           <div className="native-usecase-copy">
             <p className="eyebrow">{activeCase.protocol}</p>
-            <h4>{activeCase.title}</h4>
-            <p className="native-usecase-summary">{activeCase.summary}</p>
+            <h4>{exampleCopy(locale, activeCase.id)?.title ?? activeCase.title}</h4>
+            <p className="native-usecase-summary">
+              {exampleCopy(locale, activeCase.id)?.summary ?? activeCase.summary}
+            </p>
             <p>
-              <strong>When:</strong> {activeCase.when}
+              <strong>{t.examples.when}</strong>{" "}
+              {exampleCopy(locale, activeCase.id)?.when ?? activeCase.when}
             </p>
             <ol className="native-usecase-steps">
-              {activeCase.steps.map((step) => (
+              {(exampleCopy(locale, activeCase.id)?.steps ?? activeCase.steps).map((step) => (
                 <li key={step}>{step}</li>
               ))}
             </ol>
@@ -282,7 +282,7 @@ export default function NativeGuide() {
             </div>
             {secrets ? (
               <p className="examples-secrets-note">
-                Fresh credentials for this visit: <code>{secretsSummary(secrets)}</code>
+                {t.examples.freshCreds} <code>{secretsSummary(secrets)}</code>
               </p>
             ) : null}
             {secretsError ? (
@@ -292,14 +292,14 @@ export default function NativeGuide() {
             ) : null}
             <div className="native-usecase-links">
               <a className="chip-link" href="/generate/">
-                Open generator
+                {t.examples.openGenerator}
               </a>
               <a className="chip-link" href="/config/#protocol-compare">
-                Compare protocols
+                {n.compare}
               </a>
               {activeCase.protocol === "native" ? (
                 <a className="chip-link" href="/config/#config-native">
-                  Native fields
+                  {n.configFields}
                 </a>
               ) : null}
             </div>
@@ -332,7 +332,7 @@ export default function NativeGuide() {
                   <span>{activeHint}</span>
                   <CopyButton
                     value={copyReady ? activeCode : ""}
-                    label={copyReady ? "Copy config" : "Generating…"}
+                    label={copyReady ? t.common.copyConfig : t.common.generating}
                     className="copy-button-solid"
                   />
                 </div>

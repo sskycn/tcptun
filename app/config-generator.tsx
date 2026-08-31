@@ -2,6 +2,8 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import CopyButton from "./copy-button";
+import { interpolate } from "./i18n";
+import { useMessages } from "./locale-context";
 import {
   defaultGenerateInput,
   downloadText,
@@ -15,6 +17,7 @@ import {
 type ResultTab = "server" | "client" | "uri";
 
 export default function ConfigGenerator() {
+  const t = useMessages();
   const [form, setForm] = useState<GenerateConfigInput>(defaultGenerateInput);
   const [result, setResult] = useState<GeneratedConfigs | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +48,7 @@ export default function ConfigGenerator() {
       setTab("server");
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : "Generation failed");
+      setError(err instanceof Error ? err.message : t.generate.failed);
     } finally {
       setBusy(false);
     }
@@ -55,18 +58,13 @@ export default function ConfigGenerator() {
     <section className="section generator-section" id="generate">
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">Generate</p>
-          <h2>Generate paired configs in the browser.</h2>
-          <p>
-            Builds v0.4.2 native server/client pairs: auto mode uses raw + REALITY with{" "}
-            <code>carrier.mode=auto</code> and mux, optional resumable TCP streams, or forced QUIC
-            via <code>carrier.mode=quic</code>. Keys stay
-            local.
-          </p>
+          <p className="eyebrow">{t.generate.eyebrow}</p>
+          <h2>{t.generate.heading}</h2>
+          <p>{t.generate.lead}</p>
         </div>
         <div className="chip-row">
           <span>X25519</span>
-          <span>server + client</span>
+          <span>{t.generate.chipPair}</span>
           <span>URI</span>
         </div>
       </div>
@@ -74,8 +72,8 @@ export default function ConfigGenerator() {
       <div className="generator-grid">
         <form className="generator-form" onSubmit={handleGenerate}>
           <fieldset className="generator-fieldset">
-            <legend>Protocol</legend>
-            <div className="generator-protocol-grid" role="radiogroup" aria-label="Tunnel protocol">
+            <legend>{t.generate.protocol}</legend>
+            <div className="generator-protocol-grid" role="radiogroup" aria-label={t.generate.protocolAria}>
               {protocols.map((item) => (
                 <label
                   key={item.id}
@@ -97,7 +95,7 @@ export default function ConfigGenerator() {
                     }
                   />
                   <span className="generator-protocol-name">{item.label}</span>
-                  <span className="generator-protocol-hint">{item.hint}</span>
+                  <span className="generator-protocol-hint">{t.generate.nativeHint}</span>
                 </label>
               ))}
             </div>
@@ -105,7 +103,7 @@ export default function ConfigGenerator() {
 
           <div className="generator-fields">
             <label>
-              <span>Server address</span>
+              <span>{t.generate.serverAddress}</span>
               <input
                 value={form.server}
                 onChange={(event) => update("server", event.target.value)}
@@ -115,7 +113,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>Port</span>
+              <span>{t.generate.port}</span>
               <input
                 type="number"
                 min={1}
@@ -126,7 +124,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>Server listen</span>
+              <span>{t.generate.serverListen}</span>
               <input
                 value={form.listen}
                 onChange={(event) => update("listen", event.target.value)}
@@ -136,7 +134,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>Local listen</span>
+              <span>{t.generate.localListen}</span>
               <input
                 value={form.localListen}
                 onChange={(event) => update("localListen", event.target.value)}
@@ -146,7 +144,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>Local port</span>
+              <span>{t.generate.localPort}</span>
               <input
                 type="number"
                 min={1}
@@ -157,7 +155,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label>
-              <span>REALITY server name</span>
+              <span>{t.generate.realityServerName}</span>
               <input
                 value={form.serverName}
                 onChange={(event) => update("serverName", event.target.value)}
@@ -167,7 +165,7 @@ export default function ConfigGenerator() {
               />
             </label>
             <label className="generator-field-wide">
-              <span>REALITY dest (optional, default server-name:443)</span>
+              <span>{t.generate.realityDest}</span>
               <input
                 value={form.dest}
                 onChange={(event) => update("dest", event.target.value)}
@@ -192,9 +190,7 @@ export default function ConfigGenerator() {
                     }))
                   }
                 />
-                <span>
-                  v0.4.2 Reality auto — TCP+QUIC on one address (carrier.mode=auto)
-                </span>
+                <span>{t.generate.autoReality}</span>
               </label>
               {form.autoReality && !form.quic ? (
                 <label className="generator-check">
@@ -203,9 +199,7 @@ export default function ConfigGenerator() {
                     checked={Boolean(form.resume)}
                     onChange={(event) => update("resume", event.target.checked)}
                   />
-                  <span>
-                    Resume eligible TCP streams across carrier replacement
-                  </span>
+                  <span>{t.generate.resume}</span>
                 </label>
               ) : null}
               <label className="generator-check">
@@ -221,14 +215,14 @@ export default function ConfigGenerator() {
                     }))
                   }
                 />
-                <span>Force Native QUIC only (same as <code>--quic</code>, no TCP fallback)</span>
+                <span>{t.generate.forceQuic}</span>
               </label>
             </>
           ) : null}
 
           <div className="generator-actions">
             <button type="submit" className="button primary" disabled={busy}>
-              {busy ? "Generating…" : "Generate config"}
+              {busy ? t.common.generating : t.common.generate}
             </button>
             <button
               type="button"
@@ -239,7 +233,7 @@ export default function ConfigGenerator() {
                 setError(null);
               }}
             >
-              Reset
+              {t.common.reset}
             </button>
           </div>
 
@@ -250,7 +244,7 @@ export default function ConfigGenerator() {
           {result ? (
             <>
               <div className="generator-result-toolbar">
-                <div className="config-example-tabs" role="tablist" aria-label="Generated result">
+                <div className="config-example-tabs" role="tablist" aria-label={t.generate.resultAria}>
                   {(
                     [
                       ["server", "server.json"],
@@ -271,7 +265,7 @@ export default function ConfigGenerator() {
                   ))}
                 </div>
                 <div className="generator-result-actions">
-                  <CopyButton value={activeContent} label="Copy" className="copy-button-solid" />
+                  <CopyButton value={activeContent} label={t.common.copy} className="copy-button-solid" />
                   <button
                     type="button"
                     className="button secondary generator-download"
@@ -283,7 +277,7 @@ export default function ConfigGenerator() {
                       )
                     }
                   >
-                    Download
+                    {t.common.download}
                   </button>
                 </div>
               </div>
@@ -294,8 +288,8 @@ export default function ConfigGenerator() {
 
               <div className="generator-cli">
                 <div className="generator-cli-heading">
-                  <span>CLI starting point</span>
-                  <CopyButton value={result.cliCommand} label="Copy" className="copy-button-ghost" />
+                  <span>{t.generate.cliStart}</span>
+                  <CopyButton value={result.cliCommand} label={t.common.copy} className="copy-button-ghost" />
                 </div>
                 <pre>
                   <code>{result.cliCommand}</code>
@@ -308,38 +302,33 @@ export default function ConfigGenerator() {
                   className="button secondary"
                   onClick={() => downloadText("server.json", result.serverJson)}
                 >
-                  Download server.json
+                  {interpolate(t.generate.downloadFile, { name: "server.json" })}
                 </button>
                 <button
                   type="button"
                   className="button secondary"
                   onClick={() => downloadText("client.json", result.clientJson)}
                 >
-                  Download client.json
+                  {interpolate(t.generate.downloadFile, { name: "client.json" })}
                 </button>
                 <button
                   type="button"
                   className="button secondary"
                   onClick={() => downloadText("client.uri", result.clientUri, "text/plain")}
                 >
-                  Download client.uri
+                  {interpolate(t.generate.downloadFile, { name: "client.uri" })}
                 </button>
               </div>
             </>
           ) : (
             <div className="generator-empty">
-              <p className="eyebrow">Output</p>
-              <h3>Fill in the form, then generate</h3>
-              <p>
-                Creates server.json, client.json, and client.uri. JSON matches{" "}
-                <code>tcptun config {form.protocol}</code>; URI matches <code>tcptun uri export</code>.
-              </p>
+              <p className="eyebrow">{t.generate.output}</p>
+              <h3>{t.generate.emptyTitle}</h3>
+              <p>{t.generate.emptyLead}</p>
               <ul>
-                <li>Generates an X25519 key pair and short id</li>
-                <li>Creates a native token (v0.4.2 is native-only)</li>
-                <li>Native defaults to v0.4.2 automatic TCP/QUIC Reality carriers (carrier.mode=auto)</li>
-                <li>Resumable TCP streams add matching bounded settings to both peers</li>
-                <li>Forced QUIC emits carrier.mode=quic with mux enabled</li>
+                {t.generate.bullets.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
               </ul>
             </div>
           )}

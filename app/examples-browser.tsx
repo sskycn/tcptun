@@ -8,7 +8,8 @@ import {
   secretsSummary,
   type ExampleSecrets,
 } from "./example-secrets";
-import { useMessages } from "./locale-context";
+import { exampleCopy } from "./i18n/examples-cases";
+import { useLocale, useMessages } from "./locale-context";
 import { exampleCatalogGroups, protocolUseCases } from "./site-data";
 
 type SideTab = "server" | "client";
@@ -27,6 +28,7 @@ function readHashId(): (typeof protocolUseCases)[number]["id"] | null {
 
 export default function ExamplesBrowser() {
   const t = useMessages();
+  const locale = useLocale();
   const defaultId = protocolUseCases[0]?.id ?? "native-reality";
   const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>("native");
   const [useCaseId, setUseCaseId] = useState<(typeof protocolUseCases)[number]["id"]>(defaultId);
@@ -177,10 +179,12 @@ export default function ExamplesBrowser() {
                       onClick={() => selectCase(item.id)}
                     >
                       <span className="examples-menu-item-title">
-                        {item.title}
+                        {exampleCopy(locale, item.id)?.title ?? item.title}
                         {item.recommended ? <span className="examples-menu-badge">{t.examples.rec}</span> : null}
                       </span>
-                      <span className="examples-menu-item-summary">{item.summary}</span>
+                      <span className="examples-menu-item-summary">
+                        {exampleCopy(locale, item.id)?.summary ?? item.summary}
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -196,13 +200,16 @@ export default function ExamplesBrowser() {
                 {activeCase.protocol}
                 {activeCase.recommended ? ` · ${t.examples.recommended}` : ""}
               </p>
-              <h3>{activeCase.title}</h3>
-              <p className="native-usecase-summary">{activeCase.summary}</p>
+              <h3>{exampleCopy(locale, activeCase.id)?.title ?? activeCase.title}</h3>
+              <p className="native-usecase-summary">
+                {exampleCopy(locale, activeCase.id)?.summary ?? activeCase.summary}
+              </p>
               <p>
-                <strong>{t.examples.when}</strong> {activeCase.when}
+                <strong>{t.examples.when}</strong>{" "}
+                {exampleCopy(locale, activeCase.id)?.when ?? activeCase.when}
               </p>
               <ol className="native-usecase-steps">
-                {activeCase.steps.map((step) => (
+                {(exampleCopy(locale, activeCase.id)?.steps ?? activeCase.steps).map((step) => (
                   <li key={step}>{step}</li>
                 ))}
               </ol>
@@ -217,15 +224,15 @@ export default function ExamplesBrowser() {
                   {t.examples.openGenerator}
                 </a>
                 <a className="chip-link" href="/config/">
-                  Config reference
+                  {t.examples.configRef}
                 </a>
                 {activeCase.protocol === "native" ? (
                   <a className="chip-link" href="/protocols/native/">
-                    Native guide
+                    {t.nav.nativeProtocol}
                   </a>
                 ) : (
                   <a className="chip-link" href="/protocols/">
-                    Protocols
+                    {t.nav.protocols}
                   </a>
                 )}
               </div>

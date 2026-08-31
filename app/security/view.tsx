@@ -10,28 +10,9 @@ import {
   pinnedInstallCommand,
   releaseVersion,
 } from "../site-data";
-import { getDictionary, type Locale } from "../i18n";
+import { getDictionary, interpolate, type Locale } from "../i18n";
 
 const displayVersion = `v${releaseVersion}`;
-
-const properties = [
-  {
-    title: "Strict configuration validation",
-    body: "Unknown fields are rejected. Tags, references, auth, transport, and security combinations are checked before listeners open.",
-  },
-  {
-    title: "Fail closed",
-    body: "Invalid topology does not partially start. DNS and routing refuse hidden unsafe fallbacks when validation fails.",
-  },
-  {
-    title: "Bounded resources",
-    body: "Mux pools, resume buffers, and packet paths use explicit budgets for predictable long-running services.",
-  },
-  {
-    title: "No credential logging by default",
-    body: "Operators control log level; browser tools generate keys locally and do not upload material to this site.",
-  },
-] as const;
 
 const installSafe = `# 1) Download installer for inspection
 curl -fsSL https://tcptun.com/install.sh -o install-tcptun.sh
@@ -55,57 +36,57 @@ export function SecurityView({ locale = "en" }: { locale?: Locale }) {
       <PageHero
         eyebrow={t.security.title}
         title={t.security.heroTitle}
-        description="tcptun is open for inspection: runtime source, release tags, npm package layout, and an installer you can read before executing. This page documents supply chain and security properties without marketing claims."
+        description={t.security.heroLead}
         actions={[
-          { href: githubLinks.runtime, label: "Runtime source", variant: "primary" },
-          { href: githubLinks.runtimeReleaseTag, label: `Release ${displayVersion}`, variant: "secondary" },
-          { href: "/download/", label: "Download", variant: "ghost" },
+          { href: githubLinks.runtime, label: t.security.runtimeSource, variant: "primary" },
+          { href: githubLinks.runtimeReleaseTag, label: interpolate(t.security.release, { version: displayVersion }), variant: "secondary" },
+          { href: "/download/", label: t.nav.download, variant: "ghost" },
         ]}
       />
 
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Supply chain</p>
-          <h2>Where binaries come from.</h2>
+          <p className="eyebrow">{t.security.supplyEyebrow}</p>
+          <h2>{t.security.supplyTitle}</h2>
         </div>
         <div className="capability-grid">
           <article className="capability-card">
-            <h3>Source repositories</h3>
+            <h3>{t.security.reposTitle}</h3>
             <p>
-              Runtime:{" "}
+              {interpolate(t.security.reposBody, {
+                runtime: "github.com/gostartkit/tcptun-go",
+                site: "github.com/sskycn/tcptun",
+              })}
+            </p>
+            <p>
               <a href={githubLinks.runtime} target="_blank" rel="noreferrer">
-                github.com/gostartkit/tcptun-go
+                gostartkit/tcptun-go
               </a>
-              . Website:{" "}
+              {" · "}
               <a href={githubLinks.site} target="_blank" rel="noreferrer">
-                github.com/sskycn/tcptun
+                sskycn/tcptun
               </a>
-              .
             </p>
           </article>
           <article className="capability-card">
-            <h3>Release process</h3>
+            <h3>{t.security.processTitle}</h3>
+            <p>{interpolate(t.security.processBody, { version: releaseVersion })}</p>
             <p>
-              CLI binaries ship inside the public npm package{" "}
               <a href={npmLinks.packageVersion} target="_blank" rel="noreferrer">
                 tcptun@{releaseVersion}
               </a>
-              . Tagged releases:{" "}
+              {" · "}
               <a href={githubLinks.runtimeReleases} target="_blank" rel="noreferrer">
                 GitHub Releases
               </a>
-              .
             </p>
           </article>
           <article className="capability-card">
-            <h3>Build identity</h3>
-            <p>
-              Runtime builds expose version identity (for example CoreVersion / build metadata on
-              supported bridges). Prefer matching versions on both tunnel ends for mux and resume.
-            </p>
+            <h3>{t.security.identityTitle}</h3>
+            <p>{t.security.identityBody}</p>
           </article>
           <article className="capability-card">
-            <h3>Package layout</h3>
+            <h3>{t.security.layoutTitle}</h3>
             <p>
               Individual files:{" "}
               <code>
@@ -120,16 +101,15 @@ export function SecurityView({ locale = "en" }: { locale?: Locale }) {
 
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Installation safety</p>
-          <h2>Do not pipe untrusted scripts blindly.</h2>
+          <p className="eyebrow">{t.security.installEyebrow}</p>
+          <h2>{t.security.installTitle}</h2>
           <p>
-            The one-liner is convenient: <code>{installCommand}</code>. Safer flow: download,
-            inspect, then run. Or install via npm without shell piping.
+            {t.security.installLead} <code>{installCommand}</code>
           </p>
         </div>
         <div className="code-panel">
           <div className="code-panel-heading">
-            <span>recommended install flow</span>
+            <span>{t.security.flowLabel}</span>
             <CopyButton value={installSafe} label="Copy" className="copy-button-ghost" />
           </div>
           <pre>
@@ -144,18 +124,19 @@ export function SecurityView({ locale = "en" }: { locale?: Locale }) {
             npm: <code>{npmInstallCommand}</code>
           </li>
           <li>
-            Raw installer: <a href="/install.sh">https://tcptun.com/install.sh</a>
+            {t.security.rawInstaller}{" "}
+            <a href="/install.sh">https://tcptun.com/install.sh</a>
           </li>
         </ul>
       </section>
 
       <section className="section">
         <div className="section-heading">
-          <p className="eyebrow">Runtime properties</p>
-          <h2>Security-relevant defaults.</h2>
+          <p className="eyebrow">{t.security.runtimeEyebrow}</p>
+          <h2>{t.security.runtimeTitle}</h2>
         </div>
         <div className="capability-grid">
-          {properties.map((item, index) => (
+          {t.security.properties.map((item, index) => (
             <article className="capability-card" key={item.title} data-tone={index % 3}>
               <h3>{item.title}</h3>
               <p>{item.body}</p>

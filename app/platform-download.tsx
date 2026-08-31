@@ -102,14 +102,10 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
     <>
       <div className="section-heading row-heading">
         <div>
-          <p className="eyebrow">Download</p>
-          <h2>Multi-platform binaries, ready to run.</h2>
+          <p className="eyebrow">{t.download.title}</p>
+          <h2>{t.download.binariesTitle}</h2>
           <p>
-            CLI builds ship inside the npm package{" "}
-            <a href={npmLinks.packageVersion} target="_blank" rel="noreferrer">
-              tcptun@{releaseVersion}
-            </a>
-            . Direct file links below come from that package.
+            {interpolate(t.download.binariesLead, { version: releaseVersion })}
           </p>
         </div>
         <div className="download-heading-actions">
@@ -128,16 +124,18 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
             <span className="platform-recommend-badge">{t.download.recommended}</span>
             <div>
               <strong>
-                Detected {detected.label}
+                {interpolate(t.download.detected, { label: detected.label })}
               </strong>
               <p>
-                Recommended download <code>{recommended.filename}</code>
-                {" "}({formatBytes(recommended.size)})
+                {interpolate(t.download.recommendedDownload, {
+                  filename: recommended.filename,
+                  size: formatBytes(recommended.size),
+                })}
               </p>
             </div>
           </div>
           <a className="button primary" href={recommended.url} rel="noreferrer">
-            Download recommended build
+            {t.download.downloadRecommended}
           </a>
         </div>
       ) : null}
@@ -157,13 +155,13 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
                 <div className="download-title">
                   <h3>{item.platformLabel}</h3>
                   <span>{item.archLabel}</span>
-                  {isRecommended ? <span className="recommend-pill">Recommended</span> : null}
+                  {isRecommended ? <span className="recommend-pill">{t.download.recommended}</span> : null}
                 </div>
                 <code>{item.filename}</code>
                 <p>{formatBytes(item.size)} · npm</p>
               </div>
               <a className="download-link" href={item.url} rel="noreferrer">
-                Download
+                {t.common.download}
               </a>
             </article>
           );
@@ -172,17 +170,16 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
 
       <div className="download-note npm-install-note">
         <div className="download-note-copy">
-          <strong>Install via npm</strong>
+          <strong>{t.download.installViaNpm}</strong>
           <div className="download-note-command">
             <code>{npmInstallCommand}</code>
           </div>
           <span>
-            The package wraps the same platform binaries under <code>dist/</code>. Use{" "}
-            <code>npm install -g tcptun@latest</code> for the newest release.
+            {t.download.npmWraps}
           </span>
         </div>
         <a className="download-note-link" href={npmLinks.packageVersion} target="_blank" rel="noreferrer">
-          View on npm
+          {t.download.viewOnNpm}
           <span aria-hidden="true">↗</span>
         </a>
       </div>

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import CopyButton from "./copy-button";
+import { interpolate } from "./i18n";
+import { useMessages } from "./locale-context";
 import {
   downloadText,
   generateConfigPair,
@@ -34,70 +36,23 @@ type StepId =
   | "review"
   | "result";
 
-const profiles: Array<{
-  id: WizardProfile;
-  title: string;
-  stack: string;
-  hint: string;
-  recommended?: boolean;
-}> = [
-  {
-    id: "native-reality-auto",
-    title: "native + raw + reality",
-    stack: "group mux · QUIC-first · TCP fallback",
-    hint: "Recommended for tcptun-to-tcptun on v0.4.2",
-    recommended: true,
-  },
-  {
-    id: "native-quic",
-    title: "native + raw + reality-quic",
-    stack: "mux.mode=quic · forced QUIC · no TCP fallback",
-    hint: "When you want a dedicated QUIC pool only",
-  },
-];
-
-const steps: Array<{ id: StepId; title: string; summary: string }> = [
-  {
-    id: "protocol",
-    title: "Protocol",
-    summary: "Pick a tunnel stack. native + raw + reality is listed first.",
-  },
-  {
-    id: "server",
-    title: "Public endpoint",
-    summary: "Host and port clients will dial.",
-  },
-  {
-    id: "listen",
-    title: "Server listen",
-    summary: "Where the VPS binds.",
-  },
-  {
-    id: "reality",
-    title: "REALITY camouflage",
-    summary: "SNI and dest for the security layer.",
-  },
-  {
-    id: "client",
-    title: "Local proxy",
-    summary: "Client mixed inbound for apps.",
-  },
-  {
-    id: "options",
-    title: "Options",
-    summary: "Protocol-specific extras.",
-  },
-  {
-    id: "review",
-    title: "Review",
-    summary: "Confirm inputs before generation.",
-  },
-  {
-    id: "result",
-    title: "Your plan",
-    summary: "Runnable configs, commands, and checklist.",
-  },
-];
+function wizardProfiles(t: ReturnType<typeof useMessages>) {
+  return [
+    {
+      id: "native-reality-auto" as const,
+      title: t.guide.autoTitle,
+      stack: t.guide.autoStack,
+      hint: t.guide.autoHint,
+      recommended: true,
+    },
+    {
+      id: "native-quic" as const,
+      title: t.guide.quicTitle,
+      stack: t.guide.quicStack,
+      hint: t.guide.quicHint,
+    },
+  ];
+}
 
 const defaultForm: WizardForm = {
   profile: "native-reality-auto",
@@ -119,7 +74,8 @@ function joinHostPort(host: string, port: number): string {
   return `${normalized}:${port}`;
 }
 
-function profileMeta(profile: WizardProfile) {
+function profileMeta(profile: WizardProfile, t: ReturnType<typeof useMessages>) {
+  const profiles = wizardProfiles(t);
   return profiles.find((item) => item.id === profile) ?? profiles[0];
 }
 
@@ -139,8 +95,8 @@ function toGenerateInput(form: WizardForm) {
   };
 }
 
-function stackLabel(profile: WizardProfile, resume: boolean): string {
-  const meta = profileMeta(profile);
+function stackLabel(profile: WizardProfile, resume: boolean, t: ReturnType<typeof useMessages>): string {
+  const meta = profileMeta(profile, t);
   if (profile === "native-reality-auto") {
     return resume
       ? "native + raw + reality + group mux + resume"
@@ -152,17 +108,16 @@ function stackLabel(profile: WizardProfile, resume: boolean): string {
   return meta.stack;
 }
 
-function firewallNote(profile: WizardProfile): string {
-  if (profile === "native-reality-auto") {
-    return "Open BOTH TCP and UDP on the public port (auto dual carriers).";
-  }
-  if (profile === "native-quic") {
-    return "Open UDP on the public port (forced QUIC).";
-  }
-  return "Open TCP on the public port (REALITY over raw).";
+function firewallNote(profile: WizardProfile, t: ReturnType<typeof useMessages>): string {
+  if (profile === "native-reality-auto") return t.guide.firewallAuto;
+  if (profile === "native-quic") return t.guide.firewallQuic;
+  return t.guide.firewallTcp;
 }
 
 export default function GuideWizard() {
+  const t = useMessages();
+  const steps = t.guide.steps as Array<{ id: StepId; title: string; summary: string }>;
+  const profiles = wizardProfiles(t);
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<WizardForm>(defaultForm);
   const [error, setError] = useState<string | null>(null);
@@ -174,7 +129,7 @@ export default function GuideWizard() {
   const total = steps.length;
   const progress = ((stepIndex + 1) / total) * 100;
   const isResult = step.id === "result";
-  const selected = profileMeta(form.profile);
+  const selected = profileMeta(form.profile, t);
 
   const runbook = useMemo(() => {
     if (!result) return "";
@@ -182,7 +137,7 @@ export default function GuideWizard() {
     const localProxy = joinHostPort(form.localListen, form.localPort);
     const generate = toGenerateInput(form);
     return [
-      `# tcptun plan · ${stackLabel(form.profile, form.resume)}`,
+      `# tcptun plan · ${stackLabel(form.profile, form.resume, t)}`,
       `# Profile: ${selected.title}`,
       `# Public edge: ${publicEndpoint}`,
       `# Local proxy:  ${localProxy}`,
@@ -201,7 +156,7 @@ export default function GuideWizard() {
       "# - client.json  (local machine)",
       "",
       `# 3) Firewall / security group`,
-      `# ${firewallNote(form.profile)}`,
+      `# ${firewallNote(form.profile, t)}`,
       `# port ${form.port}`,
       "",
       "# 4) Validate",
@@ -330,7 +285,10 @@ export default function GuideWizard() {
 
         <div className="guide-wizard-meta">
           <span className="guide-wizard-step-count">
-            Step {String(stepIndex + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+            {interpolate(t.guide.stepOf, {
+              current: String(stepIndex + 1).padStart(2, "0"),
+              total: String(total).padStart(2, "0"),
+            })}
           </span>
           <span className="guide-wizard-stack-badge">{selected.title}</span>
         </div>
@@ -357,15 +315,14 @@ export default function GuideWizard() {
 
         <div className="guide-wizard-main">
           <article className="guide-wizard-card">
-            <p className="eyebrow">Interactive wizard</p>
+            <p className="eyebrow">{t.guide.interactive}</p>
             <h2>{step.title}</h2>
             <p className="guide-wizard-summary">{step.summary}</p>
 
             {step.id === "protocol" ? (
               <div className="guide-wizard-form">
                 <p className="guide-wizard-body">
-                  Choose a native tunnel profile. The recommended{" "}
-                  <strong>native + raw + reality</strong> automatic dual-carrier stack is listed first.
+                  {t.guide.protocolBody}
                 </p>
                 <div className="guide-profile-grid" role="radiogroup" aria-label="Protocol profile">
                   {profiles.map((item) => (
@@ -378,7 +335,7 @@ export default function GuideWizard() {
                       <div className="guide-profile-heading">
                         <strong>{item.title}</strong>
                         {item.recommended ? (
-                          <span className="guide-recommended">Recommended</span>
+                          <span className="guide-recommended">{t.guide.recommended}</span>
                         ) : null}
                       </div>
                       <span className="guide-profile-stack">{item.stack}</span>
@@ -392,10 +349,10 @@ export default function GuideWizard() {
             {step.id === "server" ? (
               <div className="guide-wizard-form">
                 <p className="guide-wizard-body">
-                  This is the public host and port your clients dial. DNS or IP both work.
+                  {t.guide.serverBody}
                 </p>
                 <label className="guide-field">
-                  <span>Public server host</span>
+                  <span>{t.guide.publicHost}</span>
                   <input
                     value={form.server}
                     onChange={(event) => update("server", event.target.value)}
@@ -405,7 +362,7 @@ export default function GuideWizard() {
                   />
                 </label>
                 <label className="guide-field">
-                  <span>Public port</span>
+                  <span>{t.guide.publicPort}</span>
                   <input
                     type="number"
                     min={1}
@@ -415,20 +372,18 @@ export default function GuideWizard() {
                     required
                   />
                 </label>
-                <p className="guide-field-hint">{firewallNote(form.profile)}</p>
+                <p className="guide-field-hint">{firewallNote(form.profile, t)}</p>
               </div>
             ) : null}
 
             {step.id === "listen" ? (
               <div className="guide-wizard-form">
-                <p className="guide-wizard-body">
-                  Where the server process binds. Most VPS deployments use all interfaces.
-                </p>
-                <div className="guide-choice-grid" role="radiogroup" aria-label="Listen address">
+                <p className="guide-wizard-body">{t.guide.listenBody}</p>
+                <div className="guide-choice-grid" role="radiogroup" aria-label={t.guide.serverListen}>
                   {[
-                    { value: "0.0.0.0", label: "All IPv4", hint: "0.0.0.0 (recommended)" },
-                    { value: "::", label: "All interfaces", hint: ":: (dual-stack where supported)" },
-                    { value: "127.0.0.1", label: "Local only", hint: "127.0.0.1 (testing)" },
+                    { value: "0.0.0.0", label: t.guide.listenAllV4, hint: t.guide.listenAllV4Hint },
+                    { value: "::", label: t.guide.listenAll, hint: t.guide.listenAllHint },
+                    { value: "127.0.0.1", label: t.guide.listenLocal, hint: t.guide.listenLocalHint },
                   ].map((choice) => (
                     <button
                       key={choice.value}
@@ -442,7 +397,7 @@ export default function GuideWizard() {
                   ))}
                 </div>
                 <label className="guide-field">
-                  <span>Custom listen host</span>
+                  <span>{t.guide.customListen}</span>
                   <input
                     value={form.listen}
                     onChange={(event) => update("listen", event.target.value)}
@@ -451,7 +406,7 @@ export default function GuideWizard() {
                   />
                 </label>
                 <p className="guide-field-hint">
-                  Final server listen address:{" "}
+                  {t.guide.listenFinal}{" "}
                   <code>{joinHostPort(form.listen || "0.0.0.0", form.port)}</code>
                 </p>
               </div>
@@ -460,14 +415,10 @@ export default function GuideWizard() {
             {step.id === "reality" ? (
               <div className="guide-wizard-form">
                 <p className="guide-wizard-body">
-                  {form.profile === "native-reality-auto"
-                    ? "REALITY camouflage is shared by QUIC and TCP carriers. Prefer a popular HTTPS site that also supports HTTP/3 when possible."
-                    : form.profile === "native-quic"
-                      ? "REALITY-QUIC uses the same key fields. Dest should support HTTPS camouflage; the carrier itself is QUIC-only."
-                      : "Generated configs use raw + REALITY. Server name is SNI; dest is the camouflage target."}
+                  {form.profile === "native-quic" ? t.guide.realityQuicBody : t.guide.realityAutoBody}
                 </p>
                 <label className="guide-field">
-                  <span>Server name (SNI)</span>
+                  <span>{t.guide.serverName}</span>
                   <input
                     value={form.serverName}
                     onChange={(event) => update("serverName", event.target.value)}
@@ -477,7 +428,7 @@ export default function GuideWizard() {
                   />
                 </label>
                 <label className="guide-field">
-                  <span>Dest (optional, default server-name:443)</span>
+                  <span>{t.guide.dest}</span>
                   <input
                     value={form.dest}
                     onChange={(event) => update("dest", event.target.value)}
@@ -515,10 +466,10 @@ export default function GuideWizard() {
             {step.id === "client" ? (
               <div className="guide-wizard-form">
                 <p className="guide-wizard-body">
-                  Apps on the client machine will use this local mixed proxy after the tunnel starts.
+                  {t.guide.clientBody}
                 </p>
                 <label className="guide-field">
-                  <span>Local listen</span>
+                  <span>{t.guide.localListen}</span>
                   <input
                     value={form.localListen}
                     onChange={(event) => update("localListen", event.target.value)}
@@ -528,7 +479,7 @@ export default function GuideWizard() {
                   />
                 </label>
                 <label className="guide-field">
-                  <span>Local port</span>
+                  <span>{t.guide.localPort}</span>
                   <input
                     type="number"
                     min={1}
@@ -547,7 +498,7 @@ export default function GuideWizard() {
                       onClick={() => update("localPort", port)}
                     >
                       <strong>:{port}</strong>
-                      <span>Common local proxy port</span>
+                      <span>{t.guide.commonPort}</span>
                     </button>
                   ))}
                 </div>
@@ -558,43 +509,38 @@ export default function GuideWizard() {
               <div className="guide-wizard-form">
                 {form.profile === "native-reality-auto" ? (
                   <>
-                    <p className="guide-wizard-body">
-                      Optional v0.3.0 feature. Resumable streams keep eligible TCP flows alive when the
-                      physical Reality QUIC/TCP carrier is replaced. Both ends must run v0.3.0+.
-                    </p>
-                    <div className="guide-choice-grid" role="radiogroup" aria-label="Resumable streams">
+                    <p className="guide-wizard-body">{t.guide.optionsResumeBody}</p>
+                    <div className="guide-choice-grid" role="radiogroup" aria-label={t.guide.resumeTitle}>
                       <button
                         type="button"
                         className={!form.resume ? "is-active" : undefined}
                         onClick={() => update("resume", false)}
                       >
-                        <strong>Standard</strong>
-                        <span>Reality auto only — simpler, recommended first run</span>
+                        <strong>{t.guide.standard}</strong>
+                        <span>{t.guide.resumeSimple}</span>
                       </button>
                       <button
                         type="button"
                         className={form.resume ? "is-active" : undefined}
                         onClick={() => update("resume", true)}
                       >
-                        <strong>Resumable TCP</strong>
-                        <span>mux.resume=true on both peers (one server process)</span>
+                        <strong>{t.guide.resumeTitle}</strong>
+                        <span>{t.guide.resumeHint}</span>
                       </button>
                     </div>
                     <ul className="guide-wizard-bullets">
-                      <li>Does not cover UDP, reverse publish, or multi-backend L4 load balancers</li>
-                      <li>Keep resume off during rolling upgrades until both peers are ready</li>
+                      {t.guide.resumeNotes.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
                     </ul>
                   </>
                 ) : (
                   <>
-                    <p className="guide-wizard-body">
-                      Forced QUIC mode uses <code>carrier.mode=quic</code> with mux enabled.
-                      There is no TCP fallback. Resume is not available on this path.
-                    </p>
+                    <p className="guide-wizard-body">{t.guide.quicBody}</p>
                     <ul className="guide-wizard-bullets">
-                      <li>UDP must reach the public port end-to-end</li>
-                      <li>Keep <code>security.type=reality</code> and select QUIC via carrier.mode</li>
-                      <li>DATAGRAM UDP modes can be tuned later in the JSON mux block</li>
+                      {t.guide.quicNotes.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
                     </ul>
                   </>
                 )}
@@ -603,40 +549,37 @@ export default function GuideWizard() {
 
             {step.id === "review" ? (
               <div className="guide-wizard-form">
-                <p className="guide-wizard-body">
-                  Confirm the plan. Generating creates fresh REALITY keys and credentials in this
-                  browser — nothing is uploaded.
-                </p>
+                <p className="guide-wizard-body">{t.guide.reviewBody}</p>
                 <dl className="guide-review-list">
                   <div>
-                    <dt>Profile</dt>
+                    <dt>{t.guide.profile}</dt>
                     <dd>{selected.title}</dd>
                   </div>
                   <div>
-                    <dt>Stack</dt>
-                    <dd>{stackLabel(form.profile, form.resume)}</dd>
+                    <dt>{t.guide.stack}</dt>
+                    <dd>{stackLabel(form.profile, form.resume, t)}</dd>
                   </div>
                   <div>
-                    <dt>Public edge</dt>
+                    <dt>{t.guide.publicEdge}</dt>
                     <dd>
                       <code>{joinHostPort(form.server, form.port)}</code>
                     </dd>
                   </div>
                   <div>
-                    <dt>Server listen</dt>
+                    <dt>{t.guide.serverListen}</dt>
                     <dd>
                       <code>{joinHostPort(form.listen, form.port)}</code>
                     </dd>
                   </div>
                   <div>
-                    <dt>REALITY SNI / dest</dt>
+                    <dt>{t.guide.realitySni}</dt>
                     <dd>
                       <code>{form.serverName}</code> /{" "}
                       <code>{form.dest.trim() || `${form.serverName}:443`}</code>
                     </dd>
                   </div>
                   <div>
-                    <dt>Local proxy</dt>
+                    <dt>{t.guide.localProxy}</dt>
                     <dd>
                       <code>{joinHostPort(form.localListen, form.localPort)}</code>
                     </dd>
@@ -653,7 +596,7 @@ export default function GuideWizard() {
                   </div>
                   <div>
                     <dt>Firewall</dt>
-                    <dd>{firewallNote(form.profile)}</dd>
+                    <dd>{firewallNote(form.profile, t)}</dd>
                   </div>
                 </dl>
               </div>
@@ -662,9 +605,7 @@ export default function GuideWizard() {
             {step.id === "result" && result ? (
               <div className="guide-wizard-form">
                 <p className="guide-wizard-body">
-                  Your executable plan for <strong>{selected.title}</strong> is ready. Download the
-                  JSON files to the matching machines, apply the firewall rules, then follow the
-                  runbook.
+                  {interpolate(t.guide.resultBody, { title: selected.title })}
                 </p>
                 <div className="guide-result-actions">
                   <button
@@ -672,28 +613,28 @@ export default function GuideWizard() {
                     className="button secondary"
                     onClick={() => downloadText("server.json", result.serverJson)}
                   >
-                    Download server.json
+                    {interpolate(t.generate.downloadFile, { name: "server.json" })}
                   </button>
                   <button
                     type="button"
                     className="button secondary"
                     onClick={() => downloadText("client.json", result.clientJson)}
                   >
-                    Download client.json
+                    {interpolate(t.generate.downloadFile, { name: "client.json" })}
                   </button>
                   <button
                     type="button"
                     className="button secondary"
                     onClick={() => downloadText("client.uri", result.clientUri, "text/plain")}
                   >
-                    Download client.uri
+                    {interpolate(t.generate.downloadFile, { name: "client.uri" })}
                   </button>
                   <button
                     type="button"
                     className="button ghost"
                     onClick={() => downloadText("tcptun-runbook.sh", `${runbook}\n`, "text/plain")}
                   >
-                    Download runbook
+                    {interpolate(t.generate.downloadFile, { name: "runbook" })}
                   </button>
                 </div>
               </div>
@@ -712,14 +653,14 @@ export default function GuideWizard() {
                 disabled={stepIndex === 0 || busy}
                 onClick={handleBack}
               >
-                Back
+                {t.guide.back}
               </button>
               <div className="guide-wizard-nav-links">
                 <button type="button" className="chip-link guide-reset-button" onClick={handleReset}>
-                  Start over
+                  {t.common.reset}
                 </button>
                 <Link className="chip-link" href="/examples/">
-                  Examples
+                  {t.nav.examples}
                 </Link>
               </div>
               {!isResult ? (
@@ -729,11 +670,11 @@ export default function GuideWizard() {
                   disabled={busy}
                   onClick={() => void handleNext()}
                 >
-                  {step.id === "review" ? (busy ? "Generating…" : "Generate plan") : "Next"}
+                  {step.id === "review" ? (busy ? t.common.generating : t.guide.generatePlan) : t.guide.next}
                 </button>
               ) : (
                 <Link className="button primary" href="/download/">
-                  Download binaries
+                  {t.nav.download}
                 </Link>
               )}
             </div>
@@ -764,7 +705,7 @@ export default function GuideWizard() {
                   <div className="config-example-tabs" role="tablist" aria-label="Plan outputs">
                     {(
                       [
-                        ["runbook", "Runbook"],
+                        ["runbook", t.guide.livePlan],
                         ["server", "server.json"],
                         ["client", "client.json"],
                         ["uri", "client.uri"],
@@ -785,7 +726,7 @@ export default function GuideWizard() {
                   <div className="config-example-meta">
                     <CopyButton
                       value={activeResultContent}
-                      label="Copy"
+                      label={t.common.copy}
                       className="copy-button-solid"
                     />
                   </div>
@@ -796,7 +737,7 @@ export default function GuideWizard() {
               </div>
             ) : (
               <div className="guide-wizard-checklist">
-                <strong>Live plan snapshot</strong>
+                <strong>{t.guide.livePlan}</strong>
                 <ul>
                   <li>
                     Profile <code>{selected.title}</code>

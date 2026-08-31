@@ -5,7 +5,7 @@ import LocalizedLink from "./localized-link";
 import { PlatformDownloadButton } from "./platform-download";
 import SiteChrome from "./site-chrome";
 import { getDictionary, interpolate, type Locale } from "./i18n";
-import { githubLinks, installCommand, releaseHighlights, releaseVersion } from "./site-data";
+import { githubLinks, installCommand, releaseVersion } from "./site-data";
 
 const displayVersion = `v${releaseVersion}`;
 
@@ -109,7 +109,7 @@ export default function HomeView({ locale = "en" }: { locale?: Locale }) {
               <span className="capability-label">{path.label}</span>
               <h3>{path.title}</h3>
               <p>{path.body}</p>
-              <span className="path-card-cta">Continue →</span>
+              <span className="path-card-cta">{t.home.continue}</span>
             </LocalizedLink>
           ))}
         </div>
@@ -223,7 +223,7 @@ export default function HomeView({ locale = "en" }: { locale?: Locale }) {
           </a>
         </div>
         <div className="capability-grid">
-          {releaseHighlights.map((item, index) => (
+          {t.home.releases.map((item, index) => (
             <article className="capability-card" key={item.title} data-tone={index % 3}>
               <div className="capability-meta">
                 <span className="capability-label">{item.label}</span>
@@ -249,10 +249,10 @@ export default function HomeView({ locale = "en" }: { locale?: Locale }) {
         </div>
         <div className="trust-strip">
           <a href={githubLinks.runtime} target="_blank" rel="noreferrer">
-            Source · tcptun-go
+            {t.home.sourceRuntime}
           </a>
           <a href={githubLinks.runtimeReleaseTag} target="_blank" rel="noreferrer">
-            Release tag {displayVersion}
+            {interpolate(t.home.releaseTag, { version: displayVersion })}
           </a>
           <a href="/install.sh">{t.home.inspectInstall}</a>
           <LocalizedLink href="/download/">{t.home.binariesVerify}</LocalizedLink>

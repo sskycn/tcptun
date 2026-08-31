@@ -28,7 +28,7 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
                 aria-pressed={mode === "latest"}
                 onClick={() => setMode("latest")}
               >
-                latest
+                {t.common.latest}
               </button>
               <button
                 type="button"
@@ -59,7 +59,7 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
               aria-pressed={mode === "latest"}
               onClick={() => setMode("latest")}
             >
-              latest
+              {t.common.latest}
             </button>
             <button
               type="button"
@@ -73,7 +73,7 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
         </div>
         <div className="download-note-command">
           <code>{command}</code>
-          <CopyButton value={command} label="Copy" className="copy-button-solid" />
+          <CopyButton value={command} label={t.common.copy} className="copy-button-solid" />
         </div>
         <span>
           {mode === "latest"
