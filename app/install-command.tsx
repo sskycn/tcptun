@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import CopyButton from "./copy-button";
+import { interpolate } from "./i18n";
+import { useMessages } from "./locale-context";
 import { installCommand, pinnedInstallCommand, releaseVersion } from "./site-data";
 
 type InstallCommandProps = {
@@ -9,6 +11,7 @@ type InstallCommandProps = {
 };
 
 export default function InstallCommand({ variant = "hero" }: InstallCommandProps) {
+  const t = useMessages();
   const [mode, setMode] = useState<"latest" | "pinned">("latest");
   const command = mode === "latest" ? installCommand : pinnedInstallCommand;
 
@@ -17,8 +20,8 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
       <div className="install-strip">
         <div className="install-strip-copy">
           <div className="install-mode-row">
-            <span className="install-strip-label">One-line install</span>
-            <div className="install-mode-toggle" role="group" aria-label="Install version">
+            <span className="install-strip-label">{t.download.oneLine}</span>
+            <div className="install-mode-toggle" role="group" aria-label={t.download.installVersion}>
               <button
                 type="button"
                 className={mode === "latest" ? "is-active" : undefined}
@@ -39,7 +42,7 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
           </div>
           <code>{command}</code>
         </div>
-        <CopyButton value={command} label="Copy command" className="copy-button-solid" />
+        <CopyButton value={command} label={t.common.copyCommand} className="copy-button-solid" />
       </div>
     );
   }
@@ -48,8 +51,8 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
     <div className="download-note">
       <div className="download-note-copy">
         <div className="install-mode-row">
-          <strong>One-line install</strong>
-          <div className="install-mode-toggle" role="group" aria-label="Install version">
+          <strong>{t.download.oneLine}</strong>
+          <div className="install-mode-toggle" role="group" aria-label={t.download.installVersion}>
             <button
               type="button"
               className={mode === "latest" ? "is-active" : undefined}
@@ -74,12 +77,12 @@ export default function InstallCommand({ variant = "hero" }: InstallCommandProps
         </div>
         <span>
           {mode === "latest"
-            ? "Installs the latest release to /usr/local/bin. Override the directory with TCPTUN_INSTALL_DIR."
-            : `Installs v${releaseVersion}. Override the directory with TCPTUN_INSTALL_DIR.`}
+            ? t.download.latestNote
+            : interpolate(t.download.pinnedNote, { version: releaseVersion })}
         </span>
       </div>
       <a className="download-note-link" href="/install.sh">
-        View script
+        {t.download.viewScript}
         <span aria-hidden="true">↗</span>
       </a>
     </div>

@@ -8,6 +8,7 @@ import {
   secretsSummary,
   type ExampleSecrets,
 } from "./example-secrets";
+import { useMessages } from "./locale-context";
 import { exampleCatalogGroups, protocolUseCases } from "./site-data";
 
 type SideTab = "server" | "client";
@@ -25,6 +26,7 @@ function readHashId(): (typeof protocolUseCases)[number]["id"] | null {
 }
 
 export default function ExamplesBrowser() {
+  const t = useMessages();
   const defaultId = protocolUseCases[0]?.id ?? "native-reality";
   const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>("native");
   const [useCaseId, setUseCaseId] = useState<(typeof protocolUseCases)[number]["id"]>(defaultId);
@@ -107,17 +109,12 @@ export default function ExamplesBrowser() {
     <section className="section protocol-section examples-catalog" id="protocol-examples">
       <div className="examples-catalog-toolbar">
         <div>
-          <p className="eyebrow">Catalog</p>
-          <h2>Browse every worked config.</h2>
-          <p>
-            Native stacks first. Pick a configuration from the menu, then copy the matching server /
-            client JSON. Reality keys, short IDs, tokens, and UUIDs are generated in your browser for
-            this page load — refresh to get a new set. Run <code>tcptun config check</code>, start
-            the server, then the client.
-          </p>
+          <p className="eyebrow">{t.examples.catalogEyebrow}</p>
+          <h2>{t.examples.catalogTitle}</h2>
+          <p>{t.examples.catalogLead}</p>
           {secrets ? (
             <p className="examples-secrets-note">
-              Fresh credentials for this visit: <code>{secretsSummary(secrets)}</code>
+              {t.examples.freshCreds} <code>{secretsSummary(secrets)}</code>
             </p>
           ) : null}
           {secretsError ? (
@@ -129,8 +126,8 @@ export default function ExamplesBrowser() {
         <div className="examples-filter-tabs" role="tablist" aria-label="Filter by protocol">
           {(
             [
-              ["native", "native"],
-              ["all", "All"],
+              ["native", t.examples.filterNative],
+              ["all", t.examples.filterAll],
               ["vless", "vless"],
               ["vmess", "vmess"],
               ["trojan", "trojan"],
@@ -166,8 +163,12 @@ export default function ExamplesBrowser() {
           {groupedCases.map((group) => (
             <div className="examples-menu-group" key={group.id}>
               <div className="examples-menu-heading">
-                <p className="examples-menu-label">{group.label}</p>
-                <p className="examples-menu-desc">{group.description}</p>
+                <p className="examples-menu-label">
+                  {t.examples.groups[group.id]?.label ?? group.label}
+                </p>
+                <p className="examples-menu-desc">
+                  {t.examples.groups[group.id]?.description ?? group.description}
+                </p>
               </div>
               <ul className="examples-menu-list">
                 {group.items.map((item) => (
@@ -180,7 +181,7 @@ export default function ExamplesBrowser() {
                     >
                       <span className="examples-menu-item-title">
                         {item.title}
-                        {item.recommended ? <span className="examples-menu-badge">Rec</span> : null}
+                        {item.recommended ? <span className="examples-menu-badge">{t.examples.rec}</span> : null}
                       </span>
                       <span className="examples-menu-item-summary">{item.summary}</span>
                     </button>
@@ -196,12 +197,12 @@ export default function ExamplesBrowser() {
             <div className="native-usecase-copy">
               <p className="eyebrow">
                 {activeCase.protocol}
-                {activeCase.recommended ? " · recommended" : ""}
+                {activeCase.recommended ? ` · ${t.examples.recommended}` : ""}
               </p>
               <h3>{activeCase.title}</h3>
               <p className="native-usecase-summary">{activeCase.summary}</p>
               <p>
-                <strong>When:</strong> {activeCase.when}
+                <strong>{t.examples.when}</strong> {activeCase.when}
               </p>
               <ol className="native-usecase-steps">
                 {activeCase.steps.map((step) => (
@@ -216,7 +217,7 @@ export default function ExamplesBrowser() {
               </div>
               <div className="native-usecase-links">
                 <a className="chip-link" href="/generate/">
-                  Open generator
+                  {t.examples.openGenerator}
                 </a>
                 <a className="chip-link" href="/config/">
                   Config reference
@@ -244,7 +245,7 @@ export default function ExamplesBrowser() {
                       className={side === "server" ? "is-active" : undefined}
                       onClick={() => setSide("server")}
                     >
-                      Server
+                      {t.common.server}
                     </button>
                     <button
                       type="button"
@@ -253,20 +254,20 @@ export default function ExamplesBrowser() {
                       className={side === "client" ? "is-active" : undefined}
                       onClick={() => setSide("client")}
                     >
-                      Client
+                      {t.common.client}
                     </button>
                   </div>
                   <div className="config-example-meta">
                     <span>{activeHint}</span>
                     <CopyButton
                       value={copyReady ? activeCode : ""}
-                      label={copyReady ? "Copy config" : "Generating…"}
+                      label={copyReady ? t.common.copyConfig : t.common.generating}
                       className="copy-button-solid"
                     />
                   </div>
                 </div>
                 <pre className="config-example-code" role="tabpanel">
-                  <code>{copyReady ? activeCode : "Generating Reality keys and credentials…"}</code>
+                  <code>{copyReady ? activeCode : t.examples.generatingKeys}</code>
                 </pre>
               </div>
             </div>

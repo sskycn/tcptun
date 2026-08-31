@@ -1,27 +1,17 @@
 import type { Metadata } from "next";
-import ConfigGenerator from "../config-generator";
-import PageHero from "../page-hero";
-import SiteChrome from "../site-chrome";
-import { releaseVersion } from "../site-data";
+import { GenerateView } from "./view";
+import { getDictionary } from "../i18n";
+import { pageMetadata } from "../i18n/metadata";
 
-export const metadata: Metadata = {
-  title: "Generate config",
-  description: "Generate matching tcptun server/client configs and URIs in the browser with local Web Crypto keys.",
-};
+const t = getDictionary("en");
 
-export default function GeneratePage() {
-  return (
-    <SiteChrome>
-      <PageHero
-        eyebrow="Generate"
-        title="Paired configs in the browser."
-        description="Create server.json, client.json, and client.uri locally. Native defaults to v0.4.2 Reality auto carriers; optional resumable streams and forced QUIC."
-        actions={[
-          { href: "/examples/", label: "Browse examples", variant: "secondary" },
-          { href: "/uri/", label: "URI tools", variant: "ghost" },
-        ]}
-      />
-      <ConfigGenerator />
-    </SiteChrome>
-  );
+export const metadata: Metadata = pageMetadata(
+  "en",
+  "/generate/",
+  t.generate.title,
+  t.generate.heroLead,
+);
+
+export default function Page() {
+  return <GenerateView locale="en" />;
 }

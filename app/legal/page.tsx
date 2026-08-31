@@ -1,23 +1,17 @@
 import type { Metadata } from "next";
-import DisclaimerSection from "../disclaimer-section";
-import PageHero from "../page-hero";
-import SiteChrome from "../site-chrome";
-import { releaseVersion } from "../site-data";
+import { LegalView } from "./view";
+import { getDictionary } from "../i18n";
+import { pageMetadata } from "../i18n/metadata";
 
-export const metadata: Metadata = {
-  title: "Legal",
-  description: "tcptun disclaimer: lawful use only, you bear all consequences, no warranty or promise.",
-};
+const t = getDictionary("en");
 
-export default function LegalPage() {
-  return (
-    <SiteChrome>
-      <PageHero
-        eyebrow="Legal"
-        title="Disclaimer and cookies."
-        description="Use this software only under lawful conditions. You assume all consequences. The author provides no warranty or promise."
-      />
-      <DisclaimerSection />
-    </SiteChrome>
-  );
+export const metadata: Metadata = pageMetadata(
+  "en",
+  "/legal/",
+  t.legal.title,
+  t.legal.heroLead,
+);
+
+export default function Page() {
+  return <LegalView locale="en" />;
 }

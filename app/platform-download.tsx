@@ -10,6 +10,8 @@ import {
   formatBytes,
   platformInitial,
 } from "./detect-platform";
+import { interpolate } from "./i18n";
+import { useMessages } from "./locale-context";
 import { binaryDownloads, npmInstallCommand, npmLinks } from "./site-data";
 import InstallCommand from "./install-command";
 
@@ -21,9 +23,11 @@ type PlatformDownloadButtonProps = {
 
 export function PlatformDownloadButton({
   className = "button primary",
-  fallbackLabel = "Download Linux x64",
+  fallbackLabel,
   fallbackHref,
 }: PlatformDownloadButtonProps) {
+  const t = useMessages();
+  const resolvedFallback = fallbackLabel || t.download.fallbackLinux;
   const [recommended, setRecommended] = useState<BinaryDownload | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -51,19 +55,23 @@ export function PlatformDownloadButton({
   if (!ready || !recommended) {
     return (
       <a className={className} href={fallback}>
-        {fallbackLabel}
+        {resolvedFallback}
       </a>
     );
   }
 
   return (
     <a className={className} href={recommended.url} rel="noreferrer">
-      Download {recommended.platformLabel} {recommended.archLabel}
+      {interpolate(t.download.downloadBinary, {
+        platform: recommended.platformLabel,
+        arch: recommended.archLabel,
+      })}
     </a>
   );
 }
 
 export function DownloadSection({ releaseVersion }: { releaseVersion: string }) {
+  const t = useMessages();
   const [detected, setDetected] = useState<DetectedPlatform | null>(null);
   const [recommended, setRecommended] = useState<BinaryDownload | null>(null);
 
@@ -106,10 +114,10 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
         </div>
         <div className="download-heading-actions">
           <a className="button secondary" href={npmLinks.package} target="_blank" rel="noreferrer">
-            npm package
+            {t.download.npmPackage}
           </a>
           <a className="button ghost" href={npmLinks.tarball} rel="noreferrer">
-            tarball
+            {t.download.tarball}
           </a>
         </div>
       </div>
@@ -117,7 +125,7 @@ export function DownloadSection({ releaseVersion }: { releaseVersion: string }) 
       {recommended && detected ? (
         <div className="platform-recommend">
           <div className="platform-recommend-copy">
-            <span className="platform-recommend-badge">Recommended for you</span>
+            <span className="platform-recommend-badge">{t.download.recommended}</span>
             <div>
               <strong>
                 Detected {detected.label}

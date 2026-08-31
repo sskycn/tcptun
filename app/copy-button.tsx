@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useMessages } from "./locale-context";
 
 type CopyButtonProps = {
   value: string;
@@ -10,9 +11,11 @@ type CopyButtonProps = {
 
 export default function CopyButton({
   value,
-  label = "Copy",
+  label,
   className = "",
 }: CopyButtonProps) {
+  const t = useMessages();
+  const resolvedLabel = label || t.common.copy;
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -50,7 +53,7 @@ export default function CopyButton({
       type="button"
       className={`copy-button ${copied ? "is-copied" : ""} ${className}`.trim()}
       onClick={handleCopy}
-      aria-label={copied ? "Copied" : label}
+      aria-label={copied ? t.common.copied : resolvedLabel}
     >
       <span className="copy-button-icon" aria-hidden="true">
         {copied ? (
@@ -83,7 +86,7 @@ export default function CopyButton({
           </svg>
         )}
       </span>
-      <span>{copied ? "Copied" : label}</span>
+      <span>{copied ? t.common.copied : resolvedLabel}</span>
     </button>
   );
 }

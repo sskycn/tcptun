@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { cookieNotice } from "./site-data";
+import { useMessages } from "./locale-context";
 
 const storageKey = "tcptun-cookie-consent";
 export const cookieBannerOpenEvent = "tcptun-open-cookie-banner";
@@ -12,6 +12,7 @@ export function openCookieBanner() {
 }
 
 export default function CookieBanner() {
+  const t = useMessages();
   const [visible, setVisible] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const detailsId = useId();
@@ -54,22 +55,19 @@ export default function CookieBanner() {
   if (!visible) return null;
 
   return (
-    <div className="cookie-banner" role="dialog" aria-label="Cookie notice" aria-modal="false">
+    <div className="cookie-banner" role="dialog" aria-label={t.cookies.aria} aria-modal="false">
       <div className="cookie-banner-inner">
         <div className="cookie-banner-copy">
-          <strong className="cookie-banner-title">We use cookies</strong>
-          <p>
-            {cookieNotice.intro} We also store your theme preference locally. See details or accept
-            to continue.
-          </p>
+          <strong className="cookie-banner-title">{t.cookies.title}</strong>
+          <p>{t.cookies.lead}</p>
           {detailsOpen ? (
             <div className="cookie-banner-details" id={detailsId}>
               <ul>
-                {cookieNotice.points.map((point) => (
+                {t.cookies.points.map((point) => (
                   <li key={point}>{point}</li>
                 ))}
               </ul>
-              <p>{cookieNotice.acceptance}</p>
+              <p>{t.cookies.acceptance}</p>
             </div>
           ) : null}
         </div>
@@ -81,10 +79,10 @@ export default function CookieBanner() {
             aria-controls={detailsId}
             onClick={() => setDetailsOpen((value) => !value)}
           >
-            {detailsOpen ? "Hide details" : "Learn more"}
+            {detailsOpen ? t.cookies.hideDetails : t.cookies.details}
           </button>
           <button type="button" className="button primary" onClick={accept}>
-            Accept
+            {t.cookies.accept}
           </button>
         </div>
       </div>

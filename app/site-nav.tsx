@@ -1,67 +1,71 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { androidAppLinks, githubLinks } from "./site-data";
-
-/** Primary destinations — short, product-path oriented. */
-const primaryLinks = [
-  { href: "/guide/", label: "Get started" },
-  { href: "/docs/", label: "Docs" },
-  { href: "/examples/", label: "Examples" },
-  { href: "/embed/", label: "Embed" },
-  { href: "/download/", label: "Download" },
-] as const;
-
-/** Mobile / overflow groups for the rest of the site. */
-const navGroups = [
-  {
-    title: "Product",
-    links: [
-      { href: "/guide/", label: "Get started" },
-      { href: "/embed/", label: "Go SDK" },
-      { href: "/use-cases/", label: "Use cases" },
-      { href: "/download/", label: "Download" },
-      { href: "/download/#android", label: "Android app" },
-      { href: "/start/", label: "CLI" },
-    ],
-  },
-  {
-    title: "Documentation",
-    links: [
-      { href: "/docs/", label: "Docs hub" },
-      { href: "/architecture/", label: "Architecture" },
-      { href: "/config/", label: "Configuration" },
-      { href: "/protocols/", label: "Protocols" },
-      { href: "/protocols/native/", label: "Native protocol" },
-      { href: "/examples/", label: "Examples catalog" },
-      { href: "/examples/#native-reality", label: "Reality auto" },
-      { href: "/examples/#native-reverse", label: "Reverse publish" },
-      { href: "/security/", label: "Security & trust" },
-      { href: "/faq/", label: "FAQ" },
-    ],
-  },
-  {
-    title: "Tools",
-    links: [
-      { href: "/generate/", label: "Config generator" },
-      { href: "/uri/", label: "URI tools" },
-      { href: "/convert/", label: "Xray convert" },
-      { href: "/guide/", label: "Setup wizard" },
-    ],
-  },
-] as const;
+import { localizeHref, stripLocalePrefix } from "./i18n";
+import LocalizedLink from "./localized-link";
+import { useLocale, useMessages } from "./locale-context";
 
 function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(href);
+  const path = stripLocalePrefix(pathname);
+  const target = stripLocalePrefix(href);
+  if (target === "/") return path === "/";
+  return path === target || path.startsWith(target);
 }
 
 export default function SiteNav() {
   const pathname = usePathname() || "/";
+  const locale = useLocale();
+  const t = useMessages();
   const [open, setOpen] = useState(false);
   const menuId = useId();
+
+  const primaryLinks = [
+    { href: "/guide/", label: t.nav.getStarted },
+    { href: "/docs/", label: t.nav.docs },
+    { href: "/examples/", label: t.nav.examples },
+    { href: "/embed/", label: t.nav.embed },
+    { href: "/download/", label: t.nav.download },
+  ] as const;
+
+  const navGroups = [
+    {
+      title: t.nav.product,
+      links: [
+        { href: "/guide/", label: t.nav.getStarted },
+        { href: "/embed/", label: t.nav.goSdk },
+        { href: "/use-cases/", label: t.nav.useCases },
+        { href: "/download/", label: t.nav.download },
+        { href: "/download/#android", label: t.nav.androidApp },
+        { href: "/start/", label: t.nav.cli },
+      ],
+    },
+    {
+      title: t.nav.documentation,
+      links: [
+        { href: "/docs/", label: t.nav.docsHub },
+        { href: "/architecture/", label: t.nav.architecture },
+        { href: "/config/", label: t.nav.configuration },
+        { href: "/protocols/", label: t.nav.protocols },
+        { href: "/protocols/native/", label: t.nav.nativeProtocol },
+        { href: "/examples/", label: t.nav.examplesCatalog },
+        { href: "/examples/#native-reality", label: t.nav.realityAuto },
+        { href: "/examples/#native-reverse", label: t.nav.reversePublish },
+        { href: "/security/", label: t.nav.securityTrust },
+        { href: "/faq/", label: t.nav.faq },
+      ],
+    },
+    {
+      title: t.nav.tools,
+      links: [
+        { href: "/generate/", label: t.nav.configGenerator },
+        { href: "/uri/", label: t.nav.uriTools },
+        { href: "/convert/", label: t.nav.xrayConvert },
+        { href: "/guide/", label: t.nav.setupWizard },
+      ],
+    },
+  ] as const;
 
   useEffect(() => {
     setOpen(false);
@@ -94,22 +98,17 @@ export default function SiteNav() {
     <div className="site-nav">
       <nav className="nav nav-desktop" aria-label="Primary navigation">
         {primaryLinks.map((link) => (
-          <Link
+          <LocalizedLink
             key={link.href}
             href={link.href}
             className={isActive(pathname, link.href) ? "is-active" : undefined}
             aria-current={isActive(pathname, link.href) ? "page" : undefined}
           >
             {link.label}
-          </Link>
+          </LocalizedLink>
         ))}
-        <a
-          href={githubLinks.runtime}
-          target="_blank"
-          rel="noreferrer"
-          className="nav-external"
-        >
-          GitHub
+        <a href={githubLinks.runtime} target="_blank" rel="noreferrer" className="nav-external">
+          {t.nav.github}
         </a>
       </nav>
 
@@ -118,7 +117,7 @@ export default function SiteNav() {
         className={`nav-toggle ${open ? "is-open" : ""}`}
         aria-expanded={open}
         aria-controls={menuId}
-        aria-label={open ? "Close menu" : "Open menu"}
+        aria-label={open ? t.common.closeMenu : t.common.openMenu}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="nav-toggle-bars" aria-hidden="true">
@@ -145,7 +144,7 @@ export default function SiteNav() {
             <div className="nav-mobile-group" key={group.title}>
               <p className="nav-mobile-label">{group.title}</p>
               {group.links.map((link) => (
-                <Link
+                <LocalizedLink
                   key={link.href + link.label}
                   href={link.href}
                   className={isActive(pathname, link.href) ? "is-active" : undefined}
@@ -155,14 +154,14 @@ export default function SiteNav() {
                 >
                   <span>{link.label}</span>
                   <span className="nav-mobile-hash" aria-hidden="true">
-                    {link.href}
+                    {localizeHref(link.href, locale)}
                   </span>
-                </Link>
+                </LocalizedLink>
               ))}
             </div>
           ))}
           <div className="nav-mobile-group">
-            <p className="nav-mobile-label">Source</p>
+            <p className="nav-mobile-label">{t.nav.source}</p>
             <a
               href={githubLinks.runtime}
               target="_blank"
@@ -170,7 +169,7 @@ export default function SiteNav() {
               tabIndex={open ? 0 : -1}
               onClick={() => setOpen(false)}
             >
-              <span>GitHub · runtime</span>
+              <span>{t.nav.githubRuntime}</span>
               <span className="nav-mobile-hash" aria-hidden="true">
                 sskycn/tcptun-go
               </span>
@@ -182,7 +181,9 @@ export default function SiteNav() {
               tabIndex={open ? 0 : -1}
               onClick={() => setOpen(false)}
             >
-              <span>Android v{androidAppLinks.appVersion}</span>
+              <span>
+                Android v{androidAppLinks.appVersion}
+              </span>
               <span className="nav-mobile-hash" aria-hidden="true">
                 runtime {androidAppLinks.runtimeVersion}
               </span>

@@ -1,4 +1,6 @@
-import Link from "next/link";
+"use client";
+
+import LocalizedLink from "./localized-link";
 
 type PageHeroProps = {
   eyebrow: string;
@@ -36,9 +38,9 @@ export default function PageHero({ eyebrow, title, description, actions = [] }: 
                 );
               }
               return (
-                <Link key={action.href + action.label} className={className} href={action.href}>
+                <LocalizedLink key={action.href + action.label} className={className} href={action.href}>
                   {action.label}
-                </Link>
+                </LocalizedLink>
               );
             })}
           </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { productDescription, productTagline } from "./site-data";
+import { rootMetadata } from "./i18n/metadata";
 
 const sans = Inter({
   subsets: ["latin"],
@@ -33,27 +33,7 @@ const themeInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: {
-    default: "tcptun · Programmable Networking Runtime",
-    template: "%s · tcptun",
-  },
-  description: productDescription,
-  keywords: [
-    "programmable networking runtime",
-    "Go networking library",
-    "TCP UDP tunnel runtime",
-    "embedded VPN engine",
-    "reverse TCP tunnel",
-    "application aware VPN routing",
-    "QUIC tunnel runtime",
-    "tcptun",
-  ],
-  openGraph: {
-    title: "tcptun · Programmable Networking Runtime",
-    description: productTagline,
-    type: "website",
-    url: "https://tcptun.com",
-  },
+  ...rootMetadata("en"),
   icons: {
     icon: "/tcptun-logo.png",
     apple: "/tcptun-logo.png",

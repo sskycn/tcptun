@@ -1,15 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useMessages } from "./locale-context";
 
 type ThemeChoice = "system" | "light" | "dark";
 
 const storageKey = "tcptun-theme";
-const choices: Array<{ label: string; value: ThemeChoice }> = [
-  { label: "System", value: "system" },
-  { label: "Light", value: "light" },
-  { label: "Dark", value: "dark" },
-];
 
 function applyTheme(choice: ThemeChoice) {
   const root = document.documentElement;
@@ -28,6 +24,12 @@ function savedTheme(): ThemeChoice {
 }
 
 export default function ThemeToggle() {
+  const t = useMessages();
+  const choices: Array<{ label: string; value: ThemeChoice }> = [
+    { label: t.theme.system, value: "system" },
+    { label: t.theme.light, value: "light" },
+    { label: t.theme.dark, value: "dark" },
+  ];
   const [theme, setTheme] = useState<ThemeChoice>(() => savedTheme());
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function ThemeToggle() {
   }
 
   return (
-    <div className="theme-toggle" role="group" aria-label="Color theme" suppressHydrationWarning>
+    <div className="theme-toggle" role="group" aria-label={t.theme.group} suppressHydrationWarning>
       {choices.map((choice) => (
         <button
           key={choice.value}

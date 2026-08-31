@@ -1,27 +1,17 @@
 import type { Metadata } from "next";
-import PageHero from "../page-hero";
-import SiteChrome from "../site-chrome";
-import UriConverter from "../uri-converter";
-import { releaseVersion } from "../site-data";
+import { UriView } from "./view";
+import { getDictionary } from "../i18n";
+import { pageMetadata } from "../i18n/metadata";
 
-export const metadata: Metadata = {
-  title: "URI tools",
-  description: "Convert tcptun configs, share URIs, and QR codes for native, VLESS, VMess, and Trojan.",
-};
+const t = getDictionary("en");
 
-export default function UriPage() {
-  return (
-    <SiteChrome>
-      <PageHero
-        eyebrow="URI"
-        title="Config, share URIs, and QR codes."
-        description="Export and import native / VLESS / VMess / Trojan endpoints. QR codes use compact T3 profiles; import still accepts T2 and plain URIs."
-        actions={[
-          { href: "/generate/", label: "Generate config", variant: "secondary" },
-          { href: "/convert/", label: "Xray convert", variant: "ghost" },
-        ]}
-      />
-      <UriConverter />
-    </SiteChrome>
-  );
+export const metadata: Metadata = pageMetadata(
+  "en",
+  "/uri/",
+  t.uri.title,
+  t.uri.title,
+);
+
+export default function Page() {
+  return <UriView locale="en" />;
 }
