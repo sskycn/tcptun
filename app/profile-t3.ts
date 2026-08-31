@@ -3,6 +3,7 @@ import type { TcptunCarrier, TcptunMux, TcptunOutbound, TcptunSecurity } from ".
 const PREFIX_T3 = "T3:";
 const PREFIX_T2 = "T2:";
 const BASE45 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+/** Wire protocol codes 1–3 are historical; encode/decode reject anything except native. */
 const PROTOCOLS = ["native", "vless", "vmess", "trojan"] as const;
 const TRANSPORTS = ["raw", "ws", "h2", "h3"] as const;
 const SECURITIES = ["", "tls", "reality", "reality-quic"] as const;
@@ -101,10 +102,10 @@ function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): Com
     throw new Error("T3 cannot represent balance settings");
   }
 
-  const protocol = outbound.type.trim().toLowerCase();
-  if (!PROTOCOLS.includes(protocol as (typeof PROTOCOLS)[number])) {
-    throw new Error(`T3 does not support protocol ${outbound.type}`);
+  if (outbound.type.trim().toLowerCase() !== "native") {
+    throw new Error("T3 only supports native profiles");
   }
+  const protocol = "native";
   const transport = (outbound.transport?.type || "raw").trim().toLowerCase();
   if (!TRANSPORTS.includes(transport as (typeof TRANSPORTS)[number])) {
     throw new Error(`T3 does not support transport ${outbound.transport?.type || ""}`);
@@ -116,7 +117,7 @@ function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): Com
 
   const networkCode = encodeNetworks(outbound.network);
   const { host, port } = splitEndpoint(outbound.address[0]);
-  const credential = outboundCredential(outbound, protocol);
+  const credential = outboundCredential(outbound);
   const securityConfig = outbound.security || {};
   const security = normalizeSecurity(securityConfig.type);
   validateSecurity(securityConfig, security);
@@ -124,8 +125,7 @@ function compactProfileFromOutbound(outbound: TcptunOutbound, name: string): Com
   if (security && !sni) throw new Error("T3 security endpoints must set server_name explicitly");
 
   const flowSource = outbound.flow?.trim() || "";
-  const flowExplicitEmpty =
-    protocol === "vless" && (security === "reality" || security === "reality-tcp") && flowSource === "";
+  const flowExplicitEmpty = false;
   const mux = normalizeMux(outbound.mux, outbound.carrier);
   // Compact profile still encodes carrier selection in the historical muxMode slot
   // (1=tcp/group, 2=quic) — align with Go profileuri after carrier.mode split.
@@ -344,7 +344,7 @@ function encodeCompactProfile(profile: CompactProfile): Uint8Array {
   writer.byte(header2);
   if (extensions) writer.varUInt(extensions);
   writer.port(profile.port);
-  writer.credential(profile.protocol, profile.credential);
+  writer.credential(profile.credential);
   writer.host(profile.host);
   if (hasPath) writer.string(profile.path);
   if (hasCustomSNI) writer.string(profile.sni);
@@ -454,17 +454,18 @@ function readPositiveExtension(reader: CompactReader, extensions: number, bit: n
 }
 
 function outboundFromProfile(profile: CompactProfile, tag: string): TcptunOutbound {
+  if (profile.protocol !== "native") {
+    throw new Error("T3 profiles other than native are not supported");
+  }
   const outbound: TcptunOutbound = {
     tag,
-    type: profile.protocol,
+    type: "native",
     address: [joinHostPort(profile.host, profile.port)],
     network: decodeNetworks(profile.networkCode),
     transport: { type: profile.transport, path: profile.path },
   };
   if (profile.flow) outbound.flow = profile.flow;
-  if (profile.protocol === "vless" || profile.protocol === "vmess") outbound.uuid = profile.credential;
-  else if (profile.protocol === "trojan") outbound.password = profile.credential;
-  else outbound.token = profile.credential;
+  outbound.token = profile.credential;
   if (profile.security === "tls") {
     outbound.security = {
       type: "tls",
@@ -565,16 +566,10 @@ class CompactWriter {
     }
   }
 
-  credential(protocol: string, value: string) {
+  credential(value: string) {
     if (value !== value.trim()) throw new Error("T3 cannot preserve credential leading/trailing whitespace");
-    const uuid = protocol === "vless" || protocol === "vmess" ? parseUUID(value) : null;
-    if (uuid) {
-      this.byte(0);
-      this.data.push(...uuid);
-    } else {
-      this.byte(1);
-      this.string(value);
-    }
+    this.byte(1);
+    this.string(value);
   }
 
   host(value: string) {
@@ -737,15 +732,7 @@ function decodeNetworks(code: number): string[] {
   return code === 1 ? ["tcp"] : code === 2 ? ["udp"] : ["tcp", "udp"];
 }
 
-function outboundCredential(outbound: TcptunOutbound, protocol: string): string {
-  if (protocol === "vless" || protocol === "vmess") {
-    if (outbound.password || outbound.token) throw new Error(`T3 ${protocol} profile contains credentials from another protocol`);
-    return outbound.uuid || "";
-  }
-  if (protocol === "trojan") {
-    if (outbound.uuid || outbound.token) throw new Error("T3 Trojan profile contains credentials from another protocol");
-    return outbound.password || "";
-  }
+function outboundCredential(outbound: TcptunOutbound): string {
   if (outbound.uuid || outbound.password) throw new Error("T3 Native profile contains credentials from another protocol");
   return outbound.token || "";
 }
@@ -768,11 +755,6 @@ function joinHostPort(host: string, port: number): string {
 
 function hasDuration(value: string | number | undefined): boolean {
   return typeof value === "number" ? value !== 0 : Boolean(value);
-}
-
-function parseUUID(value: string): Uint8Array | null {
-  if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value)) return null;
-  return decodeHex(value.replaceAll("-", ""));
 }
 
 function formatUUID(value: Uint8Array): string {

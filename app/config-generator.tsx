@@ -60,7 +60,7 @@ export default function ConfigGenerator() {
           <p>
             Builds v0.4.2 native server/client pairs: auto mode uses raw + REALITY with{" "}
             <code>carrier.mode=auto</code> and mux, optional resumable TCP streams, or forced QUIC
-            via <code>carrier.mode=quic</code>. VLESS / VMess / Trojan are not generated. Keys stay
+            via <code>carrier.mode=quic</code>. Keys stay
             local.
           </p>
         </div>

@@ -2,7 +2,6 @@ import {
   generateX25519Pair,
   randomBase64Url,
   randomHex,
-  randomUuidV4,
 } from "./crypto-credentials";
 import { buildOutboundUri, type TcptunOutbound, type TunnelProtocol } from "./uri-convert";
 
@@ -51,7 +50,7 @@ export function defaultGenerateInput(): GenerateConfigInput {
 
 export function validateGenerateInput(input: GenerateConfigInput): string | null {
   if (input.protocol !== "native") {
-    return "v0.4.2 generates native configs only; VLESS, VMess, and Trojan were removed";
+    return "v0.4.2 generates native configs only";
   }
   if (!input.server.trim()) return "Server address is required";
   if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {
@@ -86,14 +85,14 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
 
   const { privateKey, publicKey } = await generateX25519Pair();
   const shortId = randomHex(8);
-  const credential = await generateCredential(protocol);
+  const credential = await generateCredential();
 
   const serverInbound: Record<string, unknown> = {
     tag: "server",
     type: protocol,
     address: [joinHostPort(listen, input.port)],
     network: ["tcp", "udp"],
-    users: [serverUser(protocol, credential)],
+    users: [serverUser(credential)],
     transport: { type: "raw" },
     security: {
       // v0.3.0+: keep security.type=reality and select auto/tcp/quic via carrier.mode.
@@ -117,7 +116,6 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
         : {}),
     };
   } else {
-    // VLESS / VMess / Trojan generators remain Reality TCP (no dual carriers).
     serverInbound.carrier = { mode: "tcp" };
   }
 
@@ -141,7 +139,7 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
       short_id: shortId,
       spider_x: "/",
     },
-    ...clientCredentialFields(protocol, credential),
+    ...clientCredentialFields(credential),
   };
   if (quic) {
     clientOutbound.carrier = { mode: "quic", udp_mode: "auto" };
@@ -227,36 +225,15 @@ function joinHostPort(host: string, port: number): string {
   return `${normalized}:${port}`;
 }
 
-function serverUser(protocol: TunnelProtocol, credential: string) {
-  if (protocol === "vless") {
-    return { id: credential, flow: "xtls-rprx-vision" };
-  }
-  if (protocol === "vmess") {
-    return { id: credential };
-  }
-  if (protocol === "trojan") {
-    return { password: credential };
-  }
+function serverUser(credential: string) {
   return { id: credential };
 }
 
-function clientCredentialFields(protocol: TunnelProtocol, credential: string) {
-  if (protocol === "vless") {
-    return { uuid: credential, flow: "xtls-rprx-vision" };
-  }
-  if (protocol === "vmess") {
-    return { uuid: credential };
-  }
-  if (protocol === "trojan") {
-    return { password: credential };
-  }
+function clientCredentialFields(credential: string) {
   return { token: credential };
 }
 
-async function generateCredential(protocol: TunnelProtocol): Promise<string> {
-  if (protocol === "vless" || protocol === "vmess") {
-    return randomUuidV4();
-  }
+async function generateCredential(): Promise<string> {
   return randomBase64Url(24);
 }
 

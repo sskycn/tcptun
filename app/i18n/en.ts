@@ -63,7 +63,6 @@ export const en = {
     faq: "FAQ",
     configGenerator: "Config generator",
     uriTools: "URI tools",
-    xrayConvert: "Xray convert",
     setupWizard: "Setup wizard",
     legal: "Legal",
     privacy: "Privacy",
@@ -90,7 +89,7 @@ export const en = {
     points: [
       "Theme preference may be stored in your browser (for example localStorage key tcptun-theme) so light, dark, or system mode can be restored on later visits.",
       "Hosting, CDN, or security infrastructure that serves this site may set technical cookies or logs needed to deliver pages, assets, and basic reliability.",
-      "Browser tools on this site (config generation, URI conversion, and Xray conversion) process data locally in your browser; those tools are not used by us to set advertising cookies.",
+      "Browser tools on this site (config generation and URI conversion) process data locally in your browser; those tools are not used by us to set advertising cookies.",
       "We do not use first-party advertising or marketing tracking cookies on this site. Third-party services outside our control may still process requests according to their own policies.",
       "You can clear cookies and site data in your browser settings at any time. Disabling storage may reset preferences such as theme.",
     ],
@@ -187,7 +186,7 @@ export const en = {
     protoEyebrow: "Protocols",
     protoTitle: "Native tunnels. Local mixed hops.",
     protoLead:
-      "v{version} tunnel endpoints are native only. mixed and socks5 remain for authenticated local/LAN proxy hops — not Xray -c config files.",
+      "v{version} tunnel endpoints are native only. mixed and socks5 remain for authenticated local/LAN proxy hops.",
     nativeGuide: "Native guide",
     nativeTitle: "tcptun Native protocol",
     nativeBody:
@@ -196,7 +195,7 @@ export const en = {
     localLabel: "Local proxy",
     localTitle: "mixed / SOCKS5",
     localBody:
-      "Authenticated local listeners and LAN hops with users[] and SOCKS5 secure auth v2. VLESS, VMess, and Trojan were removed in v0.4.0 and are not loaded.",
+      "Authenticated local listeners and LAN hops with users[] and SOCKS5 secure auth v2.",
     configCta: "Config reference →",
     releaseEyebrow: "Latest · {version}",
     releaseTitle: "What shipped in this runtime.",
@@ -306,7 +305,7 @@ export const en = {
         links: [
           { href: "/embed/", label: "Go SDK", body: "pkg.tcptun.com/net and net contracts." },
           { href: "/use-cases/#android", label: "Android integration", body: "VPN-oriented platform path." },
-          { href: "https://github.com/sskycn/tcptun-go", label: "Runtime source", body: "sskycn/tcptun-go on GitHub.", external: true },
+          { href: "https://github.com/gostartkit/tcptun-go", label: "Runtime source", body: "gostartkit/tcptun-go on GitHub.", external: true },
         ],
       },
       {
@@ -314,7 +313,6 @@ export const en = {
         links: [
           { href: "/generate/", label: "Config generator", body: "Browser-local key generation." },
           { href: "/uri/", label: "URI / QR tools", body: "Import and export endpoints." },
-          { href: "/convert/", label: "Xray convert", body: "Wire configs → tcptun JSON (local)." },
           { href: "/guide/", label: "Setup wizard", body: "Guided first tunnel." },
         ],
       },
@@ -332,7 +330,7 @@ export const en = {
     title: "Examples",
     heroTitle: "Configuration catalog, native first.",
     heroLead:
-      "Browse every worked server/client pair for tcptun {version}: Reality carriers, reverse publish, topology patterns, then removed wire-interop protocols. Keys and tokens are generated in your browser on each visit. Copy JSON, validate, start the server first.",
+      "Browse every worked server/client pair for tcptun {version}: Reality carriers, reverse publish, and topology patterns. Keys and tokens are generated in your browser on each visit. Copy JSON, validate, start the server first.",
     realityAuto: "Reality auto",
     generatePair: "Generate pair",
     configRef: "Config reference",
@@ -356,10 +354,6 @@ export const en = {
       "native-topology": {
         label: "Native · topology",
         description: "Reverse publish, multi-path, balance, routing, chain, and relay.",
-      },
-      "wire-interop": {
-        label: "Removed in v0.4",
-        description: "Historical VLESS / VMess / Trojan samples. v0.4.2 will not load these tunnel types.",
       },
     },
   },
@@ -406,7 +400,7 @@ export const en = {
       {
         id: "interop",
         title: "Local mixed / SOCKS5 hops",
-        body: "Keep mixed and socks5 for authenticated local or LAN hops. v0.4.2 tunnel endpoints are native only; VLESS / VMess / Trojan are not loaded.",
+        body: "Keep mixed and socks5 for authenticated local or LAN hops. Tunnel endpoints are native.",
         cta: "Protocols",
       },
     ],
@@ -421,7 +415,7 @@ export const en = {
     eyebrow: "Generate",
     heading: "Generate paired configs in the browser.",
     lead:
-      "Builds v0.4.2 native server/client pairs: auto mode uses raw + REALITY with carrier.mode=auto and mux, optional resumable TCP streams, or forced QUIC via carrier.mode=quic. VLESS / VMess / Trojan are not generated. Keys stay local.",
+      "Builds v0.4.2 native server/client pairs: auto mode uses raw + REALITY with carrier.mode=auto and mux, optional resumable TCP streams, or forced QUIC via carrier.mode=quic. Keys stay local.",
     protocol: "Protocol",
     autoReality: "v0.4.2 Reality auto — TCP+QUIC on one address (carrier.mode=auto)",
     resume: "Resume eligible TCP streams across carrier replacement",
@@ -437,10 +431,9 @@ export const en = {
     ],
   },
   convert: {
-    title: "Xray convert",
-    heroTitle: "Xray config → tcptun.",
-    heroLead:
-      "Browser conversion still accepts Xray JSON and vless/vmess/trojan links, but tcptun v{version} will not run those tunnel types. Rebuild as native before deploying.",
+    title: "URI tools",
+    heroTitle: "URI tools",
+    heroLead: "Export and import native endpoints.",
   },
   uri: {
     title: "URI tools",
@@ -501,7 +494,7 @@ export const en = {
     title: "Protocols",
     heroTitle: "Native tunnels in one topology.",
     heroLead:
-      "v{version} removed VLESS, VMess, and Trojan. Use native for tcptun-to-tcptun carriers, mux, and reverse publish. mixed / socks5 stay as authenticated local hops.",
+      "Use native for tcptun-to-tcptun carriers, mux, and reverse publish. mixed / socks5 stay as authenticated local hops.",
     nativeGuide: "Native guide",
     allExamples: "All examples",
     configRef: "Config reference",
@@ -525,7 +518,7 @@ export const en = {
     items: [
       {
         q: "Can I use Xray config files directly?",
-        a: "No. tcptun uses its own JSON topology. v0.4.2 tunnel endpoints are native only — VLESS, VMess, and Trojan were removed and are not loaded.",
+        a: "No. tcptun uses its own JSON topology. Tunnel endpoints are native; mixed and socks5 are for local/LAN proxy hops.",
       },
       {
         q: "What is the native protocol?",
@@ -536,8 +529,8 @@ export const en = {
         a: "Install tcptun, run tcptun config native --server <host> --port <port>, edit the generated server/client endpoints and token, validate with tcptun config check, start the server then the client, and point apps at 127.0.0.1:1080.",
       },
       {
-        q: "How do I choose among the four tunnel protocols?",
-        a: "v0.4.2 has one tunnel protocol: native. Use it for throughput, mux, QUIC, reverse publish, and Reality/TLS carriers. mixed and socks5 remain for local/LAN proxy hops. VLESS, VMess, and Trojan were removed.",
+        q: "Which tunnel protocol should I use?",
+        a: "Use native for throughput, mux, QUIC, reverse publish, and Reality/TLS carriers. mixed and socks5 remain for local/LAN proxy hops.",
       },
       {
         q: "How do I validate a config?",
@@ -596,8 +589,8 @@ export const en = {
         a: "Keys and credentials are generated locally with Web Crypto and never uploaded. You can also use the CLI: tcptun config <protocol> --server ….",
       },
       {
-        q: "How do I convert an Xray config to tcptun?",
-        a: "The Convert tool can still parse Xray JSON or vless/vmess/trojan links in the browser, but v0.4.2 will not run those tunnel types. Rebuild the path as native (or keep mixed/socks5 for local hops) before deploying.",
+        q: "How do I move from another proxy config?",
+        a: "Rebuild the path as native (or keep mixed/socks5 for local hops). tcptun does not load Xray JSON or other vendors’ share links as tunnel endpoints.",
       },
       {
         q: "What happens when no config file is provided?",

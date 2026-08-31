@@ -26,8 +26,6 @@ import {
   realityFieldGroups,
   realityRules,
   reversePublishNotes,
-  vlessRealityClientExample,
-  vlessRealityServerExample,
 } from "./site-data";
 
 const nativeExampleTabs = [
@@ -94,18 +92,6 @@ const nativeExampleTabs = [
 ] as const;
 
 const realityExampleTabs = [
-  {
-    id: "vless-server",
-    label: "VLESS server",
-    hint: "server-vless-reality.json",
-    code: vlessRealityServerExample,
-  },
-  {
-    id: "vless-client",
-    label: "VLESS client",
-    hint: "client-vless-reality.json",
-    code: vlessRealityClientExample,
-  },
   {
     id: "native-server",
     label: "Native auto server",
@@ -186,7 +172,7 @@ type SnippetKey = keyof typeof protocolOutboundSnippets;
 
 export default function ConfigSection() {
   const [nativeTab, setNativeTab] = useState<NativeTabId>("server");
-  const [realityTab, setRealityTab] = useState<RealityTabId>("vless-server");
+  const [realityTab, setRealityTab] = useState<RealityTabId>("native-server");
   const [snippetKey, setSnippetKey] = useState<SnippetKey>("native");
 
   const activeNative =
@@ -597,8 +583,8 @@ export default function ConfigSection() {
             <p className="eyebrow">REALITY</p>
             <h3>REALITY and REALITY QUIC</h3>
             <p>
-              Configured under <code>security</code>. All four tunnel protocols can use it; VLESS
-              generated configs enable Vision by default.
+              Configured under <code>security</code> for native + raw. Pair with{" "}
+              <code>carrier.mode</code> for auto, TCP-only, or QUIC-only.
             </p>
           </div>
           <div className="chip-row">
@@ -675,8 +661,8 @@ export default function ConfigSection() {
         <div className="section-subheading row-heading section-subheading-wide">
           <div>
             <p className="eyebrow">Compare</p>
-            <h3>Four tunnel protocols</h3>
-            <p>Xray compatibility is for wire protocols, not config files.</p>
+            <h3>Native tunnel protocol</h3>
+            <p>Tunnel endpoints are native. mixed and socks5 remain for local proxy hops.</p>
           </div>
         </div>
 
@@ -688,7 +674,6 @@ export default function ConfigSection() {
                 <th>Credential</th>
                 <th>Interop</th>
                 <th>Default security</th>
-                <th>Vision</th>
                 <th>Mux</th>
                 <th>Best for</th>
               </tr>
@@ -702,7 +687,6 @@ export default function ConfigSection() {
                   <td>{row.credential}</td>
                   <td>{row.interop}</td>
                   <td>{row.securityDefault}</td>
-                  <td>{row.vision}</td>
                   <td>{row.muxNote}</td>
                   <td>{row.bestFor}</td>
                 </tr>

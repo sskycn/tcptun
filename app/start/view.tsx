@@ -30,7 +30,7 @@ const workflows = [
   {
     name: "uri",
     title: "Import URI",
-    body: "Build a client config from native / VLESS / VMess / Trojan URIs.",
+    body: "Build a client config from a native URI.",
     command: "tcptun uri import --input client.uri --client --output client.json",
   },
   {

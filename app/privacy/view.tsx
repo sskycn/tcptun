@@ -32,7 +32,7 @@ const privacyItems = [
     title: "Browser-local tools",
     body: (
       <>
-        Config generation, URI conversion, and Xray conversion are designed to run in your browser.
+        Config generation and URI conversion are designed to run in your browser.
         Values you paste into those tools, including keys, tokens, passwords, and configuration text,
         are not intentionally uploaded by the tcptun application. As with any web application, browser
         extensions, network inspection software, and the browser itself can have their own access.

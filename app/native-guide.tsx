@@ -18,7 +18,7 @@ import {
 } from "./site-data";
 
 type SideTab = "server" | "client";
-type ProtocolFilter = "all" | "native" | "vless" | "vmess" | "trojan";
+type ProtocolFilter = "all" | "native";
 
 export default function NativeGuide() {
   const nativeProtocol = tunnelProtocols.find((item) => item.name === "native") ?? tunnelProtocols[0];
@@ -200,18 +200,15 @@ export default function NativeGuide() {
         <div className="section-heading row-heading">
           <div>
             <p className="eyebrow">Use cases</p>
-            <h2>Worked examples for every tunnel protocol.</h2>
+            <h2>Worked native examples.</h2>
             <p>
-              Complete server / client pairs for native, VLESS, VMess, and Trojan. Copy a pair, replace
-              placeholders, validate, then start the server before the client.
+              Complete server / client pairs for native. Copy a pair, replace placeholders, validate,
+              then start the server before the client.
             </p>
           </div>
           <div className="chip-row">
             <a className="chip-link" href="/generate/">
               Generator
-            </a>
-            <a className="chip-link" href="/convert/">
-              Xray convert
             </a>
             <a className="chip-link" href="/config/#protocol-compare">
               Compare
@@ -224,9 +221,6 @@ export default function NativeGuide() {
             [
               ["all", "All"],
               ["native", "native"],
-              ["vless", "vless"],
-              ["vmess", "vmess"],
-              ["trojan", "trojan"],
             ] as const
           ).map(([id, label]) => (
             <button

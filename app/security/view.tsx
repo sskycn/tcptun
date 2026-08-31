@@ -74,7 +74,7 @@ export function SecurityView({ locale = "en" }: { locale?: Locale }) {
             <p>
               Runtime:{" "}
               <a href={githubLinks.runtime} target="_blank" rel="noreferrer">
-                github.com/sskycn/tcptun-go
+                github.com/gostartkit/tcptun-go
               </a>
               . Website:{" "}
               <a href={githubLinks.site} target="_blank" rel="noreferrer">

@@ -13,7 +13,7 @@ export function UriView({ locale = "en" }: { locale?: Locale }) {
         description={t.generate.heroLead}
         actions={[
           { href: "/generate/", label: t.nav.configGenerator, variant: "secondary" },
-          { href: "/convert/", label: t.nav.xrayConvert, variant: "ghost" },
+          { href: "/examples/", label: t.nav.examples, variant: "ghost" },
         ]}
       />
       <UriConverter />

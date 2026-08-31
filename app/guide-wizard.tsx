@@ -10,7 +10,7 @@ import {
   type TunnelProtocol,
 } from "./generate-config";
 
-type WizardProfile = "native-reality-auto" | "native-quic" | "vless" | "vmess" | "trojan";
+type WizardProfile = "native-reality-auto" | "native-quic";
 
 type WizardForm = {
   profile: WizardProfile;
@@ -53,24 +53,6 @@ const profiles: Array<{
     title: "native + raw + reality-quic",
     stack: "mux.mode=quic · forced QUIC · no TCP fallback",
     hint: "When you want a dedicated QUIC pool only",
-  },
-  {
-    id: "vless",
-    title: "vless + raw + reality",
-    stack: "Vision flow · Xray-compatible wire",
-    hint: "Interop with Xray VLESS clients/servers",
-  },
-  {
-    id: "vmess",
-    title: "vmess + raw + reality",
-    stack: "VMess AEAD · Xray-compatible wire",
-    hint: "Interop with the VMess ecosystem",
-  },
-  {
-    id: "trojan",
-    title: "trojan + raw + reality",
-    stack: "Password auth · Xray-compatible wire",
-    hint: "Simple password credential with REALITY",
   },
 ];
 
@@ -142,13 +124,8 @@ function profileMeta(profile: WizardProfile) {
 }
 
 function toGenerateInput(form: WizardForm) {
-  const protocol: TunnelProtocol =
-    form.profile === "native-reality-auto" || form.profile === "native-quic"
-      ? "native"
-      : form.profile;
-
   return {
-    protocol,
+    protocol: "native" as TunnelProtocol,
     server: form.server.trim(),
     port: form.port,
     listen: form.listen.trim(),
@@ -387,9 +364,8 @@ export default function GuideWizard() {
             {step.id === "protocol" ? (
               <div className="guide-wizard-form">
                 <p className="guide-wizard-body">
-                  Choose a tunnel profile. The recommended <strong>native + raw + reality</strong>{" "}
-                  automatic dual-carrier stack is listed first. Other protocols generate matching
-                  REALITY pairs for Xray interop.
+                  Choose a native tunnel profile. The recommended{" "}
+                  <strong>native + raw + reality</strong> automatic dual-carrier stack is listed first.
                 </p>
                 <div className="guide-profile-grid" role="radiogroup" aria-label="Protocol profile">
                   {profiles.map((item) => (
@@ -609,33 +585,16 @@ export default function GuideWizard() {
                       <li>Keep resume off during rolling upgrades until both peers are ready</li>
                     </ul>
                   </>
-                ) : form.profile === "native-quic" ? (
+                ) : (
                   <>
                     <p className="guide-wizard-body">
-                      Forced QUIC mode uses <code>reality-quic</code> with <code>mux.mode=quic</code>.
+                      Forced QUIC mode uses <code>carrier.mode=quic</code> with mux enabled.
                       There is no TCP fallback. Resume is not available on this path.
                     </p>
                     <ul className="guide-wizard-bullets">
                       <li>UDP must reach the public port end-to-end</li>
-                      <li>Do not replace reality-quic with plain reality</li>
+                      <li>Keep <code>security.type=reality</code> and select QUIC via carrier.mode</li>
                       <li>DATAGRAM UDP modes can be tuned later in the JSON mux block</li>
-                    </ul>
-                  </>
-                ) : (
-                  <>
-                    <p className="guide-wizard-body">
-                      <strong>{selected.title}</strong> generates a standard REALITY pair for Xray
-                      wire interop. Credential type:{" "}
-                      {form.profile === "trojan"
-                        ? "password"
-                        : form.profile === "vless"
-                          ? "UUID + Vision flow"
-                          : "UUID"}.
-                    </p>
-                    <ul className="guide-wizard-bullets">
-                      <li>tcptun config format is not Xray config format</li>
-                      <li>Wire protocol interop covers VLESS / VMess / Trojan, not the full Xray JSON schema</li>
-                      <li>You can convert existing Xray links later on the Convert page</li>
                     </ul>
                   </>
                 )}

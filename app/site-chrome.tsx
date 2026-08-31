@@ -87,7 +87,6 @@ export default function SiteChrome({
                 <h3>{t.nav.tools}</h3>
                 <LocalizedLink href="/generate/">{t.nav.configGenerator}</LocalizedLink>
                 <LocalizedLink href="/uri/">{t.nav.uriTools}</LocalizedLink>
-                <LocalizedLink href="/convert/">{t.nav.xrayConvert}</LocalizedLink>
                 <LocalizedLink href="/guide/">{t.nav.setupWizard}</LocalizedLink>
               </div>
               <div className="footer-column">

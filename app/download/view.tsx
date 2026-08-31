@@ -141,7 +141,7 @@ export function DownloadView({ locale = "en" }: { locale?: Locale }) {
             <p>
               {t.download.sourceBody}{" "}
               <a href={githubLinks.runtime} target="_blank" rel="noreferrer">
-                sskycn/tcptun-go
+                gostartkit/tcptun-go
               </a>
               .
             </p>

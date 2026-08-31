@@ -2463,45 +2463,6 @@ pre {
   color: var(--primary);
 }
 
-.protocol-icon-vless {
-  color: color-mix(in srgb, var(--primary) 70%, #3b82f6);
-  background:
-    linear-gradient(160deg, color-mix(in srgb, #dbeafe 65%, var(--surface)), var(--surface));
-  border-color: color-mix(in srgb, #3b82f6 18%, var(--line));
-}
-
-.protocol-icon-vmess {
-  color: color-mix(in srgb, var(--accent) 75%, var(--primary));
-  background:
-    linear-gradient(160deg, color-mix(in srgb, var(--accent-soft) 75%, var(--surface)), var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 20%, var(--line));
-}
-
-.protocol-icon-trojan {
-  color: color-mix(in srgb, var(--accent) 55%, #7c3aed);
-  background:
-    linear-gradient(160deg, color-mix(in srgb, #ede9fe 55%, var(--surface)), var(--surface));
-  border-color: color-mix(in srgb, #7c3aed 16%, var(--line));
-}
-
-html[data-theme="dark"] .protocol-icon-vless {
-  background: linear-gradient(160deg, #15253d, var(--surface));
-}
-
-html[data-theme="dark"] .protocol-icon-trojan {
-  background: linear-gradient(160deg, #241a38, var(--surface));
-}
-
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) .protocol-icon-vless {
-    background: linear-gradient(160deg, #15253d, var(--surface));
-  }
-
-  html:not([data-theme="light"]) .protocol-icon-trojan {
-    background: linear-gradient(160deg, #241a38, var(--surface));
-  }
-}
-
 .protocol-card-heading h3 {
   margin: 0;
   font-size: 28px;

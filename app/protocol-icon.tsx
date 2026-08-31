@@ -29,61 +29,6 @@ function iconFor(name: string) {
           />
         </svg>
       );
-    case "vless":
-      return (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M5 12h14M14 7l5 5-5 5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <circle cx="6.5" cy="12" r="2" fill="currentColor" />
-        </svg>
-      );
-    case "vmess":
-      return (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <rect
-            x="3.5"
-            y="5.5"
-            width="17"
-            height="13"
-            rx="3"
-            stroke="currentColor"
-            strokeWidth="1.7"
-          />
-          <path
-            d="M7 12h3l1.5-3 2 6L15 12h2"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
-    case "trojan":
-      return (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M8 11V8.5a4 4 0 0 1 8 0V11"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-          />
-          <rect
-            x="6"
-            y="11"
-            width="12"
-            height="9"
-            rx="2.5"
-            stroke="currentColor"
-            strokeWidth="1.7"
-          />
-          <circle cx="12" cy="15.5" r="1.2" fill="currentColor" />
-        </svg>
-      );
     default:
       return (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">

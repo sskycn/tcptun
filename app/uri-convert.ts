@@ -1,6 +1,14 @@
 import { decodeProfilePayload, encodeT3 } from "./profile-t3";
 
-export type TunnelProtocol = "native" | "vless" | "vmess" | "trojan";
+export type TunnelProtocol = "native";
+
+function assertNativeProtocol(protocol: string) {
+  if (protocol !== "native") {
+    throw new Error(
+      `${protocol} URIs are not supported. tcptun v0.4.2 tunnel endpoints are native only.`,
+    );
+  }
+}
 
 export type UriExportScope = "outbounds" | "inbounds";
 
@@ -117,7 +125,7 @@ type TcptunInbound = {
 
 type JsonObject = Record<string, unknown>;
 
-const URI_PROTOCOLS = new Set<TunnelProtocol>(["native", "vless", "vmess", "trojan"]);
+const URI_PROTOCOLS = new Set<TunnelProtocol>(["native"]);
 const NATIVE_URI_PARAMETERS = new Set([
   "v",
   "protocol",
@@ -249,7 +257,8 @@ function resolvedCarrierMode(carrier: TcptunCarrier, mux: TcptunMux, securityTyp
 
 export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): string {
   const protocol = normalizedProtocol(outbound.type);
-  validateRepresentable(outbound, protocol);
+  assertNativeProtocol(protocol);
+  validateRepresentable(outbound);
   const { server, port } = outboundEndpoint(outbound);
   const transport = outbound.transport || {};
   const security = outbound.security || {};
@@ -262,64 +271,9 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   const isReality =
     securityType === "reality" || securityType === "reality-tcp" || securityType === "reality-quic";
 
-  if (protocol === "vmess") {
-    const payload = {
-      v: "2",
-      ps: name,
-      add: server,
-      port: String(port),
-      id: requiredCredential(outbound.uuid, "VMess uuid"),
-      aid: "0",
-      scy: "auto",
-      net: transport.type || "raw",
-      type: "none",
-      host: "",
-      path: transport.path || "",
-      tls: isReality ? "reality" : securityType === "tls" ? "tls" : "",
-      ...(isReality
-        ? {
-            sni: security.server_name || "",
-            fp: security.fingerprint || "",
-            pbk: security.public_key || "",
-            sid: security.short_id || "",
-            ...(carrierMode !== "quic" ? { spx: security.spider_x || "" } : {}),
-          }
-        : securityType === "tls" && security.server_name
-          ? { sni: security.server_name }
-          : {}),
-      ...(security.insecure ? { allowInsecure: true } : {}),
-      ...(muxEnabled ? { tcptun_mux: true } : {}),
-      ...(carrierMode ? { tcptun_carrier_mode: carrierMode } : {}),
-      ...(carrierUdpMode ? { tcptun_carrier_udp_mode: carrierUdpMode } : {}),
-      ...(positiveInteger(mux.max_sessions)
-        ? { tcptun_mux_max_sessions: mux.max_sessions }
-        : {}),
-      ...(positiveInteger(mux.max_streams_per_session)
-        ? { tcptun_mux_max_streams_per_session: mux.max_streams_per_session }
-        : {}),
-      ...(positiveInteger(mux.warm_spares) ? { tcptun_mux_warm_spares: mux.warm_spares } : {}),
-      ...(mux.resume ? { tcptun_mux_resume: true } : {}),
-      ...(hasDuration(mux.resume_timeout)
-        ? { tcptun_mux_resume_timeout: String(mux.resume_timeout) }
-        : {}),
-      ...(positiveInteger(mux.resume_buffer_size)
-        ? { tcptun_mux_resume_buffer_size: mux.resume_buffer_size }
-        : {}),
-      ...(outbound.network?.length ? { tcptun_network: outbound.network.join(",") } : {}),
-      ...(outbound.flow ? { tcptun_flow: outbound.flow } : {}),
-    };
-    return `vmess://${utf8ToBase64Raw(JSON.stringify(payload))}`;
-  }
-
-  const credential =
-    protocol === "vless"
-      ? requiredCredential(outbound.uuid, "VLESS uuid")
-      : protocol === "trojan"
-        ? requiredCredential(outbound.password, "Trojan password")
-        : requiredCredential(outbound.token, "Native token");
+  const credential = requiredCredential(outbound.token, "Native token");
   const query = new URLSearchParams();
-  if (protocol === "native") query.set("v", "1");
-  if (protocol === "vless") query.set("encryption", "none");
+  query.set("v", "1");
   query.set("type", transport.type || "raw");
   if (outbound.network?.length) query.set("network", outbound.network.join(","));
   if (transport.path) query.set("path", transport.path);
@@ -361,10 +315,12 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
 export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   const value = text.trim();
   if (!value) throw new Error("URI cannot be empty");
+  if (/^(vless|vmess|trojan):\/\//i.test(value)) {
+    throw new Error("vless / vmess / trojan URIs are not supported; tunnel endpoints are native only");
+  }
   if (value.startsWith("T3:") || value.startsWith("T2:")) {
     return decodeProfilePayload(value, tag).outbound;
   }
-  if (value.toLowerCase().startsWith("vmess://")) return parseVmessUri(value, tag);
 
   let uri: URL;
   try {
@@ -386,7 +342,7 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
     }
     protocol = "native";
   }
-  if (protocol !== "native" && protocol !== "vless" && protocol !== "trojan") {
+  if (protocol !== "native") {
     throw new Error(`Unsupported URI protocol ${protocol || "(empty)"}`);
   }
 
@@ -486,94 +442,7 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   }
 
   const username = decodeUserInfo(uri.username);
-  const password = decodeUserInfo(uri.password);
-  if (protocol === "vless") outbound.uuid = requiredCredential(username, "VLESS uuid");
-  else if (protocol === "trojan") {
-    outbound.password = requiredCredential(password || username, "Trojan password");
-  } else outbound.token = requiredCredential(username, "Native token");
-  return outbound;
-}
-
-function parseVmessUri(text: string, tag: string): TcptunOutbound {
-  let source: JsonObject;
-  try {
-    const payload = text.slice("vmess://".length).trim().split("#", 1)[0];
-    const decoded = decodeBase64Flexible(payload);
-    const parsed = JSON.parse(decoded);
-    if (!isObject(parsed)) throw new Error();
-    source = parsed;
-  } catch {
-    throw new Error("VMess URI payload is not valid Base64 JSON");
-  }
-  const port = Number(source.port);
-  assertPort(port, "VMess URI port");
-  const server = String(source.add || "").trim();
-  if (!server) throw new Error("VMess URI is missing a server address");
-  const outbound: TcptunOutbound = {
-    tag,
-    type: "vmess",
-    address: [joinHostPort(server, port)],
-    uuid: requiredCredential(String(source.id || ""), "VMess uuid"),
-    transport: {
-      type: String(source.net || "raw"),
-      ...(source.path ? { path: String(source.path) } : {}),
-    },
-  };
-  const muxConfig: TcptunMux = {};
-  setSourceInteger(muxConfig, "max_sessions", source.tcptun_mux_max_sessions);
-  setSourceInteger(muxConfig, "max_streams_per_session", source.tcptun_mux_max_streams_per_session);
-  setSourceInteger(muxConfig, "warm_spares", source.tcptun_mux_warm_spares);
-  setSourceBoolean(muxConfig, "resume", source.tcptun_mux_resume);
-  if (source.tcptun_mux_resume_timeout) {
-    muxConfig.resume_timeout = String(source.tcptun_mux_resume_timeout);
-  }
-  setSourceInteger(muxConfig, "resume_buffer_size", source.tcptun_mux_resume_buffer_size);
-  const muxEnabled = optionalSourceBoolean(source.tcptun_mux, "tcptun_mux");
-  if (muxEnabled === true || (muxEnabled === undefined && Object.keys(muxConfig).length > 0)) {
-    outbound.mux = { enabled: true, ...muxConfig };
-  }
-  const carrierMode = String(
-    source.tcptun_carrier_mode || source.tcptun_mux_mode || "",
-  )
-    .trim()
-    .toLowerCase();
-  const carrierUdpMode = String(
-    source.tcptun_carrier_udp_mode || source.tcptun_mux_udp_mode || "",
-  )
-    .trim()
-    .toLowerCase();
-  if (carrierMode || carrierUdpMode) {
-    outbound.carrier = {
-      ...(carrierMode
-        ? { mode: carrierMode === "group" ? "tcp" : carrierMode }
-        : {}),
-      ...(carrierUdpMode ? { udp_mode: carrierUdpMode } : {}),
-    };
-  }
-  if (source.tcptun_network) outbound.network = parseNetworkList(String(source.tcptun_network));
-  if (source.tcptun_flow) outbound.flow = String(source.tcptun_flow);
-
-  const security = String(source.tls || "").toLowerCase();
-  const insecure = optionalSourceBoolean(source.allowInsecure, "allowInsecure");
-  if (security === "reality" || security === "reality-quic") {
-    outbound.security = {
-      type: security,
-      server_name: String(source.sni || ""),
-      fingerprint: String(source.fp || ""),
-      public_key: String(source.pbk || ""),
-      short_id: String(source.sid || ""),
-      ...(security === "reality" ? { spider_x: String(source.spx || "") } : {}),
-      ...(insecure ? { insecure: true } : {}),
-    };
-  } else if (security && security !== "none") {
-    outbound.security = {
-      type: "tls",
-      ...(source.sni ? { server_name: String(source.sni) } : {}),
-      ...(insecure ? { insecure: true } : {}),
-    };
-  } else if (insecure) {
-    outbound.security = { insecure: true };
-  }
+  outbound.token = requiredCredential(username, "Native token");
   return outbound;
 }
 
@@ -647,9 +516,7 @@ async function outboundFromInbound(
     ...(inbound.mux != null ? { mux: { ...(inbound.mux || {}) } } : {}),
   };
   if (user.flow) outbound.flow = user.flow;
-  if (protocol === "vless" || protocol === "vmess") outbound.uuid = user.id;
-  else if (protocol === "trojan") outbound.password = user.password;
-  else outbound.token = user.id;
+  outbound.token = user.id;
 
   const security = inbound.security || {};
   const securityType = (security.type || "").toLowerCase();
@@ -705,7 +572,7 @@ function normalizeAddressList(
   return result;
 }
 
-function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtocol) {
+function validateRepresentable(outbound: TcptunOutbound) {
   if (outbound.via) throw new Error(`outbound ${outbound.tag} uses via; URIs cannot represent outbound chains`);
   if (outbound.username) throw new Error(`outbound ${outbound.tag} username cannot be written into a tunnel URI`);
   if (
@@ -735,14 +602,8 @@ function validateRepresentable(outbound: TcptunOutbound, protocol: TunnelProtoco
   ) {
     throw new Error(`outbound ${outbound.tag} contains server-side security fields and cannot be written into a client URI`);
   }
-  if (protocol === "native" && (outbound.password || outbound.uuid)) {
+  if (outbound.password || outbound.uuid) {
     throw new Error(`outbound ${outbound.tag} contains non-Native credentials`);
-  }
-  if ((protocol === "vless" || protocol === "vmess") && (outbound.password || outbound.token)) {
-    throw new Error(`outbound ${outbound.tag} contains non-${protocol.toUpperCase()} credentials`);
-  }
-  if (protocol === "trojan" && (outbound.uuid || outbound.token)) {
-    throw new Error(`outbound ${outbound.tag} contains non-Trojan credentials`);
   }
 }
 
@@ -920,16 +781,6 @@ function optionalBoolean(value: string | null, label: string): boolean | undefin
   throw new Error(`URI ${label} must be a boolean`);
 }
 
-function optionalSourceBoolean(value: unknown, label: string): boolean | undefined {
-  if (value === undefined || value === null || value === "") return undefined;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") {
-    if (value === 1) return true;
-    if (value === 0) return false;
-  }
-  return optionalBoolean(String(value), label);
-}
-
 function setOptionalText<T extends object, K extends keyof T>(target: T, key: K, value: string | null) {
   if (value) target[key] = value as T[K];
 }
@@ -946,17 +797,6 @@ function setOptionalInteger<T extends object, K extends keyof T>(target: T, key:
   target[key] = parsed as T[K];
 }
 
-function setSourceInteger<T extends object, K extends keyof T>(target: T, key: K, value: unknown) {
-  if (value === undefined || value === null || value === "" || value === 0) return;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`VMess URI ${String(key)} must be a non-negative integer`);
-  target[key] = parsed as T[K];
-}
-
-function setSourceBoolean<T extends object, K extends keyof T>(target: T, key: K, value: unknown) {
-  if (optionalSourceBoolean(value, String(key)) === true) target[key] = true as T[K];
-}
-
 function uniqueProxyTag(index: number): string {
   return index === 0 ? "proxy" : `proxy-${index + 1}`;
 }
@@ -967,20 +807,6 @@ function decodeUserInfo(value: string): string {
   } catch {
     throw new Error("URI credential percent-encoding is invalid");
   }
-}
-
-function utf8ToBase64Raw(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=+$/g, "");
-}
-
-function decodeBase64Flexible(input: string): string {
-  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
-  const binary = atob(normalized + padding);
-  return new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)));
 }
 
 function decodeBase64UrlBytes(input: string): Uint8Array {

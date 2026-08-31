@@ -232,7 +232,7 @@ export default function UriConverter() {
               placeholder={
                 mode === "export"
                   ? "Paste a full config.json, outbound object, or outbound array"
-                  : "Paste T3: / T2: / native:// / vless:// / vmess:// / trojan://"
+                  : "Paste T3: / T2: / native://"
               }
               spellCheck={false}
               required
@@ -466,7 +466,7 @@ export default function UriConverter() {
                     : "Paste URIs / profiles to generate T3 QR codes, or upload images to recover share endpoints."}
               </p>
               <ul>
-                <li>Supports Native / VLESS / VMess / Trojan</li>
+                <li>Supports native URIs and T3 / T2 profiles</li>
                 <li>Preserves raw / ws / h2 / h3, TLS / REALITY / reality-tcp, and URI-safe mux parameters</li>
                 <li>Supports IPv4, IPv6, and domain endpoints</li>
               </ul>
@@ -505,13 +505,11 @@ function profilePayloadFromShare(share: string, index: number): string {
   }
   const outbound = parseOutboundUri(share, `proxy-${index + 1}`);
   let displayName = "tcptun";
-  if (!share.toLowerCase().startsWith("vmess://")) {
-    try {
-      const fragment = new URL(share).hash.slice(1);
-      if (fragment) displayName = decodeURIComponent(fragment);
-    } catch {
-      // parseOutboundUri above owns validation and already produced the useful error.
-    }
+  try {
+    const fragment = new URL(share).hash.slice(1);
+    if (fragment) displayName = decodeURIComponent(fragment);
+  } catch {
+    // parseOutboundUri above owns validation and already produced the useful error.
   }
   return encodeT3(outbound, displayName);
 }

@@ -65,7 +65,6 @@ export const zh: Dictionary = {
     faq: "常见问题",
     configGenerator: "配置生成器",
     uriTools: "URI 工具",
-    xrayConvert: "Xray 转换",
     setupWizard: "安装向导",
     legal: "法律声明",
     privacy: "隐私",
@@ -91,7 +90,7 @@ export const zh: Dictionary = {
     points: [
       "主题偏好可能保存在浏览器中（例如 localStorage 键 tcptun-theme），以便下次访问恢复浅色、深色或跟随系统。",
       "托管、CDN 或安全基础设施可能设置技术 Cookie 或日志，用于交付页面、资源和基本可靠性。",
-      "本站浏览器工具（配置生成、URI 转换、Xray 转换）在本地处理数据，我们不会用这些工具设置广告 Cookie。",
+      "本站浏览器工具（配置生成、URI 转换）在本地处理数据，我们不会用这些工具设置广告 Cookie。",
       "本站不使用第一方广告或营销跟踪 Cookie。不受我们控制的第三方服务仍可能按其政策处理请求。",
       "你可以随时在浏览器设置中清除 Cookie 与站点数据。禁用存储可能重置主题等偏好。",
     ],
@@ -185,7 +184,7 @@ export const zh: Dictionary = {
     protoEyebrow: "协议",
     protoTitle: "Native 隧道。本地 mixed 跳。",
     protoLead:
-      "v{version} 隧道端点仅 native。mixed 与 socks5 仍用于已认证的本地/局域网代理跳 — 不是 Xray -c 配置文件。",
+      "v{version} 隧道端点仅 native。mixed 与 socks5 仍用于已认证的本地/局域网代理跳。",
     nativeGuide: "Native 指南",
     nativeTitle: "tcptun Native 协议",
     nativeBody: "面向 TCP/QUIC 载体、mux、可恢复流、反向发布、资源控制以及 tcptun 互连部署。",
@@ -193,7 +192,7 @@ export const zh: Dictionary = {
     localLabel: "本地代理",
     localTitle: "mixed / SOCKS5",
     localBody:
-      "带 users[] 与 SOCKS5 安全认证 v2 的本地监听与局域网跳。VLESS、VMess、Trojan 已在 v0.4.0 移除，不会加载。",
+      "带 users[] 与 SOCKS5 安全认证 v2 的本地监听与局域网跳。",
     configCta: "配置参考 →",
     releaseEyebrow: "最新 · {version}",
     releaseTitle: "本运行时交付了什么。",
@@ -298,7 +297,7 @@ export const zh: Dictionary = {
         links: [
           { href: "/embed/", label: "Go SDK", body: "pkg.tcptun.com/net 与 net 契约。" },
           { href: "/use-cases/#android", label: "Android 集成", body: "面向 VPN 的平台路径。" },
-          { href: "https://github.com/sskycn/tcptun-go", label: "运行时源码", body: "GitHub 上的 sskycn/tcptun-go。", external: true },
+          { href: "https://github.com/gostartkit/tcptun-go", label: "运行时源码", body: "GitHub 上的 gostartkit/tcptun-go。", external: true },
         ],
       },
       {
@@ -306,7 +305,6 @@ export const zh: Dictionary = {
         links: [
           { href: "/generate/", label: "配置生成器", body: "浏览器本地生成密钥。" },
           { href: "/uri/", label: "URI / QR 工具", body: "导入与导出端点。" },
-          { href: "/convert/", label: "Xray 转换", body: "线协议配置 → tcptun JSON（本地）。" },
           { href: "/guide/", label: "安装向导", body: "引导式第一条隧道。" },
         ],
       },
@@ -324,7 +322,7 @@ export const zh: Dictionary = {
     title: "示例",
     heroTitle: "配置目录，Native 优先。",
     heroLead:
-      "浏览 tcptun {version} 的全部可运行服务端/客户端配对：Reality 载体、反向发布、拓扑模式，以及已移除的线协议互操作。密钥与 token 每次访问都在浏览器内生成。复制 JSON，校验后先启动服务端。",
+      "浏览 tcptun {version} 的全部可运行服务端/客户端配对：Reality 载体、反向发布与拓扑模式。密钥与 token 每次访问都在浏览器内生成。复制 JSON，校验后先启动服务端。",
     realityAuto: "Reality 自动",
     generatePair: "生成配对",
     configRef: "配置参考",
@@ -348,10 +346,6 @@ export const zh: Dictionary = {
       "native-topology": {
         label: "Native · 拓扑",
         description: "反向发布、多路径、balance、路由、chain 与中继。",
-      },
-      "wire-interop": {
-        label: "v0.4 已移除",
-        description: "历史 VLESS / VMess / Trojan 样例。v0.4.2 不会加载这些隧道类型。",
       },
     },
   },
@@ -398,7 +392,7 @@ export const zh: Dictionary = {
       {
         id: "interop",
         title: "本地 mixed / SOCKS5 跳",
-        body: "mixed 与 socks5 仍用于已认证的本地或局域网跳。v0.4.2 隧道端点仅 native；VLESS / VMess / Trojan 不会加载。",
+        body: "mixed 与 socks5 仍用于已认证的本地或局域网跳。隧道端点是 native。",
         cta: "协议",
       },
     ],
@@ -413,7 +407,7 @@ export const zh: Dictionary = {
     eyebrow: "生成",
     heading: "在浏览器里生成配对配置。",
     lead:
-      "生成 v0.4.2 native 服务端/客户端配对：自动模式使用 raw + REALITY、carrier.mode=auto 与 mux，可选可恢复 TCP 流，或通过 carrier.mode=quic 强制 QUIC。不生成 VLESS / VMess / Trojan。密钥留在本地。",
+      "生成 v0.4.2 native 服务端/客户端配对：自动模式使用 raw + REALITY、carrier.mode=auto 与 mux，可选可恢复 TCP 流，或通过 carrier.mode=quic 强制 QUIC。密钥留在本地。",
     protocol: "协议",
     autoReality: "v0.4.2 Reality 自动 — 同一地址上的 TCP+QUIC（carrier.mode=auto）",
     resume: "在载体替换时恢复符合条件的 TCP 流",
@@ -428,10 +422,9 @@ export const zh: Dictionary = {
     ],
   },
   convert: {
-    title: "Xray 转换",
-    heroTitle: "Xray 配置 → tcptun。",
-    heroLead:
-      "浏览器转换仍可接受 Xray JSON 以及 vless/vmess/trojan 链接，但 tcptun v{version} 不会运行这些隧道类型。部署前请重建为 native。",
+    title: "URI 工具",
+    heroTitle: "URI 工具",
+    heroLead: "导出和导入 native 端点。",
   },
   uri: {
     title: "URI 工具",
@@ -492,7 +485,7 @@ export const zh: Dictionary = {
     title: "协议",
     heroTitle: "一套拓扑里的 Native 隧道。",
     heroLead:
-      "v{version} 已移除 VLESS、VMess 和 Trojan。tcptun 互连请使用 native 载体、mux 与反向发布。mixed / socks5 仍作为已认证的本地跳。",
+      "tcptun 互连请使用 native 载体、mux 与反向发布。mixed / socks5 仍作为已认证的本地跳。",
     nativeGuide: "Native 指南",
     allExamples: "全部示例",
     configRef: "配置参考",
@@ -516,7 +509,7 @@ export const zh: Dictionary = {
     items: [
       {
         q: "能直接使用 Xray 配置文件吗？",
-        a: "不能。tcptun 使用自己的 JSON 拓扑。v0.4.2 隧道端点仅 native — VLESS、VMess 和 Trojan 已移除，不会加载。",
+        a: "不能。tcptun 使用自己的 JSON 拓扑。隧道端点是 native；mixed 与 socks5 用于本地/局域网代理跳。",
       },
       {
         q: "什么是 native 协议？",
@@ -527,8 +520,8 @@ export const zh: Dictionary = {
         a: "安装 tcptun，运行 tcptun config native --server <host> --port <port>，编辑生成的服务端/客户端地址与 token，用 tcptun config check 校验，先启动服务端再启动客户端，应用指向 127.0.0.1:1080。",
       },
       {
-        q: "四种隧道协议该怎么选？",
-        a: "v0.4.2 只有一种隧道协议：native。用于吞吐、mux、QUIC、反向发布和 Reality/TLS 载体。mixed 与 socks5 仍用于本地/局域网代理跳。VLESS、VMess、Trojan 已移除。",
+        q: "隧道协议该怎么选？",
+        a: "互连请使用 native，用于吞吐、mux、QUIC、反向发布和 Reality/TLS 载体。mixed 与 socks5 仍用于本地/局域网代理跳。",
       },
       {
         q: "如何校验配置？",
@@ -587,8 +580,8 @@ export const zh: Dictionary = {
         a: "密钥与凭证用 Web Crypto 在本地生成，不会上传。也可以用 CLI：tcptun config <protocol> --server …。",
       },
       {
-        q: "如何把 Xray 配置转换成 tcptun？",
-        a: "转换工具仍可在浏览器里解析 Xray JSON 或 vless/vmess/trojan 链接，但 v0.4.2 不会运行这些隧道类型。部署前请重建为 native（或把 mixed/socks5 仅用于本地跳）。",
+        q: "如何从其他代理配置迁过来？",
+        a: "请重建为 native（或把 mixed/socks5 仅用于本地跳）。tcptun 不会把 Xray JSON 或其他厂商分享链接当作隧道端点加载。",
       },
       {
         q: "不提供配置文件时会发生什么？",

@@ -61,7 +61,6 @@ export default function SiteNav() {
       links: [
         { href: "/generate/", label: t.nav.configGenerator },
         { href: "/uri/", label: t.nav.uriTools },
-        { href: "/convert/", label: t.nav.xrayConvert },
         { href: "/guide/", label: t.nav.setupWizard },
       ],
     },
@@ -171,7 +170,7 @@ export default function SiteNav() {
             >
               <span>{t.nav.githubRuntime}</span>
               <span className="nav-mobile-hash" aria-hidden="true">
-                sskycn/tcptun-go
+                gostartkit/tcptun-go
               </span>
             </a>
             <a

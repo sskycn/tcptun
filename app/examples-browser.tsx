@@ -12,7 +12,7 @@ import { useMessages } from "./locale-context";
 import { exampleCatalogGroups, protocolUseCases } from "./site-data";
 
 type SideTab = "server" | "client";
-type ProtocolFilter = "all" | "native" | "vless" | "vmess" | "trojan";
+type ProtocolFilter = "all" | "native";
 
 const validIds = new Set(protocolUseCases.map((item) => item.id));
 
@@ -128,9 +128,6 @@ export default function ExamplesBrowser() {
             [
               ["native", t.examples.filterNative],
               ["all", t.examples.filterAll],
-              ["vless", "vless"],
-              ["vmess", "vmess"],
-              ["trojan", "trojan"],
             ] as const
           ).map(([id, label]) => (
             <button

@@ -2,7 +2,6 @@ import {
   generateX25519Pair,
   randomBase64Url,
   randomHex,
-  randomUuidV4,
 } from "./crypto-credentials";
 
 /** Fresh secrets for one /examples (or native guide) page load. */
@@ -11,12 +10,10 @@ export type ExampleSecrets = {
   publicKey: string;
   /** Reality short ID: 8 random bytes → 16 hex chars (matches `tcptun config`). */
   shortId: string;
-  /** Native token / Trojan password / reverse publish token. */
+  /** Native token / reverse publish token. */
   token: string;
   /** Second native token for relay hops that need distinct credentials. */
   tokenAlt: string;
-  /** VLESS / VMess UUID. */
-  uuid: string;
 };
 
 export async function generateExampleSecrets(): Promise<ExampleSecrets> {
@@ -27,7 +24,6 @@ export async function generateExampleSecrets(): Promise<ExampleSecrets> {
     shortId: randomHex(8),
     token: randomBase64Url(24),
     tokenAlt: randomBase64Url(24),
-    uuid: randomUuidV4(),
   };
 }
 
@@ -41,8 +37,6 @@ export function applyExampleSecrets(source: string, secrets: ExampleSecrets): st
     .join(secrets.privateKey)
     .split("REPLACE_WITH_SERVER_PUBLIC_KEY")
     .join(secrets.publicKey)
-    .split("00000000-0000-4000-8000-000000000000")
-    .join(secrets.uuid)
     .split("replace-with-a-long-random-token")
     .join(secrets.token)
     .split("inbound-secret")
