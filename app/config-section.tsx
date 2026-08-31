@@ -473,8 +473,9 @@ export default function ConfigSection() {
             <span>mux snippet</span>
             <CopyButton
               value={`"mux": {
+  "enabled": true,
   "max_sessions": 4,
-  "max_streams_per_session": 16,
+  "max_streams_per_session": 128,
   "warm_spares": 1
 }`}
               label="Copy"
@@ -483,8 +484,9 @@ export default function ConfigSection() {
           </div>
           <pre>
             <code>{`"mux": {
+  "enabled": true,
   "max_sessions": 4,
-  "max_streams_per_session": 16,
+  "max_streams_per_session": 128,
   "warm_spares": 1
 }`}</code>
           </pre>

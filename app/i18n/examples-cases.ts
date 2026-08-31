@@ -112,7 +112,7 @@ const en: Record<string, ExampleCopy> = {
   },
   "route-split": {
     title: "Route split + blackhole",
-    summary: "Send private/geoip direct, block ads, default everything else through native REALITY with carrier.mode=auto.",
+    summary: "Block ad suffixes, send RFC1918 prefixes direct, default everything else through native REALITY with carrier.mode=auto.",
     when: "You need domain/IP based routing without a second client process.",
     steps: [
       "Keep proxy, direct, and optional blackhole outbounds.",
@@ -247,7 +247,7 @@ const zh: Record<string, ExampleCopy> = {
   },
   "route-split": {
     title: "路由分流 + blackhole",
-    summary: "私网/geoip 走 direct，广告走 blackhole，其余默认走 native REALITY 且 carrier.mode=auto。",
+    summary: "广告后缀走 blackhole，RFC1918 前缀走 direct，其余默认走 native REALITY 且 carrier.mode=auto。",
     when: "需要按域名/IP 分流，但不想再跑第二个客户端进程。",
     steps: [
       "保留 proxy、direct，以及可选的 blackhole 出站。",

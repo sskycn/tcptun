@@ -622,8 +622,9 @@ export const topologyExample = `{
       "address": ["proxy.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "mux": {}
-    }
+      "mux": { "enabled": true }
+    },
+    { "tag": "direct", "type": "direct" }
   ],
   "route": { "default_outbound": "proxy", "rules": [] },
   "dns": {}
@@ -698,7 +699,6 @@ export const nativeQuicClientExample = `{
       "security": {
         "type": "reality",
         "server_name": "example.com",
-        "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
@@ -769,7 +769,7 @@ export const nativeReverseServerExample = `{
     { "tag": "direct", "type": "direct", "network": ["tcp"] }
   ],
   "route": { "default_outbound": "direct", "rules": [] },
-  "dns": {}
+  "dns": { "strategy": "prefer_ipv4" }
 }`;
 
 export const nativeReverseClientExample = `{
@@ -788,16 +788,16 @@ export const nativeReverseClientExample = `{
       "type": "native",
       "address": ["server.example.com:9443"],
       "token": "replace-with-a-long-random-token",
+      "network": ["tcp"],
       "transport": { "type": "raw" },
       "mux": { "enabled": true },
       "expose": [
         { "service": "web", "target": "127.0.0.1:3000" }
       ]
-    },
-    { "tag": "direct", "type": "direct" }
+    }
   ],
   "route": { "default_outbound": "edge", "rules": [] },
-  "dns": {}
+  "dns": { "strategy": "prefer_ipv4" }
 }`;
 
 export const nativeConfigHighlights = [
@@ -837,7 +837,7 @@ export const nativeFieldGroups = [
       { key: "network", side: "both", detail: "tcp / udp, combinable." },
       { key: "transport", side: "both", detail: "Only type / path (raw / ws / h2 / h3)." },
       { key: "security", side: "both", detail: "tls or reality. Carrier path is carrier.mode=auto|tcp|quic; all security parameters live here." },
-      { key: "mux", side: "both", detail: "Presence enables mux; {} uses defaults. Pool parameters are mainly on the client." },
+      { key: "mux", side: "both", detail: "mux.enabled is required and must be true when mux is present; omit mux to disable. Pool parameters are mainly on the client." },
     ],
   },
   {
@@ -856,14 +856,16 @@ export const nativeFieldGroups = [
       { key: "token", side: "client", detail: "Required; matches server users[].id." },
       { key: "security.server_name", side: "client", detail: "SNI for TLS/QUIC." },
       { key: "expose", side: "client", detail: "Reverse publish: service + target, optional network=tcp|udp." },
+      { key: "carrier.mode", side: "both", detail: "auto / tcp / quic. auto and quic require mux.enabled." },
+      { key: "carrier.prefer", side: "client", detail: "auto only: adaptive / quic / tcp. Official auto examples use quic." },
+      { key: "carrier.udp_mode", side: "client", detail: "auto and quic: reliable / auto / datagram." },
+      { key: "carrier.*_receive_window", side: "both", detail: "QUIC receive windows; stream max 16 MiB, connection max 64 MiB." },
       { key: "mux.max_sessions", side: "client", detail: "Connection pool cap, 1–32, default 4." },
       { key: "mux.max_streams_per_session", side: "client", detail: "Per-connection stream cap, 1–4096." },
       { key: "mux.warm_spares", side: "client", detail: "Warm idle connections; must be less than max_sessions." },
-      { key: "mux.udp_mode", side: "client", detail: "QUIC only: reliable / auto / datagram." },
       { key: "mux.resume", side: "both", detail: "v0.3.0: preserve eligible native TCP logical streams across carrier replacement when carrier.mode=auto." },
       { key: "mux.resume_timeout", side: "both", detail: "Recovery window: default 15s; explicit 100ms–5m." },
       { key: "mux.resume_buffer_size", side: "both", detail: "Per-direction replay buffer: default 4 MiB; explicit 64 KiB–64 MiB." },
-      { key: "mux.*_receive_window", side: "both", detail: "QUIC receive windows; stream max 16 MiB, connection max 64 MiB." },
     ],
   },
 ] as const;
@@ -871,7 +873,7 @@ export const nativeFieldGroups = [
 export const nativeMuxNotes = [
   {
     title: "How to enable",
-    body: "Any mux object enables mux (commonly \"mux\": {}). Do not use enabled; omit the mux field to disable it.",
+    body: "Set mux.enabled=true. enabled is required and must be true; omit the mux field to disable it.",
   },
   {
     title: "TCP mux",
@@ -996,7 +998,8 @@ export const nativeRealityServerExample = `{
   "outbounds": [
     { "tag": "direct", "type": "direct", "network": ["tcp", "udp"] }
   ],
-  "route": { "default_outbound": "direct", "rules": [] }
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": {}
 }`;
 
 export const nativeRealityClientExample = `{
@@ -1020,21 +1023,22 @@ export const nativeRealityClientExample = `{
       "security": {
         "type": "reality",
         "server_name": "example.com",
-        "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
       },
-      "carrier": { "mode": "auto" },
+      "carrier": { "mode": "auto", "prefer": "quic", "udp_mode": "auto" },
       "mux": {
         "enabled": true,
         "max_sessions": 4,
         "max_streams_per_session": 128,
         "warm_spares": 1
       }
-    }
+    },
+    { "tag": "direct", "type": "direct" }
   ],
-  "route": { "default_outbound": "proxy", "rules": [] }
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
 }`;
 
 /** Native v0.3.0 automatic Reality carriers with resumable TCP logical streams. */
@@ -1067,7 +1071,8 @@ export const nativeResumableServerExample = `{
     }
   ],
   "outbounds": [{ "tag": "direct", "type": "direct" }],
-  "route": { "default_outbound": "direct", "rules": [] }
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": {}
 }`;
 
 export const nativeResumableClientExample = `{
@@ -1092,21 +1097,22 @@ export const nativeResumableClientExample = `{
       "security": {
         "type": "reality",
         "server_name": "example.com",
-        "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
       },
-      "carrier": { "mode": "auto" },
+      "carrier": { "mode": "auto", "prefer": "quic", "udp_mode": "auto" },
       "mux": {
         "enabled": true,
         "resume": true,
         "resume_timeout": "15s",
         "resume_buffer_size": 4194304
       }
-    }
+    },
+    { "tag": "direct", "type": "direct" }
   ],
-  "route": { "default_outbound": "proxy", "rules": [] }
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
 }`;
 
 export const nativeUseCases = [
@@ -1267,7 +1273,6 @@ export const realityFieldGroups = [
       { key: "public_key", detail: "Server public key." },
       { key: "server_name", detail: "SNI; must be in server_names." },
       { key: "short_id", detail: "A single short id." },
-      { key: "fingerprint", detail: "uTLS fingerprint, commonly chrome." },
       { key: "spider_x", detail: "Optional path, default /." },
     ],
   },
@@ -1318,7 +1323,7 @@ export const protocolOutboundSnippets = {
   "address": ["proxy.example.com:9443"],
   "token": "change-me",
   "transport": { "type": "raw" },
-  "mux": {}
+  "mux": { "enabled": true }
 }`,
 } as const;
 
@@ -1346,7 +1351,8 @@ export const nativeRealityTcpServerExample = `{
     }
   ],
   "outbounds": [{ "tag": "direct", "type": "direct" }],
-  "route": { "default_outbound": "direct", "rules": [] }
+  "route": { "default_outbound": "direct", "rules": [] },
+  "dns": {}
 }`;
 
 export const nativeRealityTcpClientExample = `{
@@ -1370,16 +1376,17 @@ export const nativeRealityTcpClientExample = `{
       "security": {
         "type": "reality",
         "server_name": "example.com",
-        "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
       },
       "carrier": { "mode": "tcp" },
       "mux": { "enabled": true }
-    }
+    },
+    { "tag": "direct", "type": "direct" }
   ],
-  "route": { "default_outbound": "proxy", "rules": [] }
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
 }`;
 
 export const nativeMultiAddressClientExample = `{
@@ -1407,16 +1414,17 @@ export const nativeMultiAddressClientExample = `{
       "security": {
         "type": "reality",
         "server_name": "example.com",
-        "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
       },
-      "carrier": { "mode": "auto" },
+      "carrier": { "mode": "auto", "prefer": "quic", "udp_mode": "auto" },
       "mux": { "enabled": true }
-    }
+    },
+    { "tag": "direct", "type": "direct" }
   ],
-  "route": { "default_outbound": "proxy", "rules": [] }
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
 }`;
 
 export const balanceFailoverExample = `{
@@ -1436,12 +1444,11 @@ export const balanceFailoverExample = `{
       "address": ["edge-a.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "carrier": { "mode": "auto" },
+      "carrier": { "mode": "auto", "prefer": "quic", "udp_mode": "auto" },
       "mux": { "enabled": true },
       "security": {
         "type": "reality",
         "server_name": "example.com",
-        "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
@@ -1453,12 +1460,11 @@ export const balanceFailoverExample = `{
       "address": ["edge-b.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "carrier": { "mode": "auto" },
+      "carrier": { "mode": "auto", "prefer": "quic", "udp_mode": "auto" },
       "mux": { "enabled": true },
       "security": {
         "type": "reality",
         "server_name": "example.com",
-        "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
@@ -1479,11 +1485,12 @@ export const balanceFailoverExample = `{
     "default_outbound": "pool",
     "rules": [
       {
-        "domain": ["geosite:private"],
+        "ip_cidrs": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
         "outbound": "direct"
       }
     ]
-  }
+  },
+  "dns": {}
 }`;
 
 export const routeSplitExample = `{
@@ -1503,12 +1510,11 @@ export const routeSplitExample = `{
       "address": ["proxy.example.com:9443"],
       "token": "change-me",
       "transport": { "type": "raw" },
-      "carrier": { "mode": "auto" },
+      "carrier": { "mode": "auto", "prefer": "quic", "udp_mode": "auto" },
       "mux": { "enabled": true },
       "security": {
         "type": "reality",
         "server_name": "example.com",
-        "fingerprint": "chrome",
         "public_key": "REPLACE_WITH_SERVER_PUBLIC_KEY",
         "short_id": "abcd1234",
         "spider_x": "/"
@@ -1520,11 +1526,12 @@ export const routeSplitExample = `{
   "route": {
     "default_outbound": "proxy",
     "rules": [
-      { "domain": ["ads.example"], "outbound": "block" },
-      { "ip": ["geoip:private"], "outbound": "direct" },
-      { "domain": ["geosite:cn"], "outbound": "direct" }
+      { "domain_suffixes": ["ads.example"], "outbound": "block" },
+      { "ip_cidrs": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"], "outbound": "direct" },
+      { "domain_suffixes": ["internal.example"], "outbound": "direct" }
     ]
-  }
+  },
+  "dns": {}
 }`;
 
 export const nativeReverseUdpServerExample = `{
@@ -1948,7 +1955,7 @@ export const protocolUseCases = [
     group: "native-topology",
     recommended: false,
     title: "Route split + blackhole",
-    summary: "Send private/geoip direct, block ads, default everything else through native REALITY with carrier.mode=auto.",
+    summary: "Block ad suffixes, send RFC1918 prefixes direct, default everything else through native REALITY with carrier.mode=auto.",
     when: "You need domain/IP based routing without a second client process.",
     steps: [
       "Keep proxy, direct, and optional blackhole outbounds.",

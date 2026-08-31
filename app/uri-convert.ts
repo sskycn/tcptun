@@ -75,6 +75,7 @@ export type TcptunMux = {
 /** v0.2.5+ / v0.3.0 carrier selection (separate from mux pooling). */
 export type TcptunCarrier = {
   mode?: string;
+  prefer?: string;
   udp_mode?: string;
   initial_stream_receive_window?: number;
   max_stream_receive_window?: number;
@@ -144,6 +145,7 @@ const NATIVE_URI_PARAMETERS = new Set([
   "mux",
   // v0.3.0 carrier selection (replaces mux_mode / mux_udp_mode for new URIs)
   "carrier_mode",
+  "carrier_prefer",
   "carrier_udp_mode",
   // Legacy aliases still accepted when importing older URIs
   "mux_mode",
@@ -209,7 +211,9 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
     .filter(Boolean);
   if (lines.length === 0) throw new Error("Paste at least one URI");
 
-  const outbounds = lines.map((line, index) => parseOutboundUri(line, uniqueProxyTag(index)));
+  const outbounds = lines.map((line, index) =>
+    fileConfigOutbound(parseOutboundUri(line, uniqueProxyTag(index))),
+  );
   const client = options.client !== false;
   let output: unknown = outbounds.length === 1 ? outbounds[0] : outbounds;
 
@@ -219,6 +223,7 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
     assertPort(localPort, "Local port");
     const defaultOutbound = outbounds[0].tag;
     const networks = outbounds[0].network?.length ? [...outbounds[0].network] : ["tcp", "udp"];
+    const hasDirect = outbounds.some((item) => item.tag === "direct" || item.type === "direct");
     output = {
       log: { level: "info" },
       inbounds: [
@@ -227,12 +232,10 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
           type: "mixed",
           address: [joinHostPort(localListen, localPort)],
           network: networks,
-          transport: {},
-          security: {},
         },
       ],
-      outbounds,
-      route: { default_outbound: defaultOutbound },
+      outbounds: hasDirect ? outbounds : [...outbounds, { tag: "direct", type: "direct" }],
+      route: { default_outbound: defaultOutbound, rules: [] as unknown[] },
       dns: {},
     };
   }
@@ -242,6 +245,44 @@ export function urisToConfig(raw: string, options: UriImportOptions = {}): UriIm
     count: outbounds.length,
     summary: `Generated ${client ? "a client config" : " outbound config"} from ${outbounds.length} share endpoints`,
   };
+}
+
+function fileConfigOutbound(outbound: TcptunOutbound): TcptunOutbound {
+  const next: TcptunOutbound = { ...outbound };
+  if (next.security) {
+    const type = (next.security.type || "").trim().toLowerCase();
+    const { fingerprint: _fingerprint, ...security } = next.security;
+    void _fingerprint;
+    next.security = {
+      ...security,
+      type: type === "reality-tcp" || type === "reality-quic" ? "reality" : next.security.type,
+    };
+    if (type === "reality-tcp" || type === "reality-quic") {
+      next.carrier = {
+        ...(next.carrier || {}),
+        mode: next.carrier?.mode || (type === "reality-quic" ? "quic" : "tcp"),
+      };
+    }
+  }
+  if (next.mux) {
+    const {
+      mode: _mode,
+      udp_mode: _udpMode,
+      initial_stream_receive_window: _isrw,
+      max_stream_receive_window: _msrw,
+      initial_connection_receive_window: _icrw,
+      max_connection_receive_window: _mcrw,
+      ...mux
+    } = next.mux;
+    void _mode;
+    void _udpMode;
+    void _isrw;
+    void _msrw;
+    void _icrw;
+    void _mcrw;
+    next.mux = { ...mux, enabled: true };
+  }
+  return next;
 }
 
 function resolvedCarrierMode(carrier: TcptunCarrier, mux: TcptunMux, securityType = ""): string {
@@ -285,7 +326,6 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
     // v0.3.0: always emit security=reality; physical path goes in carrier_mode.
     query.set("security", "reality");
     query.set("sni", security.server_name || "");
-    query.set("fp", security.fingerprint || "");
     query.set("pbk", security.public_key || "");
     query.set("sid", security.short_id || "");
     if (security.spider_x) query.set("spx", security.spider_x);
@@ -295,6 +335,8 @@ export function buildOutboundUri(outbound: TcptunOutbound, name = "tcptun"): str
   if (protocol === "native" || muxEnabled) query.set("mux", String(muxEnabled));
   // v0.3.0 URI: carrier_mode / carrier_udp_mode (not mux_mode).
   if (carrierMode) query.set("carrier_mode", carrierMode);
+  const carrierPrefer = (carrier.prefer || "").trim().toLowerCase();
+  if (carrierPrefer) query.set("carrier_prefer", carrierPrefer);
   if (carrierUdpMode) query.set("carrier_udp_mode", carrierUdpMode);
   if (positiveInteger(mux.max_sessions)) query.set("mux_max_sessions", String(mux.max_sessions));
   if (positiveInteger(mux.max_streams_per_session)) {
@@ -387,6 +429,7 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
   const carrier: TcptunCarrier = {};
   const carrierMode =
     (query.get("carrier_mode") || query.get("mux_mode") || "").trim().toLowerCase();
+  const carrierPrefer = (query.get("carrier_prefer") || "").trim().toLowerCase();
   const carrierUdpMode =
     (query.get("carrier_udp_mode") || query.get("mux_udp_mode") || "").trim().toLowerCase();
   if (carrierMode) {
@@ -395,6 +438,12 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
     }
     // Legacy mux_mode=group maps to carrier tcp mux pool naming in v0.3 docs.
     carrier.mode = carrierMode === "group" ? "tcp" : carrierMode;
+  }
+  if (carrierPrefer) {
+    if (carrierPrefer !== "adaptive" && carrierPrefer !== "quic" && carrierPrefer !== "tcp") {
+      throw new Error(`Unsupported carrier_prefer ${carrierPrefer}`);
+    }
+    carrier.prefer = carrierPrefer;
   }
   if (carrierUdpMode) carrier.udp_mode = carrierUdpMode;
   if (Object.keys(carrier).length > 0) outbound.carrier = carrier;
@@ -426,13 +475,15 @@ export function parseOutboundUri(text: string, tag = "proxy"): TcptunOutbound {
     }
     const includeSpider =
       resolvedSecurity === "reality" && (outbound.carrier?.mode || "auto") !== "quic";
+    const publicKey = query.get("pbk") || "";
+    const shortId = query.get("sid") || "";
+    const spiderX = query.get("spx") || "";
     outbound.security = {
-      type: resolvedSecurity,
-      server_name: sni,
-      fingerprint: query.get("fp") || "",
-      public_key: query.get("pbk") || "",
-      short_id: query.get("sid") || "",
-      ...(includeSpider ? { spider_x: query.get("spx") || "" } : {}),
+      type: "reality",
+      ...(sni ? { server_name: sni } : {}),
+      ...(publicKey ? { public_key: publicKey } : {}),
+      ...(shortId ? { short_id: shortId } : {}),
+      ...(includeSpider && spiderX ? { spider_x: spiderX } : {}),
       ...(insecure ? { insecure: true } : {}),
     };
   } else if (securityType !== "none" && securityType !== "") {
@@ -527,13 +578,22 @@ async function outboundFromInbound(
   ) {
     if (!security.private_key) throw new Error(`inbound ${inbound.tag} is missing REALITY private_key`);
     if (!security.server_names?.length) throw new Error(`inbound ${inbound.tag} is missing REALITY server_names`);
+    if (securityType === "reality-tcp" || securityType === "reality-quic") {
+      if (!outbound.carrier?.mode) {
+        outbound.carrier = {
+          ...(outbound.carrier || {}),
+          mode: securityType === "reality-quic" ? "quic" : "tcp",
+        };
+      }
+    }
     outbound.security = {
-      type: securityType,
+      type: "reality",
       server_name: security.server_names[0],
-      fingerprint: "chrome",
       public_key: x25519PublicKey(security.private_key),
       short_id: security.short_ids?.[0] || "",
-      ...(securityType === "reality" || securityType === "reality-tcp" ? { spider_x: "/" } : {}),
+      ...(securityType === "reality-quic" || outbound.carrier?.mode === "quic"
+        ? {}
+        : { spider_x: "/" }),
     };
   } else if (securityType === "tls") {
     outbound.security = {

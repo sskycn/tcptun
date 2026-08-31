@@ -50,10 +50,13 @@ const SAMPLE_CONFIG = `{
       "address": ["proxy.example.com:9443"],
       "token": "replace-with-token",
       "network": ["tcp", "udp"],
-      "transport": { "type": "raw" }
-    }
+      "transport": { "type": "raw" },
+      "mux": { "enabled": true }
+    },
+    { "tag": "direct", "type": "direct" }
   ],
-  "route": { "default_outbound": "proxy", "rules": [] }
+  "route": { "default_outbound": "proxy", "rules": [] },
+  "dns": {}
 }`;
 
 const SAMPLE_URI =

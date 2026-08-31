@@ -478,11 +478,10 @@ function outboundFromProfile(profile: CompactProfile, tag: string): TcptunOutbou
     profile.security === "reality-quic"
   ) {
     outbound.security = {
-      type: profile.security,
-      server_name: profile.sni,
-      fingerprint: profile.fingerprint,
-      public_key: profile.publicKey,
-      short_id: profile.shortID,
+      type: "reality",
+      ...(profile.sni ? { server_name: profile.sni } : {}),
+      ...(profile.publicKey ? { public_key: profile.publicKey } : {}),
+      ...(profile.shortID ? { short_id: profile.shortID } : {}),
       ...(profile.spiderX ? { spider_x: profile.spiderX } : {}),
     };
   }
@@ -495,41 +494,34 @@ function outboundFromProfile(profile: CompactProfile, tag: string): TcptunOutbou
         : {}),
       ...(profile.muxWarmSpare ? { warm_spares: profile.muxWarmSpare } : {}),
     };
-    const carrierMode =
-      profile.muxMode === "quic"
-        ? "quic"
-        : profile.muxMode === "group"
-          ? "tcp"
-          : profile.security === "reality-quic"
-            ? "quic"
-            : profile.security === "reality-tcp"
-              ? "tcp"
-              : "";
-    if (carrierMode || profile.muxUDPMode || profile.initialStreamWindow || profile.maxStreamWindow) {
-      outbound.carrier = {
-        ...(carrierMode ? { mode: carrierMode } : {}),
-        ...(profile.muxUDPMode ? { udp_mode: profile.muxUDPMode } : {}),
-        ...(profile.initialStreamWindow
-          ? { initial_stream_receive_window: profile.initialStreamWindow }
-          : {}),
-        ...(profile.maxStreamWindow
-          ? { max_stream_receive_window: profile.maxStreamWindow }
-          : {}),
-        ...(profile.initialConnectionWindow
-          ? { initial_connection_receive_window: profile.initialConnectionWindow }
-          : {}),
-        ...(profile.maxConnectionWindow
-          ? { max_connection_receive_window: profile.maxConnectionWindow }
-          : {}),
-      };
-    }
-    // Prefer security.type=reality + carrier.mode over legacy reality-tcp/quic aliases.
-    if (
-      outbound.security &&
-      (outbound.security.type === "reality-tcp" || outbound.security.type === "reality-quic")
-    ) {
-      outbound.security = { ...outbound.security, type: "reality" };
-    }
+  }
+  const carrierMode =
+    profile.muxMode === "quic"
+      ? "quic"
+      : profile.muxMode === "group"
+        ? "tcp"
+        : profile.security === "reality-quic"
+          ? "quic"
+          : profile.security === "reality-tcp"
+            ? "tcp"
+            : "";
+  if (carrierMode || profile.muxUDPMode || profile.initialStreamWindow || profile.maxStreamWindow) {
+    outbound.carrier = {
+      ...(carrierMode ? { mode: carrierMode } : {}),
+      ...(profile.muxUDPMode ? { udp_mode: profile.muxUDPMode } : {}),
+      ...(profile.initialStreamWindow
+        ? { initial_stream_receive_window: profile.initialStreamWindow }
+        : {}),
+      ...(profile.maxStreamWindow
+        ? { max_stream_receive_window: profile.maxStreamWindow }
+        : {}),
+      ...(profile.initialConnectionWindow
+        ? { initial_connection_receive_window: profile.initialConnectionWindow }
+        : {}),
+      ...(profile.maxConnectionWindow
+        ? { max_connection_receive_window: profile.maxConnectionWindow }
+        : {}),
+    };
   }
   return outbound;
 }

@@ -124,6 +124,7 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
     inbounds: [serverInbound],
     outbounds: [{ tag: "direct", type: "direct", network: ["tcp", "udp"] }],
     route: { default_outbound: "direct", rules: [] as unknown[] },
+    dns: {},
   };
 
   const clientOutbound: Record<string, unknown> = {
@@ -150,7 +151,7 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
       warm_spares: 1,
     };
   } else if (protocol === "native" && input.autoReality) {
-    clientOutbound.carrier = { mode: "auto" };
+    clientOutbound.carrier = { mode: "auto", prefer: "quic", udp_mode: "auto" };
     clientOutbound.mux = {
       enabled: true,
       max_sessions: 4,
@@ -174,8 +175,9 @@ export async function generateConfigPair(input: GenerateConfigInput): Promise<Ge
         network: ["tcp", "udp"],
       },
     ],
-    outbounds: [clientOutbound],
+    outbounds: [clientOutbound, { tag: "direct", type: "direct" }],
     route: { default_outbound: "proxy", rules: [] as unknown[] },
+    dns: {},
   };
 
   const clientUri = buildOutboundUri(clientOutbound as TcptunOutbound, "tcptun");
