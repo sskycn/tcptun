@@ -71,7 +71,7 @@ export const zh: Dictionary = {
     protocols: "协议",
     nativeProtocol: "native 协议",
     examplesCatalog: "示例目录",
-    realityAuto: "Reality 自动",
+    realityAuto: "carrier.mode=auto",
     reversePublish: "反向发布",
     securityTrust: "安全与信任",
     faq: "常见问题",
@@ -323,7 +323,7 @@ export const zh: Dictionary = {
         title: "概念",
         links: [
           { href: "/architecture/", label: "架构", body: "FileConfig → RuntimeConfig → 服务。" },
-          { href: "/config/", label: "配置", body: "拓扑字段、Reality auto、resume、反向发布。" },
+          { href: "/config/", label: "配置", body: "拓扑字段、carrier.mode、resume、反向发布。" },
           { href: "/faq/", label: "常见问题", body: "常见运维问题。" },
         ],
       },
@@ -368,7 +368,7 @@ export const zh: Dictionary = {
     heroTitle: "配置目录，Native 优先。",
     heroLead:
       "浏览 tcptun {version} 的全部可运行服务端/客户端配对：Reality 载体、反向发布与拓扑模式。密钥与 token 每次访问都在浏览器内生成。复制 JSON，校验后先启动服务端。",
-    realityAuto: "Reality 自动",
+    realityAuto: "carrier.mode=auto",
     generatePair: "生成配对",
     configRef: "配置参考",
     catalogEyebrow: "目录",
@@ -446,7 +446,7 @@ export const zh: Dictionary = {
     title: "生成配置",
     heroTitle: "在浏览器里生成配对配置。",
     heroLead:
-      "在本地创建 server.json、client.json 和 client.uri。Native 默认使用 v0.4.2 Reality 自动载体；可选可恢复流与强制 QUIC。",
+      "在本地创建 server.json、client.json 和 client.uri。native 默认使用 REALITY 与 carrier.mode=auto；可选可恢复流与强制 QUIC。",
     browseExamples: "浏览示例",
     uriTools: "URI 工具",
     eyebrow: "生成",
@@ -454,14 +454,14 @@ export const zh: Dictionary = {
     lead:
       "生成 v0.4.2 native 服务端/客户端配对：自动模式使用 raw + REALITY、carrier.mode=auto 与 mux，可选可恢复 TCP 流，或通过 carrier.mode=quic 强制 QUIC。密钥留在本地。",
     protocol: "协议",
-    autoReality: "v0.4.2 Reality 自动 — 同一地址上的 TCP+QUIC（carrier.mode=auto）",
+    autoReality: "同一地址上的自动 TCP+QUIC（carrier.mode=auto）",
     resume: "在载体替换时恢复符合条件的 TCP 流",
     emptyTitle: "填写表单后生成",
     emptyLead: "创建 server.json、client.json 和 client.uri。JSON 对应 tcptun config native；URI 对应 tcptun uri export。",
     bullets: [
       "生成 X25519 密钥对和 short id",
       "创建 native token（v0.4.2 仅 native）",
-      "native 默认使用 v0.4.2 自动 TCP/QUIC Reality 载体（carrier.mode=auto）",
+      "native 默认使用自动 TCP/QUIC 载体（carrier.mode=auto）配合 REALITY",
       "可恢复 TCP 流会在两端写入匹配的有界设置",
       "强制 QUIC 会写出 carrier.mode=quic 并启用 mux",
     ],
@@ -562,7 +562,7 @@ export const zh: Dictionary = {
     localListen: "本地监听",
     localPort: "本地端口",
     commonPort: "常用本地代理端口",
-    resumeSimple: "仅 Reality 自动 — 更简单，适合第一次",
+    resumeSimple: "仅 carrier.mode=auto — 更简单，适合第一次",
     resumeTitle: "可恢复 TCP",
     resumeHint: "两端 mux.resume=true（同一服务进程）",
     resumeNotes: [
@@ -583,10 +583,10 @@ export const zh: Dictionary = {
     firewallQuic: "在公网端口放行 UDP（强制 QUIC）。",
     firewallTcp: "在公网端口放行 TCP（REALITY over raw）。",
     autoTitle: "native + raw + reality",
-    autoStack: "group mux · QUIC 优先 · TCP 回退",
+    autoStack: "mux + carrier.mode=auto · QUIC 优先 · TCP 回退",
     autoHint: "推荐用于 v0.4.2 的 tcptun 互连",
-    quicTitle: "native + raw + reality-quic",
-    quicStack: "mux.mode=quic · 强制 QUIC · 无 TCP 回退",
+    quicTitle: "native + raw + reality",
+    quicStack: "carrier.mode=quic · 强制 QUIC · 无 TCP 回退",
     quicHint: "只要专用 QUIC 池时使用",
     steps: [
       { id: "protocol", title: "协议", summary: "选择隧道栈。native + raw + reality 列在最前。" },
@@ -639,7 +639,7 @@ export const zh: Dictionary = {
       { name: "generate", title: "生成配对", body: "生成带凭证和 REALITY 密钥的匹配服务端/客户端配置。" },
       { name: "uri", title: "导入 URI", body: "从 native URI 构建客户端配置。" },
       { name: "quic", title: "强制 QUIC 配对", body: "生成 native Reality，carrier.mode=quic（无 TCP 回退）。" },
-      { name: "resume", title: "可恢复 Reality 自动", body: "生成 native Reality 配对后，在两端设置 mux.resume=true（v0.3.0+）。" },
+      { name: "resume", title: "可恢复自动载体", body: "生成 native REALITY 且 carrier.mode=auto 的配对后，在两端设置 mux.resume=true（v0.3.0+）。" },
     ],
     downloadRun: "下载并运行。",
   },
@@ -774,7 +774,7 @@ export const zh: Dictionary = {
         { title: "地址", body: "address 始终是 host:port 字符串数组。多个出站地址是同一逻辑服务的候选入口，会竞速握手；它们不是负载均衡（负载均衡请用 balance）。" },
         { title: "传输", body: "raw 是默认且吞吐最好的选择。需要路径式前置时可用 ws / h2 / h3；QUIC 模式要求 raw。" },
         { title: "安全（v0.4.2）", body: "native + raw + mux + security.type=reality 或 tls + carrier.mode=auto 时，入站在同一地址绑定 TCP 和 UDP。出站 carrier.prefer 选择 adaptive/quic/tcp。carrier.mode=tcp|quic 强制单一载体。" },
-        { title: "Mux 与 resume", body: "mux.enabled 启用多路复用和双载体 Reality 自动。可选 mux.resume 保留符合条件的 TCP 流。carrier.mode 独立于 mux 池参数选择 auto/tcp/quic。" },
+        { title: "Mux 与 resume", body: "mux.enabled 启用多路复用和双载体。可选 mux.resume 保留符合条件的 TCP 流。carrier.mode 独立于 mux 池参数选择 auto/tcp/quic。" },
       ],
       tutorial: [
         { title: "安装 tcptun", body: "安装对应平台的二进制，或使用一键安装器 / npm 包。" },
@@ -899,7 +899,7 @@ export const zh: Dictionary = {
       },
       {
         q: "可恢复流如何工作？",
-        a: "在 Reality 自动栈（raw + mux + security.type=reality + carrier.mode=auto）的两端设置 mux.resume=true。物理 QUIC/TCP 载体失败后，符合条件的 TCP 逻辑流可以重新附着。它不覆盖 UDP、反向发布、强制 tcp/quic-only 模式或跨进程故障转移；滚动升级期间请关闭，直到两端都运行 v0.3.0 或更新版本。",
+        a: "在 raw + mux + security.type=reality + carrier.mode=auto 的两端设置 mux.resume=true。物理 QUIC/TCP 载体失败后，符合条件的 TCP 逻辑流可以重新附着。它不覆盖 UDP、反向发布、强制 tcp/quic-only 模式或跨进程故障转移；滚动升级期间请关闭，直到两端都运行 v0.3.0 或更新版本。",
       },
       {
         q: "什么是 TLS 透传 fallback？",

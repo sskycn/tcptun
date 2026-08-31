@@ -9,7 +9,7 @@ export type ExampleCopy = {
 
 const en: Record<string, ExampleCopy> = {
   "native-reality": {
-    title: "Reality auto (recommended)",
+    title: "REALITY · carrier.mode=auto (recommended)",
     summary:
       "v0.4.2 default: native + raw + mux + security.type=reality + carrier.mode=auto. TCP and QUIC on one address; outbound carrier.prefer defaults to adaptive.",
     when: "Both ends run tcptun v0.4.2 and you want automatic dual carriers without certs or a second port.",
@@ -51,12 +51,12 @@ const en: Record<string, ExampleCopy> = {
     ],
   },
   "native-resumable": {
-    title: "Resumable Reality auto",
-    summary: "Reality auto carriers plus mux.resume for eligible TCP logical streams.",
+    title: "Resumable carrier.mode=auto",
+    summary: "carrier.mode=auto plus mux.resume for eligible TCP logical streams.",
     when: "Long-lived TCP flows should survive a physical carrier replacement on one server process.",
     steps: [
       "Use v0.3.0+ on both ends and keep one unique server address.",
-      "Start from Reality auto, then enable mux.resume with matching timeout/buffer.",
+      "Start from carrier.mode=auto, then enable mux.resume with matching timeout/buffer.",
       "Keep resume off during rolling upgrades until both peers are upgraded.",
     ],
   },
@@ -112,7 +112,7 @@ const en: Record<string, ExampleCopy> = {
   },
   "route-split": {
     title: "Route split + blackhole",
-    summary: "Send private/geoip direct, block ads, default everything else through native Reality auto.",
+    summary: "Send private/geoip direct, block ads, default everything else through native REALITY with carrier.mode=auto.",
     when: "You need domain/IP based routing without a second client process.",
     steps: [
       "Keep proxy, direct, and optional blackhole outbounds.",
@@ -144,7 +144,7 @@ const en: Record<string, ExampleCopy> = {
 
 const zh: Record<string, ExampleCopy> = {
   "native-reality": {
-    title: "Reality 自动（推荐）",
+    title: "REALITY · carrier.mode=auto（推荐）",
     summary:
       "v0.4.2 默认：native + raw + mux + security.type=reality + carrier.mode=auto。同一地址上的 TCP 与 QUIC；出站 carrier.prefer 默认为 adaptive。",
     when: "两端都运行 tcptun v0.4.2，希望自动双载体，且不想管证书或第二个端口。",
@@ -186,12 +186,12 @@ const zh: Record<string, ExampleCopy> = {
     ],
   },
   "native-resumable": {
-    title: "可恢复 Reality 自动",
-    summary: "Reality 自动载体加上 mux.resume，用于符合条件的 TCP 逻辑流。",
+    title: "可恢复 carrier.mode=auto",
+    summary: "carrier.mode=auto 加上 mux.resume，用于符合条件的 TCP 逻辑流。",
     when: "长生命周期 TCP 流需要在同一服务进程上扛住物理载体替换。",
     steps: [
       "两端使用 v0.3.0+，并保持唯一的服务端地址。",
-      "从 Reality 自动起步，再启用匹配超时/缓冲的 mux.resume。",
+      "从 carrier.mode=auto 起步，再启用匹配超时/缓冲的 mux.resume。",
       "滚动升级期间先关闭 resume，直到两端都升级完成。",
     ],
   },
@@ -247,7 +247,7 @@ const zh: Record<string, ExampleCopy> = {
   },
   "route-split": {
     title: "路由分流 + blackhole",
-    summary: "私网/geoip 走 direct，广告走 blackhole，其余默认走 native Reality 自动。",
+    summary: "私网/geoip 走 direct，广告走 blackhole，其余默认走 native REALITY 且 carrier.mode=auto。",
     when: "需要按域名/IP 分流，但不想再跑第二个客户端进程。",
     steps: [
       "保留 proxy、direct，以及可选的 blackhole 出站。",

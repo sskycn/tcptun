@@ -99,11 +99,11 @@ function stackLabel(profile: WizardProfile, resume: boolean, t: ReturnType<typeo
   const meta = profileMeta(profile, t);
   if (profile === "native-reality-auto") {
     return resume
-      ? "native + raw + reality + group mux + resume"
-      : "native + raw + reality + group mux";
+      ? "native + raw + reality + carrier.mode=auto + mux.resume"
+      : "native + raw + reality + carrier.mode=auto";
   }
   if (profile === "native-quic") {
-    return "native + raw + reality-quic + mux.mode=quic";
+    return "native + raw + reality + carrier.mode=quic";
   }
   return meta.stack;
 }
@@ -690,9 +690,9 @@ export default function GuideWizard() {
               <span className="arrow">→</span>
               <span>
                 {form.profile === "native-quic"
-                  ? "reality-quic"
+                  ? "carrier.mode=quic"
                   : form.profile === "native-reality-auto"
-                    ? "reality auto"
+                    ? "carrier.mode=auto"
                     : "reality"}
               </span>
               <span className="arrow">→</span>

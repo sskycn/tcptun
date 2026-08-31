@@ -44,13 +44,13 @@ const nativeExampleTabs = [
   },
   {
     id: "reality-auto-server",
-    label: "Server reality auto",
+    label: "Server carrier.mode=auto",
     hint: "server-native-reality-auto.json",
     code: nativeRealityServerExample,
   },
   {
     id: "reality-auto-client",
-    label: "Client reality auto",
+    label: "Client carrier.mode=auto",
     hint: "client-native-reality-auto.json",
     code: nativeRealityClientExample,
   },
@@ -96,13 +96,13 @@ const realityExampleTabs = [
   {
     id: "native-server",
     label: "Native auto server",
-    hint: "native + raw + reality auto",
+    hint: "native + raw + reality + carrier.mode=auto",
     code: nativeRealityServerExample,
   },
   {
     id: "native-client",
     label: "Native auto client",
-    hint: "native + raw + reality auto",
+    hint: "native + raw + reality + carrier.mode=auto",
     code: nativeRealityClientExample,
   },
 ] as const;
@@ -120,13 +120,13 @@ const nativeRealityQuicLayers = [
   },
   {
     label: "Security",
-    value: "reality-quic",
-    body: "Protects the QUIC handshake with REALITY keys and site parameters; no cert deploy needed.",
+    value: "reality",
+    body: "Protects the handshake with REALITY keys and site parameters; no cert deploy needed.",
   },
   {
-    label: "Multiplexing",
-    value: "mux.mode: quic",
-    body: "Uses a QUIC connection pool for streams and UDP DATAGRAMs.",
+    label: "Carrier",
+    value: "mode=quic",
+    body: "Uses a dedicated QUIC pool for streams and UDP DATAGRAMs. Requires mux.enabled.",
   },
 ] as const;
 
@@ -196,13 +196,13 @@ export default function ConfigSection() {
             native
           </a>
           <a className="chip-link" href="#native-carriers">
-            Reality auto
+            carrier.mode=auto
           </a>
           <a className="chip-link" href="#resumable">
             {t.config.resumable}
           </a>
           <a className="chip-link" href="#native-reality-quic">
-            reality-quic
+            carrier.mode=quic
           </a>
           <a className="chip-link" href="#reverse">
             {t.config.reverse}
@@ -235,7 +235,7 @@ export default function ConfigSection() {
           </div>
           <div className="native-reality-quic-fit">
             <span>Default path</span>
-            <strong>QUIC-first Reality auto</strong>
+            <strong>QUIC-first carrier.mode=auto</strong>
             <p>
               Force TCP with <code>carrier.mode=tcp</code>, or force QUIC with{" "}
               <code>carrier.mode=quic</code>.
@@ -243,7 +243,7 @@ export default function ConfigSection() {
           </div>
         </div>
 
-        <div className="native-reality-quic-stack" aria-label="Native Reality auto stack">
+        <div className="native-reality-quic-stack" aria-label="native REALITY with carrier.mode=auto">
           {nativeRealityAutoLayers.map((layer, index) => (
             <div className="native-reality-quic-layer-wrap" key={layer.label}>
               <article className="native-reality-quic-layer">
@@ -282,7 +282,8 @@ export default function ConfigSection() {
             <strong>Generate the automatic pair</strong>
             <p>
               CLI and the browser generator emit this stack by default for native:{" "}
-              <code>security.type=reality</code> plus group mux. Enable resumable streams with{" "}
+              <code>security.type=reality</code>, <code>mux.enabled</code>, and{" "}
+              <code>carrier.mode=auto</code>. Enable resumable streams with{" "}
               <code>mux.resume=true</code> on both ends.
             </p>
           </div>
@@ -347,13 +348,13 @@ export default function ConfigSection() {
           <div>
             <p className="eyebrow">Native QUIC</p>
             <h3>
-              <code>native + raw + reality-quic</code>
+              <code>native + raw + reality + carrier.mode=quic</code>
             </h3>
             <p>
-              This is not three interchangeable modes, but one layered stack: <code>native</code> is
-              the tunnel protocol, <code>raw</code> is the transport, and <code>reality-quic</code> is
-              the QUIC-only security layer. You must also set <code>mux.mode=quic</code> to enable the
-              native QUIC connection pool.
+              Forced QUIC is still the same layers: <code>native</code> is the tunnel protocol,{" "}
+              <code>raw</code> is the transport, and <code>security.type=reality</code> stays REALITY.
+              Select the dedicated QUIC pool with <code>carrier.mode=quic</code> and{" "}
+              <code>mux.enabled</code>. There is no TCP fallback.
             </p>
           </div>
           <div className="native-reality-quic-fit">
@@ -495,7 +496,7 @@ export default function ConfigSection() {
           <p className="eyebrow">v0.3.0 continuity</p>
           <h3>Resumable TCP logical streams</h3>
           <p>
-            Add <code>resume</code> to matching Reality-auto mux blocks to preserve an eligible TCP
+            Add <code>resume</code> to matching carrier.mode=auto mux blocks to preserve an eligible TCP
             logical stream while its physical QUIC or TCP attachment is replaced.
           </p>
         </div>
@@ -647,10 +648,12 @@ export default function ConfigSection() {
         <div className="reality-warn">
           <strong>Note</strong>
           <p>
-            Native + raw + group mux + <code>reality</code> is automatic QUIC-first with TCP
-            fallback in v0.3.0. The separate forced <code>mux.mode=quic</code> stack requires
-            certificate TLS or <code>security.type=reality-quic</code>;{" "}
-            <code>tcptun config native --quic</code> generates the latter.
+            Native + raw + mux + <code>security.type=reality</code> with{" "}
+            <code>carrier.mode=auto</code> is automatic QUIC-first with TCP fallback. Force a
+            single carrier with <code>carrier.mode=tcp</code> or <code>carrier.mode=quic</code>.{" "}
+            <code>tcptun config native --quic</code> generates the latter. Legacy{" "}
+            <code>security.type=reality-quic</code> / <code>mux.mode=quic</code> aliases are not
+            the current scheme.
           </p>
         </div>
       </div>
