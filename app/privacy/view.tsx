@@ -225,6 +225,18 @@ const androidPrivacyEn: PrivacyCard[] = [
     ),
   },
   {
+    title: "VPN disclosure and consent",
+    body: (
+      <>
+        Starting in app v0.5.1, the first VPN start shows an in-app disclosure and requires
+        affirmative consent before Android VPN permission is requested. Declining, going Back, or
+        dismissing the dialog cancels the start. Versioned consent is stored in app-private{" "}
+        <code>SharedPreferences</code> on the device and is not sent to an operator server. The
+        disclosure and Settings can open this privacy page at <code>https://tcptun.com/privacy/</code>.
+      </>
+    ),
+  },
+  {
     title: "Android retention and deletion",
     body: (
       <>
@@ -340,6 +352,18 @@ const androidPrivacyZh: PrivacyCard[] = [
       <>
         应用可能申请网络状态与网络访问、VPN 与前台服务、用于扫码的相机，以及 VPN
         状态通知权限。相机只在你打开扫描并授权后使用，普通编辑配置或使用 VPN 不需要相机。
+      </>
+    ),
+  },
+  {
+    title: "VPN 披露与同意",
+    body: (
+      <>
+        从应用 v0.5.1 起，首次启动 VPN 会先显示应用内披露，并需要明确同意后才会申请 Android VPN
+        权限。选择暂不、返回或关闭对话框都会取消启动。版本化的同意记录保存在设备上应用私有的{" "}
+        <code>SharedPreferences</code>{" "}
+        中，不会发送到运营者服务器。披露对话框和设置可以打开本隐私页{" "}
+        <code>https://tcptun.com/privacy/</code>。
       </>
     ),
   },

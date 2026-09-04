@@ -151,7 +151,7 @@ export const zh: Dictionary = {
         href: "/download/#android",
         label: "集成",
         title: "Android 与平台",
-        body: "Android 客户端 v0.5.0 内嵌 tcptun-go v0.5.0，与 CLI 一致。VPN 配置需要 TLS 或 REALITY。",
+        body: "Android 客户端 v0.5.1 内嵌 tcptun-go v0.5.0，与 CLI 核心一致。VPN 配置需要 TLS 或 REALITY。",
       },
     ],
     coreEyebrow: "核心能力",
@@ -424,7 +424,7 @@ export const zh: Dictionary = {
       {
         id: "android",
         title: "Android VPN 运行时",
-        body: "用 TUN、DNS 与出站切换构建应用感知 VPN 路由。Android v0.5.0 内嵌 tcptun-go v0.5.0。VPN 配置需要 TLS 或 REALITY，且仅为 Full Tunnel。",
+        body: "用 TUN、DNS 与出站切换构建应用感知 VPN 路由。Android v0.5.1 内嵌 tcptun-go v0.5.0。VPN 配置需要 TLS 或 REALITY，且仅为 Full Tunnel。",
         cta: "Google Play",
       },
       {
@@ -944,7 +944,7 @@ export const zh: Dictionary = {
       },
       {
         q: "Android 应用是否对应 CLI v0.5.0？",
-        a: "此版本对应。Android 客户端 v0.5.0 内嵌 tcptun-go v0.5.0（Bridge API 3）。请将两端保持在 v0.5.0。Android VPN 配置需要 TLS 或 REALITY，且仅为 Full Tunnel；Reverse Subnet / P2P 是 CLI/服务端能力，应用未暴露。",
+        a: "Android 客户端 v0.5.1 内嵌 tcptun-go v0.5.0（Bridge API 3），与 CLI 核心一致。隧道对端请保持 v0.5.0。Android VPN 配置需要 TLS 或 REALITY，且仅为 Full Tunnel；Reverse Subnet / P2P 是 CLI/服务端能力，应用未暴露。",
       },
     ],
   },

@@ -151,7 +151,7 @@ export const en = {
         href: "/download/#android",
         label: "Integrate",
         title: "Android & platforms",
-        body: "Android client v0.5.0 embeds tcptun-go v0.5.0, matching the CLI. VPN profiles require TLS or REALITY.",
+        body: "Android client v0.5.1 embeds tcptun-go v0.5.0, matching the CLI core. VPN profiles require TLS or REALITY.",
       },
     ],
     coreEyebrow: "Core capabilities",
@@ -432,7 +432,7 @@ export const en = {
       {
         id: "android",
         title: "Android VPN runtime",
-        body: "Build application-aware VPN routing with TUN, DNS, and outbound switching. Android v0.5.0 embeds tcptun-go v0.5.0. VPN profiles require TLS or REALITY and use Full Tunnel only.",
+        body: "Build application-aware VPN routing with TUN, DNS, and outbound switching. Android v0.5.1 embeds tcptun-go v0.5.0. VPN profiles require TLS or REALITY and use Full Tunnel only.",
         cta: "Google Play",
       },
       {
@@ -957,7 +957,7 @@ export const en = {
       },
       {
         q: "Does the Android app match CLI v0.5.0?",
-        a: "Yes for this release. Android client v0.5.0 embeds tcptun-go v0.5.0 (Bridge API 3). Pair peers on v0.5.0. Android VPN profiles require TLS or REALITY and use Full Tunnel only; Reverse Subnet / P2P is a CLI/server capability and is not exposed in the app.",
+        a: "The Android client v0.5.1 embeds tcptun-go v0.5.0 (Bridge API 3), matching the CLI core. Pair tunnel peers on v0.5.0. Android VPN profiles require TLS or REALITY and use Full Tunnel only; Reverse Subnet / P2P is a CLI/server capability and is not exposed in the app.",
       },
     ],
   },

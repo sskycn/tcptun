@@ -237,7 +237,7 @@ export const faqItems = [
   {
     question: "Does the Android app match CLI v0.5.0?",
     answer:
-      "Yes for this release. The Android client v0.5.0 embeds tcptun-go v0.5.0 (Bridge API 3), matching the CLI. Pair peers on v0.5.0. Android VPN profiles require TLS or REALITY and use Full Tunnel only; Reverse Subnet / P2P is a CLI/server capability and is not exposed in the app.",
+      "The Android client v0.5.1 embeds tcptun-go v0.5.0 (Bridge API 3), matching the CLI core. Pair tunnel peers on v0.5.0. Android VPN profiles require TLS or REALITY and use Full Tunnel only; Reverse Subnet / P2P is a CLI/server capability and is not exposed in the app.",
   },
 ] as const;
 
@@ -383,7 +383,7 @@ export const realityAutoWizardSteps = [
     ],
     tips: [
       "Use the same tcptun version (v0.5.0) on both CLI ends for auto carriers and optional resume.",
-      "Android client v0.5.0 embeds the same tcptun-go v0.5.0 core; VPN profiles still require TLS or REALITY.",
+      "Android client v0.5.1 embeds the same tcptun-go v0.5.0 core; VPN profiles still require TLS or REALITY.",
       "Camouflage dest should support HTTPS on TCP and ideally HTTP/3 on UDP.",
     ],
     commands: [] as string[],
