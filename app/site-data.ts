@@ -32,7 +32,7 @@ export const androidAppLinks = {
   packageId: "com.tcptun.client",
   playStore: "https://play.google.com/store/apps/details?id=com.tcptun.client",
   /** Current Play Store / tagged Android client. */
-  appVersion: "0.5.0",
+  appVersion: "0.5.1",
   /** tcptun-go runtime locked by the Android bridge (bridge.lock). */
   runtimeVersion: "0.5.0",
 } as const;

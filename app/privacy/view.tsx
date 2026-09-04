@@ -179,10 +179,11 @@ const androidPrivacyEn: PrivacyCard[] = [
     body: (
       <>
         When VPN mode is enabled, device traffic is forwarded according to the selected profile. The
-        endpoint operator may see or retain connection time, source IP, destination information,
-        traffic metadata, and content not protected by end-to-end encryption. Use only endpoints you
+        endpoint operator may see or retain connection time, source IP (which can reveal approximate
+        location), destination information (including websites visited), traffic metadata, and content
+        not protected by end-to-end encryption. Use only endpoints you
         trust and review their policies. The tcptun operator does not receive that traffic through a
-        project backend. v0.5.0 requires an encrypted TLS or REALITY tunnel for Android VPN profiles;{" "}
+        project backend. v0.5.0 and later require an encrypted TLS or REALITY tunnel for Android VPN profiles;{" "}
         <code>security=none</code>, ECH profiles, and arbitrary FileConfig JSON are rejected. Overall
         security still depends on the profile, device, and remote endpoint.
       </>
@@ -308,8 +309,8 @@ const androidPrivacyZh: PrivacyCard[] = [
     title: "VPN 流量与远端端点",
     body: (
       <>
-        启用 VPN 后，设备流量会按所选配置转发到远端节点。该节点运营者可能看到或保留连接时间、来源 IP、目标信息、流量元数据，以及未被端到端加密保护的内容。请只使用你信任的节点，并查阅其政策。tcptun
-        运营者不会通过项目后端接收这些流量。v0.5.0 要求 Android VPN 配置使用加密的 TLS 或 REALITY 隧道；
+        启用 VPN 后，设备流量会按所选配置转发到远端节点。该节点运营者可能看到或保留连接时间、来源 IP（可用于推断近似位置）、目标信息（包括访问的网站）、流量元数据，以及未被端到端加密保护的内容。请只使用你信任的节点，并查阅其政策。tcptun
+        运营者不会通过项目后端接收这些流量。v0.5.0 及更高版本要求 Android VPN 配置使用加密的 TLS 或 REALITY 隧道；
         <code>security=none</code>、ECH 配置和任意 FileConfig JSON 会被拒绝。整体安全性仍取决于配置、设备和远端节点。
       </>
     ),
@@ -579,8 +580,8 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
           <h2>{locale === "zh" ? "信息如何被处理" : "What happens to information"}</h2>
           <p>
             {locale === "zh"
-              ? "最近更新于 2026 年 9 月 4 日。这是项目的通俗说明，不是法律建议。具体部署适用的规则取决于运营者、服务提供方和你所在的司法辖区。"
-              : "Last updated September 4, 2026. This is a plain-language project notice, not legal advice. The rules that apply to a particular deployment depend on its operator, providers, and your jurisdiction."}
+              ? "最近更新于 2026 年 9 月 5 日。这是项目的通俗说明，不是法律建议。具体部署适用的规则取决于运营者、服务提供方和你所在的司法辖区。"
+              : "Last updated September 5, 2026. This is a plain-language project notice, not legal advice. The rules that apply to a particular deployment depend on its operator, providers, and your jurisdiction."}
           </p>
         </div>
 
@@ -672,4 +673,3 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
     </SiteChrome>
   );
 }
-
