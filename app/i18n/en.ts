@@ -151,7 +151,7 @@ export const en = {
         href: "/download/#android",
         label: "Integrate",
         title: "Android & platforms",
-        body: "Play Store app v0.2.52 embeds tcptun v0.2.5. Pair that listing with a v0.2.5 server — not CLI v0.4.2.",
+        body: "Android client v0.5.0 embeds tcptun-go v0.5.0, matching the CLI. VPN profiles require TLS or REALITY.",
       },
     ],
     coreEyebrow: "Core capabilities",
@@ -229,7 +229,7 @@ export const en = {
       {
         label: "Native-only tunnels",
         title: "Native-only tunnel endpoints",
-        body: "v0.4.x tunnel endpoints are native only. mixed and socks5 remain for local/LAN proxy hops.",
+        body: "v0.4.0+ tunnel endpoints are native only. mixed and socks5 remain for local/LAN proxy hops.",
       },
       {
         label: "Carriers",
@@ -245,6 +245,11 @@ export const en = {
         label: "Runtime health",
         title: "Idle power profile and mux stall recovery",
         body: "A low-wakeup power profile parks idle QUIC probes on platform inbounds. Mux retires silently stalled carriers, backpressures elephant streams, and bounds local accept recovery independently of outbound backoff.",
+      },
+      {
+        label: "Reverse Subnet",
+        title: "Authenticated home-network access",
+        body: "v0.5.0 can route IPv4/IPv6 TCP/UDP to a Home Connector, with optional Edge-assisted direct QUIC and relay fallback. Android does not expose Reverse Subnet / P2P in the product UI.",
       },
     ],
   },
@@ -266,12 +271,12 @@ export const en = {
     androidLead:
       "The Android app wraps the networking runtime for device-level TUN, DNS, and outbound switching. Install from Play Store package {packageId}.",
     androidWarn:
-      "Play Store v{appVersion} embeds tcptun v{runtimeVersion}, not CLI v{cliVersion}. Pair that app with a v{runtimeVersion} server. Mixing it with this CLI release will fail or misbehave.",
+      "Play Store v{appVersion} embeds tcptun-go v{runtimeVersion}, matching CLI v{cliVersion}. Pair peers on this release. Android VPN profiles require TLS or REALITY; Reverse Subnet / P2P is not exposed in the app.",
     getPlay: "Get it on Google Play",
     androidPrivacy: "Android privacy",
     clientName: "tcptun client v{appVersion}",
     clientBody:
-      "Application-aware VPN routing on Android. This Play listing ships tcptun v{runtimeVersion}. It is not the v{cliVersion} CLI runtime on this page — keep peers on the same core version.",
+      "Application-aware VPN routing on Android. This listing ships tcptun-go v{runtimeVersion}, the same core as CLI v{cliVersion}. Full Tunnel only; remote Native outbounds must use TLS or REALITY.",
     openPlay: "Open Play Store",
     platformsEyebrow: "Platform builds",
     platformsTitle: "Linux, macOS, Windows.",
@@ -427,7 +432,7 @@ export const en = {
       {
         id: "android",
         title: "Android VPN runtime",
-        body: "Build application-aware VPN routing with TUN, DNS, and outbound switching. The current Play Store app v0.2.52 embeds tcptun v0.2.5 — pair it with a v0.2.5 server, not CLI v0.4.2. Embedders can ship a newer bridge separately.",
+        body: "Build application-aware VPN routing with TUN, DNS, and outbound switching. Android v0.5.0 embeds tcptun-go v0.5.0. VPN profiles require TLS or REALITY and use Full Tunnel only.",
         cta: "Google Play",
       },
       {
@@ -460,7 +465,7 @@ export const en = {
     eyebrow: "Generate",
     heading: "Generate paired configs in the browser.",
     lead:
-      "Builds v0.4.2 native server/client pairs: auto mode uses raw + REALITY with carrier.mode=auto and mux, optional resumable TCP streams, or forced QUIC via carrier.mode=quic. Keys stay local.",
+      "Builds v0.5.0 native server/client pairs: auto mode uses raw + REALITY with carrier.mode=auto and mux, optional resumable TCP streams, or forced QUIC via carrier.mode=quic. Keys stay local.",
     protocol: "Protocol",
     autoReality: "Automatic TCP+QUIC on one address (carrier.mode=auto)",
     resume: "Resume eligible TCP streams across carrier replacement",
@@ -469,12 +474,12 @@ export const en = {
       "Creates server.json, client.json, and client.uri. JSON matches tcptun config native; URI matches tcptun uri export.",
     bullets: [
       "Generates an X25519 key pair and short id",
-      "Creates a native token (v0.4.2 is native-only)",
+      "Creates a native token (v0.5.0 is native-only)",
       "Native defaults to automatic TCP/QUIC carriers (carrier.mode=auto) with REALITY",
       "Resumable TCP streams add matching bounded settings to both peers",
       "Forced QUIC emits carrier.mode=quic with mux enabled",
     ],
-    nativeHint: "only tunnel protocol in v0.4.2",
+    nativeHint: "only tunnel protocol in v0.5.0",
     chipPair: "server + client",
     protocolAria: "Tunnel protocol",
     serverAddress: "Server address",
@@ -529,7 +534,7 @@ export const en = {
     loadSample: "Load sample",
     notesQr: [
       "New QR codes use the denser T3 Base45 profile",
-      "Native URIs use carrier_mode / carrier_udp_mode (v0.4.2); resumable mux still requires sharing complete JSON",
+      "Native URIs use carrier_mode / carrier_udp_mode (v0.5.0); resumable mux still requires sharing complete JSON",
       "Upload recognition accepts T3, legacy T2, and plain URIs",
       "Each URI becomes its own 512 × 512 PNG",
       "Recognition and generation run entirely in the browser",
@@ -594,7 +599,7 @@ export const en = {
     firewallTcp: "Open TCP on the public port (REALITY over raw).",
     autoTitle: "native + raw + reality",
     autoStack: "mux + carrier.mode=auto · QUIC-first · TCP fallback",
-    autoHint: "Recommended for tcptun-to-tcptun on v0.4.2",
+    autoHint: "Recommended for tcptun-to-tcptun on v0.5.0",
     quicTitle: "native + raw + reality",
     quicStack: "carrier.mode=quic · forced QUIC · no TCP fallback",
     quicHint: "When you want a dedicated QUIC pool only",
@@ -774,7 +779,7 @@ export const en = {
         { title: "Authentication", body: "Server inbound users[].id must equal client outbound token. Generate long random tokens; never reuse example values like change-me in production." },
         { title: "Address", body: "address is always a string array of host:port. Multiple outbound addresses race as candidate entry points for the same logical service; they are not load balancing (use balance for that)." },
         { title: "Transport", body: "raw is the default and best for throughput. ws / h2 / h3 are available when you need path-based fronting; QUIC mode requires raw." },
-        { title: "Security (v0.4.2)", body: "With native + raw + mux + security.type=reality or tls + carrier.mode=auto, the inbound binds TCP and UDP on one address. Outbound carrier.prefer selects adaptive/quic/tcp. carrier.mode=tcp|quic forces a single carrier." },
+        { title: "Security (v0.5.0)", body: "With native + raw + mux + security.type=reality or tls + carrier.mode=auto, the inbound binds TCP and UDP on one address. Outbound carrier.prefer selects adaptive/quic/tcp. carrier.mode=tcp|quic forces a single carrier." },
         { title: "Mux & resume", body: "mux.enabled enables multiplexing and dual carriers. Optional mux.resume preserves eligible TCP streams. carrier.mode selects auto/tcp/quic independently of mux pooling knobs." },
       ],
       tutorial: [
@@ -796,7 +801,7 @@ export const en = {
     nativeSecurity: "REALITY or TLS, carrier.mode auto/tcp/quic",
     nativeMux: "Required for auto and QUIC carriers",
     nativeDescription:
-      "The only tunnel protocol in v0.4.2. raw + mux + reality or tls with carrier.mode=auto binds TCP and UDP on one address; outbound carrier.prefer selects adaptive, quic, or tcp. Resumable streams can preserve eligible TCP flows across carrier replacement.",
+      "The only tunnel protocol in v0.5.0. raw + mux + reality or tls with carrier.mode=auto binds TCP and UDP on one address; outbound carrier.prefer selects adaptive, quic, or tcp. Resumable streams can preserve eligible TCP flows across carrier replacement.",
   },
   config: {
     title: "Configuration",
@@ -951,8 +956,8 @@ export const en = {
         a: "Use a balance outbound to group members with weights and affinity_ttl. Multiple addresses on one outbound only race as candidate entry points; they are not load balancing. The embeddable Runtime and Android bridge also support start/stop, probing, and atomic switches of declared outbounds.",
       },
       {
-        q: "Does the Android app match CLI v0.4.2?",
-        a: "No. The current Google Play listing (tcptun client v0.2.52) embeds tcptun v0.2.5. Pair that app with a v0.2.5 server. Do not mix it with CLI v0.4.2: the Play app is not Native-only v0.4.x, and the CLI is not the runtime inside v0.2.52.",
+        q: "Does the Android app match CLI v0.5.0?",
+        a: "Yes for this release. Android client v0.5.0 embeds tcptun-go v0.5.0 (Bridge API 3). Pair peers on v0.5.0. Android VPN profiles require TLS or REALITY and use Full Tunnel only; Reverse Subnet / P2P is a CLI/server capability and is not exposed in the app.",
       },
     ],
   },
@@ -1000,7 +1005,7 @@ export const en = {
     androidEyebrow: "Android client",
     androidTitle: "tcptun-kotlin privacy boundary",
     androidLead:
-      "These additional disclosures apply to the tcptun-kotlin Android application (Google Play, package {packageId}, app v{appVersion}). That listing embeds tcptun v{runtimeVersion}, not the current CLI v{cliVersion}. The app is a client for endpoints you choose, not an operator-owned VPN service.",
+      "These disclosures apply to the tcptun-kotlin Android application (Google Play, package {packageId}, app v{appVersion}). The app embeds the tcptun-go runtime v{runtimeVersion}, matching CLI v{cliVersion}. It is a client for endpoints you choose, not an operator-owned VPN service.",
   },
 };
 

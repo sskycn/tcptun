@@ -5,7 +5,7 @@ export type TunnelProtocol = "native";
 function assertNativeProtocol(protocol: string) {
   if (protocol !== "native") {
     throw new Error(
-      `${protocol} URIs are not supported. tcptun v0.4.2 tunnel endpoints are native only.`,
+      `${protocol} URIs are not supported. tcptun v0.5.0 tunnel endpoints are native only.`,
     );
   }
 }

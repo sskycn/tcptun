@@ -29,7 +29,7 @@ export type GeneratedConfigs = {
 };
 
 export const protocols: Array<{ id: TunnelProtocol; label: string; hint: string }> = [
-  { id: "native", label: "native", hint: "only tunnel protocol in v0.4.2" },
+  { id: "native", label: "native", hint: "only tunnel protocol in v0.5.0" },
 ];
 
 export function defaultGenerateInput(): GenerateConfigInput {
@@ -50,7 +50,7 @@ export function defaultGenerateInput(): GenerateConfigInput {
 
 export function validateGenerateInput(input: GenerateConfigInput): string | null {
   if (input.protocol !== "native") {
-    return "v0.4.2 generates native configs only";
+    return "v0.5.0 generates native configs only";
   }
   if (!input.server.trim()) return "Server address is required";
   if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {

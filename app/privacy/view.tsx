@@ -1,32 +1,11 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import PageHero from "../page-hero";
 import SiteChrome from "../site-chrome";
 import { getDictionary, interpolate, type Locale } from "../i18n";
 import { androidAppLinks, releaseVersion } from "../site-data";
 
-const androidTitlesZh: Record<string, string> = {
-  "App role and operator backend": "应用角色与运营方后端",
-  "Data kept on the Android device": "保留在 Android 设备上的数据",
-  "Clipboard and QR scanning": "剪贴板与二维码扫描",
-  "VPN traffic and remote endpoints": "VPN 流量与远端端点",
-  "Connectivity diagnostics": "连通性诊断",
-  "Optional flow analysis": "可选流量分析",
-  Permissions: "权限",
-  "Android retention and deletion": "Android 保留与删除",
-  "Android components and security boundary": "Android 组件与安全边界",
-};
-
-const goTitlesZh: Record<string, string> = {
-  "Core role and no automatic reporting": "核心角色且无自动上报",
-  "Traffic forwarding is configuration-driven": "流量转发由配置驱动",
-  "Configuration and credentials": "配置与凭证",
-  "DNS and name resolution": "DNS 与名称解析",
-  "Logs and host callbacks": "日志与宿主回调",
-  "Optional flow observation": "可选流量观测",
-  "Status events are local callbacks": "状态事件是本地回调",
-  "Discovery, probes, and reverse publishing": "发现、探测与反向发布",
-  "Retention and responsibility": "保留与责任",
-};
+type PrivacyCard = { title: string; body: ReactNode };
 
 const websitePrivacyZh = [
   {
@@ -140,15 +119,29 @@ const privacyItems = [
   },
 ] as const;
 
-const androidPrivacyItems = [
+const androidPrivacyEn: PrivacyCard[] = [
   {
     title: "App role and operator backend",
     body: (
       <>
-        The tcptun-kotlin Android client is a local VPN and transparent-proxy tool. It uses Android
-        <code>VpnService</code> and connects to remote endpoints selected or provided by you. The
-        project operator does not provide or operate VPN nodes, accounts, subscriptions, cloud sync,
-        advertising, analytics, crash reporting, or a backend that receives app data.
+        The tcptun-kotlin Android client is a local VPN and transparent-proxy tool. It uses Android{" "}
+        <code>VpnService</code> to create a device-level VPN interface and connects to remote endpoints
+        you provide or select. The operator does not provide, sell, rent, or manage VPN nodes, proxy
+        servers, subscriptions, or cloud configuration, and has no operator-owned backend for accounts,
+        sync, advertising, analytics, or crash reporting.
+      </>
+    ),
+  },
+  {
+    title: "What the operator does not collect",
+    body: (
+      <>
+        “We do not collect” means the operator does not receive or retain data from the app. It does
+        not mean a user-configured endpoint or a connectivity-test target cannot observe network
+        metadata. The current app does not upload names, emails, phone numbers, accounts, contacts,
+        SMS, call logs, location, advertising identifiers, crash reports, profiles, VPN traffic,
+        traffic-analysis events, runtime logs, or QR images to an operator server, and includes no
+        account, advertising, analytics, or crash-reporting SDK.
       </>
     ),
   },
@@ -156,22 +149,28 @@ const androidPrivacyItems = [
     title: "Data kept on the Android device",
     body: (
       <>
-        The app may process profiles and credentials, TLS and transport parameters, routing rules,
-        runtime settings, app package names and labels, local network information, VPN/proxy status,
-        diagnostic state, and logs. Profiles, routing rules, and some settings are stored in the app&apos;s
-        private <code>SharedPreferences</code>. The current app does not separately encrypt credentials
-        inside those local profile files, so protect the device and exported profiles.
+        The app may process profiles and credentials, TLS/transport parameters, routing rules, runtime
+        settings, installed app package names and labels, local network-interface information,
+        VPN/proxy status, diagnostic state, and logs. Non-secret profile fields, routing rules, and
+        some settings are stored in app-private <code>SharedPreferences</code>. Profile credentials and
+        local proxy account passwords are stored separately with AES-256-GCM, using a key protected by
+        Android Keystore. Protect the device and any exported or shared profile data. Runtime logs and
+        traffic-analysis events are held mainly in memory; sensitive fields are redacted before they
+        are shown in the app or written to visible Logcat.
       </>
     ),
   },
   {
-    title: "Clipboard and QR scanning",
+    title: "Clipboard, QR, and A1 sharing",
     body: (
       <>
-        Clipboard text is read only after you explicitly choose to import a profile. After a successful
-        import, the app attempts to clear clipboard text that still matches the imported value. Camera
-        access is requested only when you open the QR scanner; preview frames are used on the device to
-        recognize a profile QR code and are not uploaded to a tcptun operator server.
+        Clipboard text is read only after you explicitly import a profile. After a successful import,
+        the app attempts to clear clipboard text that still matches the imported value. Camera access
+        is requested only when you open the QR scanner; preview frames are used on-device to recognize
+        a profile or local-proxy QR code and are not uploaded to an operator server. An{" "}
+        <code>A1:</code> payload shares one local SOCKS5/mixed username and password. A1 is not
+        encrypted: treat the payload, password, and QR image as a bearer secret. Do not persist them in
+        logs, diagnostics, SavedState, or public storage.
       </>
     ),
   },
@@ -179,11 +178,13 @@ const androidPrivacyItems = [
     title: "VPN traffic and remote endpoints",
     body: (
       <>
-        When VPN mode is enabled, device traffic is forwarded according to the profile through the
-        remote endpoint you selected. That endpoint operator may see or retain connection time, source
-        IP, destination information, traffic metadata, and content not protected by end-to-end
-        encryption. The endpoint operator controls its own logs and privacy policy; use only endpoints
-        you trust. The tcptun operator does not receive that endpoint traffic through a project backend.
+        When VPN mode is enabled, device traffic is forwarded according to the selected profile. The
+        endpoint operator may see or retain connection time, source IP, destination information,
+        traffic metadata, and content not protected by end-to-end encryption. Use only endpoints you
+        trust and review their policies. The tcptun operator does not receive that traffic through a
+        project backend. v0.5.0 requires an encrypted TLS or REALITY tunnel for Android VPN profiles;{" "}
+        <code>security=none</code>, ECH profiles, and arbitrary FileConfig JSON are rejected. Overall
+        security still depends on the profile, device, and remote endpoint.
       </>
     ),
   },
@@ -191,12 +192,12 @@ const androidPrivacyItems = [
     title: "Connectivity diagnostics",
     body: (
       <>
-        While a VPN session is active, the app may perform lightweight HTTPS <code>204</code> checks to
-        <code>connectivitycheck.gstatic.com/generate_204</code> and
+        While a VPN session is active, the app may send lightweight HTTPS <code>204</code> probes
+        through the current outbound to <code>connectivitycheck.gstatic.com/generate_204</code> and{" "}
         <code>cp.cloudflare.com/generate_204</code>. A user-triggered TCPing diagnostic tests port 443
-        on <code>google.com</code>, <code>github.com</code>, and <code>cloudflare.com</code>. Those sites
-        may receive connection metadata under their own policies. These checks are for connectivity, not
-        advertising or behavioral analytics.
+        on <code>google.com</code>, <code>github.com</code>, and <code>cloudflare.com</code>. Those
+        sites may process connection metadata under their own policies. These checks are for
+        connectivity, not advertising or behavioral analytics.
       </>
     ),
   },
@@ -204,10 +205,10 @@ const androidPrivacyItems = [
     title: "Optional flow analysis",
     body: (
       <>
-        If you explicitly enable traffic analysis for an app, the client may display destination
-        domain/IP, port, protocol, route reason, app package name, and timestamps locally for diagnosis.
-        The current Android client does not send this state to a tcptun operator server. When flow
-        analysis is disabled, the client skips the related app-identity lookup where the runtime allows.
+        If you explicitly enable traffic analysis for one app, the client may display destination
+        domain/IP, port, protocol, route reason, app package name, and timestamps locally. This state
+        is not sent to an operator server. Stopping the feature or changing the target clears the
+        related analysis state.
       </>
     ),
   },
@@ -215,10 +216,10 @@ const androidPrivacyItems = [
     title: "Permissions",
     body: (
       <>
-        The Android client may request internet and network-state access, VPN and foreground-service
-        operation, camera access for QR scanning, and notification permission for the VPN status
-        notification. Android controls these permissions. Camera access is not required for ordinary
-        profile editing or VPN use.
+        The app may request network-state and network-access, VPN and foreground-service operation,
+        camera access for QR scanning, and notification permission for the VPN status notification.
+        Camera access is used only after you open the scanner and grant permission, and is not required
+        for ordinary profile editing or VPN use.
       </>
     ),
   },
@@ -227,10 +228,10 @@ const androidPrivacyItems = [
     body: (
       <>
         Local profiles, routing rules, and settings remain until you edit or delete them, clear the
-        app&apos;s data in Android settings, or uninstall the app. Runtime logs and flow-analysis state are
-        primarily held in memory and disappear when cleared or when the process ends. The project
-        operator has no cloud copy; deletion requests for remote endpoint or diagnostic-site logs must
-        go to those providers.
+        app&apos;s data in Android settings, or uninstall the app. Runtime logs and flow-analysis state
+        are primarily in memory and disappear when cleared or when the process ends. The operator has
+        no cloud copy; deletion requests for remote-endpoint or diagnostic-site logs must go to those
+        providers.
       </>
     ),
   },
@@ -238,24 +239,147 @@ const androidPrivacyItems = [
     title: "Android components and security boundary",
     body: (
       <>
-        The client uses Android&apos;s VPN APIs, the tcptun-go bridge, CameraX, and Google ML Kit barcode
-        scanning. No Firebase Analytics, Crashlytics, advertising SDK, or standalone telemetry SDK is
-        part of the current Android project. App-private storage limits ordinary access by other apps,
-        but it does not protect data if the device, profile, remote endpoint, or transport configuration
+        The client uses Android VPN APIs, the tcptun-go gomobile bridge, CameraX, and Google ML Kit
+        barcode scanning. The current project has no Firebase Analytics, Crashlytics, advertising SDK,
+        or standalone telemetry SDK. Android VPN routing is dual-stack Full Tunnel only. Reverse Subnet
+        / P2P topology is a tcptun-go capability and is not exposed in the Android product. App-private
+        storage and Keystore-backed credential encryption limit ordinary access by other apps, but they
+        do not protect data if the device, shared profile, remote endpoint, or transport configuration
         is compromised.
       </>
     ),
   },
-] as const;
+  {
+    title: "Children’s privacy",
+    body: (
+      <>
+        TcpTun is a general-purpose network tool and is not directed to children. The operator does not
+        knowingly collect children’s personal information. Because the app has no operator backend, the
+        project does not receive such information from the app.
+      </>
+    ),
+  },
+];
 
-const goPrivacyItems = [
+const androidPrivacyZh: PrivacyCard[] = [
+  {
+    title: "应用角色与运营方后端",
+    body: (
+      <>
+        tcptun-kotlin Android 客户端是在设备本地运行的 VPN 与透明代理工具。它使用 Android{" "}
+        <code>VpnService</code> 建立设备级 VPN 接口，并连接到你提供或选择的远端节点。运营者不提供、销售、出租或管理
+        VPN 节点、代理服务器、订阅或云端配置，也没有用于账号、同步、广告、分析或崩溃上报的自有后端。
+      </>
+    ),
+  },
+  {
+    title: "运营者不收集什么",
+    body: (
+      <>
+        「我们不收集」是指运营者不会从应用接收或留存数据，并不等于用户配置的远端节点或连通性测试目标看不到网络元数据。当前应用不会把姓名、邮箱、电话、账号、联系人、短信、通话记录、位置、广告标识符、崩溃报告、配置、VPN
+        流量、流量分析事件、运行日志或二维码图像上传到运营者服务器，也没有账号、广告、分析或崩溃上报 SDK。
+      </>
+    ),
+  },
+  {
+    title: "保留在 Android 设备上的数据",
+    body: (
+      <>
+        应用可能在设备上处理配置与凭据、TLS/传输参数、路由规则、运行设置、已安装应用的包名和标签、本地网卡信息、VPN/代理状态、诊断状态和日志。非秘密配置字段、路由规则和部分设置保存在应用私有的{" "}
+        <code>SharedPreferences</code>{" "}
+        中。配置凭据和本地代理账号密码单独使用 AES-256-GCM 加密保存，密钥由 Android Keystore
+        保护。请仍妥善保护设备以及导出或分享的配置。运行日志和流量分析事件主要留在内存中；在应用内显示或写入可见
+        Logcat 前会脱敏敏感字段。
+      </>
+    ),
+  },
+  {
+    title: "剪贴板、二维码与 A1 分享",
+    body: (
+      <>
+        只有在你明确选择导入配置后才会读取剪贴板。导入成功后，应用会尝试清除仍与导入内容一致的剪贴板文本。相机权限只在打开二维码扫描时申请；预览帧用于在设备上识别配置或本地代理二维码，不会上传到运营者服务器。
+        <code>A1:</code>{" "}
+        payload 只分享一组本地 SOCKS5/mixed 的用户名和密码。A1
+        未加密：应把 payload、密码和二维码图像当作持有即有效的秘密，不要写入日志、诊断、SavedState 或公共存储。
+      </>
+    ),
+  },
+  {
+    title: "VPN 流量与远端端点",
+    body: (
+      <>
+        启用 VPN 后，设备流量会按所选配置转发到远端节点。该节点运营者可能看到或保留连接时间、来源 IP、目标信息、流量元数据，以及未被端到端加密保护的内容。请只使用你信任的节点，并查阅其政策。tcptun
+        运营者不会通过项目后端接收这些流量。v0.5.0 要求 Android VPN 配置使用加密的 TLS 或 REALITY 隧道；
+        <code>security=none</code>、ECH 配置和任意 FileConfig JSON 会被拒绝。整体安全性仍取决于配置、设备和远端节点。
+      </>
+    ),
+  },
+  {
+    title: "连通性诊断",
+    body: (
+      <>
+        VPN 运行期间，应用可能通过当前出站对 <code>connectivitycheck.gstatic.com/generate_204</code> 和{" "}
+        <code>cp.cloudflare.com/generate_204</code> 发起轻量 HTTPS <code>204</code>{" "}
+        探测。用户触发的 TCPing 会测试 <code>google.com</code>、<code>github.com</code> 和{" "}
+        <code>cloudflare.com</code> 的 443 端口。这些站点可能按其政策处理连接元数据。探测用于连通性，不是广告或行为分析。
+      </>
+    ),
+  },
+  {
+    title: "可选流量分析",
+    body: (
+      <>
+        若你明确为某个应用开启流量分析，客户端可能在本地显示目标域名/IP、端口、协议、路由原因、应用包名和时间。这些状态不会发送到运营者服务器。停止该功能或更换分析对象时，相关分析状态会被清除。
+      </>
+    ),
+  },
+  {
+    title: "权限",
+    body: (
+      <>
+        应用可能申请网络状态与网络访问、VPN 与前台服务、用于扫码的相机，以及 VPN
+        状态通知权限。相机只在你打开扫描并授权后使用，普通编辑配置或使用 VPN 不需要相机。
+      </>
+    ),
+  },
+  {
+    title: "Android 保留与删除",
+    body: (
+      <>
+        本地配置、路由规则和设置会一直保留，直到你在应用中修改或删除、在 Android
+        设置中清除应用数据，或卸载应用。运行日志和流量分析状态主要在内存中，清除或进程结束后消失。运营者没有云端副本；远端节点或诊断站点日志的删除请求需向相应提供方提出。
+      </>
+    ),
+  },
+  {
+    title: "Android 组件与安全边界",
+    body: (
+      <>
+        客户端使用 Android VPN API、tcptun-go gomobile bridge、CameraX 和 Google ML Kit
+        条码扫描。当前项目没有 Firebase Analytics、Crashlytics、广告 SDK 或独立遥测 SDK。Android
+        路由仅为双栈 Full Tunnel。Reverse Subnet / P2P 是 tcptun-go 能力，未在 Android
+        产品中暴露。应用私有存储和 Keystore 保护的凭据加密可限制其他应用的常规访问，但不能在设备、分享出的配置、远端节点或传输配置被攻破时保证数据安全。
+      </>
+    ),
+  },
+  {
+    title: "儿童隐私",
+    body: (
+      <>
+        TcpTun 是通用网络工具，不以儿童为目标用户，也不会明知收集儿童个人信息。由于应用没有运营者后端，项目不会从应用侧接收这类信息。
+      </>
+    ),
+  },
+];
+
+const goPrivacyEn: PrivacyCard[] = [
   {
     title: "Core role and no automatic reporting",
     body: (
       <>
         tcptun-go is the local Go runtime and embeddable networking library behind the CLI, Android
-        bridge, and other integrations. It has no account system, advertising system, analytics service,
-        crash-reporting service, or developer-owned telemetry endpoint. It does not automatically send
+        bridge, and other integrations. It has no account system, advertising, analytics,
+        crash-reporting, or developer-owned telemetry endpoint. It does not automatically send
         configurations, credentials, proxy traffic, logs, or usage reports to the tcptun project.
       </>
     ),
@@ -266,10 +390,11 @@ const goPrivacyItems = [
       <>
         The core accepts local TCP/UDP flows, SOCKS5 or mixed-proxy requests, TUN traffic, and tunnel
         protocol traffic according to the configuration supplied by the operator or embedding app. It
-        may forward those flows to direct destinations, user-configured SOCKS5 or tunnel endpoints, or
-        reverse-published services. The operators of those destinations and endpoints may see and retain
-        connection metadata and any content not protected by the selected transport or application
-        encryption.
+        may forward those flows to direct destinations, user-configured SOCKS5 or tunnel endpoints,
+        reverse-published services, or Reverse Subnet Home Connectors. Destination and endpoint
+        operators may see and retain connection metadata and any content not protected by the selected
+        transport or application encryption. SOCKS5 <code>auth_mode=secure</code> authenticates a
+        shared secret; it does not encrypt the SOCKS5 connection.
       </>
     ),
   },
@@ -277,11 +402,11 @@ const goPrivacyItems = [
     title: "Configuration and credentials",
     body: (
       <>
-        JSON configuration, URI profiles, QR payloads, tokens, UUIDs, passwords, TLS/REALITY keys, and
-        routing rules are read, validated, generated, or encoded locally by the Go process or its host.
-        URI and QR artifacts can contain credentials and are written wherever the user or host requests;
-        generated files should be protected and not shared through untrusted locations. The Go core does
-        not create a cloud copy of these values.
+        JSON configuration, URI profiles, T2/T3 QR payloads, A1 local-proxy payloads, tokens,
+        passwords, TLS/REALITY keys, and routing rules are read, validated, generated, or encoded
+        locally by the Go process or its host. URI, T3, and A1 artifacts can contain credentials. A1
+        is not encrypted. Generated files should be protected and not shared through untrusted
+        locations. The Go core does not create a cloud copy of these values.
       </>
     ),
   },
@@ -290,10 +415,10 @@ const goPrivacyItems = [
     body: (
       <>
         A deployment can use the operating-system resolver or explicitly configured DNS servers. DNS
-        queries may therefore be visible to the selected resolver, remote endpoint, or network provider,
-        depending on the configuration and route. The optional DNS outbound pinning and fake-IP mapping
-        are runtime features; fake-IP mappings are held in memory for that runtime and cleared when it
-        stops. Review the privacy policy of every DNS provider you configure.
+        queries may therefore be visible to the selected resolver, remote endpoint, or network
+        provider, depending on the configuration and route. Optional DNS outbound pinning and fake-IP
+        mapping are runtime features; fake-IP mappings are held in memory for that runtime and cleared
+        when it stops. Review the privacy policy of every DNS provider you configure.
       </>
     ),
   },
@@ -301,11 +426,12 @@ const goPrivacyItems = [
     title: "Logs and host callbacks",
     body: (
       <>
-        Runtime logs are sent only to the output or callback supplied by the host, such as the CLI&apos;s
-        local stderr or an embedding app&apos;s log callback. Depending on log level and configuration, logs
-        and status events can contain local listeners, remote endpoints, connection errors, timestamps,
-        and runtime state. The host controls whether those outputs are displayed, stored, or shared.
-        Setting the runtime log level to <code>off</code> suppresses runtime logs.
+        Runtime logs are sent only to the output or callback supplied by the host, such as the
+        CLI&apos;s local stderr or an embedding app&apos;s log callback. Depending on log level and
+        configuration, logs and status events can contain local listeners, remote endpoints,
+        connection errors, timestamps, and runtime state. The host controls whether those outputs are
+        displayed, stored, or shared. Setting the runtime log level to <code>off</code> suppresses
+        runtime logs.
       </>
     ),
   },
@@ -313,11 +439,10 @@ const goPrivacyItems = [
     title: "Optional flow observation",
     body: (
       <>
-        An embedding application can explicitly provide a flow observer or app-identity provider. If it
-        does, the Go core can expose a flow&apos;s timestamp, TCP/UDP network, source, destination/domain or
-        IP, port, original IP, outbound tag, route reason, and selected app identity. This is a local
-        callback boundary, not automatic collection by tcptun-go; the embedding application decides
-        whether to enable it and what to do with the events.
+        An embedding application can explicitly provide a flow observer or app-identity provider. If
+        it does, the Go core can expose a flow&apos;s timestamp, TCP/UDP network, source,
+        destination/domain or IP, port, original IP, outbound tag, route reason, and selected app
+        identity. This is a local callback boundary, not automatic collection by tcptun-go.
       </>
     ),
   },
@@ -325,23 +450,26 @@ const goPrivacyItems = [
     title: "Status events are local callbacks",
     body: (
       <>
-        The Android bridge can explicitly register status events such as remote-endpoint changes,
-        reconnecting, and runtime connection issues. These events update the host&apos;s in-process status
-        and may include remote endpoint summaries, state, errors, and timestamps. Registration controls
-        callback delivery to the host; it does not send the events to a tcptun server. The current Android
-        client keeps this state local for UI and diagnostics.
+        The Android bridge can register status events such as remote-endpoint changes, reconnecting,
+        and runtime connection issues. These events update the host&apos;s in-process status and may
+        include remote endpoint summaries, state, errors, and timestamps. Registration does not send
+        events to a tcptun server. The current Android client keeps this state local for UI and
+        diagnostics.
       </>
     ),
   },
   {
-    title: "Discovery, probes, and reverse publishing",
+    title: "Discovery, Reverse Subnet, and probes",
     body: (
       <>
-        In automatic no-config mode, the CLI can scan private IPv4 LAN addresses for a SOCKS5 service on
-        port <code>1080</code> and stop after a successful handshake. Hosts or integrations can also run
-        explicit outbound health or connectivity probes. Reverse publishing can make a selected local
-        TCP/UDP service reachable through a tunnel. These operations create network connections visible
-        to the contacted devices and service operators; they are not developer analytics.
+        In automatic no-config mode, the CLI can scan private IPv4 LAN addresses for a SOCKS5 service
+        on port <code>1080</code> and stop after a successful handshake. Reverse publishing can make a
+        selected local TCP/UDP service reachable through a tunnel. Reverse Subnet can proxy IPv4/IPv6
+        TCP/UDP to a Home Connector; optional direct QUIC (<code>p2p.enabled</code>) may exchange
+        host, Edge-reflexive, STUN-reflexive, and peer-reflexive candidates with the authorized peer.
+        Opt-in host candidates disclose selected private interface addresses. Direct-path failure
+        falls back to relay. These operations create network connections visible to contacted devices
+        and service operators; they are not developer analytics.
       </>
     ),
   },
@@ -349,15 +477,91 @@ const goPrivacyItems = [
     title: "Retention and responsibility",
     body: (
       <>
-        The Go core keeps active sessions, route state, DNS fake-IP mappings, counters, and other runtime
-        state in memory unless the host or operator writes it elsewhere. Stop or close ends the runtime and
-        clears its in-memory state subject to normal process and OS behavior. Files, logs, endpoint records,
-        DNS logs, and remote-server logs created by a particular deployment are controlled by that
-        deployment&apos;s operator, not by the tcptun project.
+        The Go core keeps active sessions, route state, DNS fake-IP mappings, counters, and other
+        runtime state in memory unless the host or operator writes it elsewhere. Stop or close ends
+        the runtime and clears its in-memory state subject to normal process and OS behavior. Files,
+        logs, endpoint records, DNS logs, and remote-server logs created by a particular deployment
+        are controlled by that deployment&apos;s operator, not by the tcptun project.
       </>
     ),
   },
-] as const;
+];
+
+const goPrivacyZh: PrivacyCard[] = [
+  {
+    title: "核心角色且无自动上报",
+    body: (
+      <>
+        tcptun-go 是 CLI、Android bridge 及其他集成背后的本地 Go 运行时和可嵌入网络库。它没有账号、广告、分析、崩溃上报或开发者自有遥测端点，也不会自动把配置、凭据、代理流量、日志或使用报告发送给 tcptun 项目。
+      </>
+    ),
+  },
+  {
+    title: "流量转发由配置驱动",
+    body: (
+      <>
+        核心按运营者或嵌入应用提供的配置，接受本地 TCP/UDP 流、SOCKS5 或 mixed 代理请求、TUN 流量和隧道协议流量，并可能转发到直连目标、用户配置的 SOCKS5 或隧道端点、反向发布服务，或 Reverse Subnet 的 Home Connector。目标与端点运营者可能看到并保留连接元数据，以及未被所选传输或应用层加密保护的内容。SOCKS5{" "}
+        <code>auth_mode=secure</code> 只认证共享密钥，并不加密 SOCKS5 连接。
+      </>
+    ),
+  },
+  {
+    title: "配置与凭证",
+    body: (
+      <>
+        JSON 配置、URI、T2/T3 二维码 payload、A1 本地代理 payload、token、密码、TLS/REALITY 密钥和路由规则由 Go 进程或其宿主在本地读取、校验、生成或编码。URI、T3 和 A1 可能包含凭据。A1 未加密。生成的文件应受保护，不要通过不信任的位置分享。Go 核心不会为这些值创建云端副本。
+      </>
+    ),
+  },
+  {
+    title: "DNS 与名称解析",
+    body: (
+      <>
+        部署可以使用操作系统解析器或显式配置的 DNS 服务器。因此 DNS 查询可能对所选解析器、远端节点或网络提供方可见，具体取决于配置和路由。可选的 DNS 出站固定与 fake-IP 映射是运行时功能；fake-IP 映射保存在该运行时内存中，停止时清除。请查阅你配置的每个 DNS 提供方的隐私政策。
+      </>
+    ),
+  },
+  {
+    title: "日志与宿主回调",
+    body: (
+      <>
+        运行日志只发送到宿主提供的输出或回调，例如 CLI 的本地 stderr 或嵌入应用的日志回调。按日志级别和配置，日志与状态事件可能包含本地监听、远端端点、连接错误、时间和运行状态。是否展示、存储或分享由宿主决定。将运行日志级别设为 <code>off</code> 可抑制运行日志。
+      </>
+    ),
+  },
+  {
+    title: "可选流量观测",
+    body: (
+      <>
+        嵌入应用可以显式提供 flow observer 或应用身份 provider。若启用，Go 核心可以暴露流的时间、TCP/UDP 网络、源、目标域名或 IP、端口、原始 IP、出站标签、路由原因和所选应用身份。这是本地回调边界，不是 tcptun-go 的自动采集。
+      </>
+    ),
+  },
+  {
+    title: "状态事件是本地回调",
+    body: (
+      <>
+        Android bridge 可以注册远端端点变化、重连和运行时连接问题等状态事件。这些事件更新宿主进程内状态，可能包含远端端点摘要、状态、错误和时间。注册不会把事件发送到 tcptun 服务器。当前 Android 客户端把这些状态留在本地用于界面和诊断。
+      </>
+    ),
+  },
+  {
+    title: "发现、Reverse Subnet 与探测",
+    body: (
+      <>
+        无配置自动模式下，CLI 可以扫描私有 IPv4 局域网中端口 <code>1080</code> 的 SOCKS5 服务，并在首次握手成功后停止。反向发布可以通过隧道暴露选定的本地 TCP/UDP 服务。Reverse Subnet 可以把 IPv4/IPv6 TCP/UDP 代理到 Home Connector；可选的直连 QUIC（<code>p2p.enabled</code>）可能与已授权对端交换 host、Edge-reflexive、STUN-reflexive 和 peer-reflexive 候选。选择启用 host 候选会向对端披露所选私有接口地址。直连失败会回退到中继。这些操作会与被联系的设备和运营者产生网络连接，不是开发者分析。
+      </>
+    ),
+  },
+  {
+    title: "保留与责任",
+    body: (
+      <>
+        除非宿主或运营者另行写入，Go 核心把活动会话、路由状态、DNS fake-IP 映射、计数器和其他运行状态保存在内存中。停止或关闭会结束运行时，并按正常进程与操作系统行为清除内存状态。某次部署产生的文件、日志、端点记录、DNS 日志和远端服务器日志由该部署的运营者控制，而不是 tcptun 项目。
+      </>
+    ),
+  },
+];
 
 export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
   const t = getDictionary(locale);
@@ -375,8 +579,8 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
           <h2>{locale === "zh" ? "信息如何被处理" : "What happens to information"}</h2>
           <p>
             {locale === "zh"
-              ? "最近更新于 2026 年 8 月 4 日。这是项目的通俗说明，不是法律建议。具体部署适用的规则取决于运营者、服务提供方和你所在的司法辖区。"
-              : "Last updated August 4, 2026. This is a plain-language project notice, not legal advice. The rules that apply to a particular deployment depend on its operator, providers, and your jurisdiction."}
+              ? "最近更新于 2026 年 9 月 4 日。这是项目的通俗说明，不是法律建议。具体部署适用的规则取决于运营者、服务提供方和你所在的司法辖区。"
+              : "Last updated September 4, 2026. This is a plain-language project notice, not legal advice. The rules that apply to a particular deployment depend on its operator, providers, and your jurisdiction."}
           </p>
         </div>
 
@@ -430,11 +634,11 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
         </div>
 
         <div className="privacy-grid">
-          {androidPrivacyItems.map((item, index) => (
+          {(locale === "zh" ? androidPrivacyZh : androidPrivacyEn).map((item, index) => (
             <article className="privacy-card" key={item.title}>
               <div className="privacy-meta">
                 <span className="privacy-index">{String(index + 1).padStart(2, "0")}</span>
-                <h3>{locale === "zh" ? androidTitlesZh[item.title] ?? item.title : item.title}</h3>
+                <h3>{item.title}</h3>
               </div>
               <p>{item.body}</p>
             </article>
@@ -454,11 +658,11 @@ export function PrivacyView({ locale = "en" }: { locale?: Locale }) {
         </div>
 
         <div className="privacy-grid">
-          {goPrivacyItems.map((item, index) => (
+          {(locale === "zh" ? goPrivacyZh : goPrivacyEn).map((item, index) => (
             <article className="privacy-card" key={item.title}>
               <div className="privacy-meta">
                 <span className="privacy-index">{String(index + 1).padStart(2, "0")}</span>
-                <h3>{locale === "zh" ? goTitlesZh[item.title] ?? item.title : item.title}</h3>
+                <h3>{item.title}</h3>
               </div>
               <p>{item.body}</p>
             </article>

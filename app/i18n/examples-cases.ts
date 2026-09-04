@@ -11,8 +11,8 @@ const en: Record<string, ExampleCopy> = {
   "native-reality": {
     title: "REALITY · carrier.mode=auto (recommended)",
     summary:
-      "v0.4.2 default: native + raw + mux + security.type=reality + carrier.mode=auto. TCP and QUIC on one address; outbound carrier.prefer defaults to adaptive.",
-    when: "Both ends run tcptun v0.4.2 and you want automatic dual carriers without certs or a second port.",
+      "v0.5.0 default: native + raw + mux + security.type=reality + carrier.mode=auto. TCP and QUIC on one address; outbound carrier.prefer defaults to adaptive.",
+    when: "Both ends run tcptun v0.5.0 and you want automatic dual carriers without certs or a second port.",
     steps: [
       "Generate with --server-name and --dest (HTTPS + HTTP/3 capable camouflage).",
       "Ensure mux.enabled and carrier.mode=auto so automatic carriers activate.",
@@ -146,8 +146,8 @@ const zh: Record<string, ExampleCopy> = {
   "native-reality": {
     title: "REALITY · carrier.mode=auto（推荐）",
     summary:
-      "v0.4.2 默认：native + raw + mux + security.type=reality + carrier.mode=auto。同一地址上的 TCP 与 QUIC；出站 carrier.prefer 默认为 adaptive。",
-    when: "两端都运行 tcptun v0.4.2，希望自动双载体，且不想管证书或第二个端口。",
+      "v0.5.0 默认：native + raw + mux + security.type=reality + carrier.mode=auto。同一地址上的 TCP 与 QUIC；出站 carrier.prefer 默认为 adaptive。",
+    when: "两端都运行 tcptun v0.5.0，希望自动双载体，且不想管证书或第二个端口。",
     steps: [
       "生成时指定 --server-name 和 --dest（伪装站点需支持 HTTPS 与 HTTP/3）。",
       "确保 mux.enabled 与 carrier.mode=auto，以启用自动载体。",

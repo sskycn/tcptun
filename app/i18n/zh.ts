@@ -151,7 +151,7 @@ export const zh: Dictionary = {
         href: "/download/#android",
         label: "集成",
         title: "Android 与平台",
-        body: "Play 商店应用 v0.2.52 内嵌 tcptun v0.2.5。请与 v0.2.5 服务端配对，不要与 CLI v0.4.2 混用。",
+        body: "Android 客户端 v0.5.0 内嵌 tcptun-go v0.5.0，与 CLI 一致。VPN 配置需要 TLS 或 REALITY。",
       },
     ],
     coreEyebrow: "核心能力",
@@ -225,7 +225,7 @@ export const zh: Dictionary = {
       {
         label: "仅 native 隧道",
         title: "隧道端点仅 native",
-        body: "v0.4.x 隧道端点仅 native。mixed 与 socks5 仍用于本地/局域网代理跳。",
+        body: "v0.4.0+ 隧道端点仅 native。mixed 与 socks5 仍用于本地/局域网代理跳。",
       },
       {
         label: "载体",
@@ -241,6 +241,11 @@ export const zh: Dictionary = {
         label: "运行时健康",
         title: "空闲省电与 mux 停滞恢复",
         body: "低唤醒功耗配置会在平台入站上停放空闲 QUIC 探测。mux 会淘汰静默停滞的载体，对大象流做反压，并把本地 accept 恢复与出站退避分开限制。",
+      },
+      {
+        label: "Reverse Subnet",
+        title: "已认证的家庭网络访问",
+        body: "v0.5.0 可以把 IPv4/IPv6 TCP/UDP 路由到 Home Connector，可选 Edge 协助的直连 QUIC 并回退中继。Android 产品界面不暴露 Reverse Subnet / P2P。",
       },
     ],
   },
@@ -262,12 +267,12 @@ export const zh: Dictionary = {
     androidLead:
       "Android 应用把同一网络运行时用于设备级 TUN、DNS 与出站切换。从 Play 商店安装，包名 {packageId}。",
     androidWarn:
-      "Play 商店 v{appVersion} 内嵌 tcptun v{runtimeVersion}，不是 CLI v{cliVersion}。请将该应用与 v{runtimeVersion} 服务端配对。与本 CLI 版本混用会失败或行为异常。",
+      "Play 商店 v{appVersion} 内嵌 tcptun-go v{runtimeVersion}，与 CLI v{cliVersion} 一致。请将两端保持在此版本。Android VPN 配置需要 TLS 或 REALITY；应用未暴露 Reverse Subnet / P2P。",
     getPlay: "前往 Google Play",
     androidPrivacy: "Android 隐私",
     clientName: "tcptun 客户端 v{appVersion}",
     clientBody:
-      "Android 上的应用感知 VPN 路由。该 Play 列表内置 tcptun v{runtimeVersion}，不是本页的 v{cliVersion} CLI 运行时 — 请保持对端核心版本一致。",
+      "Android 上的应用感知 VPN 路由。该列表内置 tcptun-go v{runtimeVersion}，与 CLI v{cliVersion} 同一核心。仅 Full Tunnel；远端 Native 出站必须使用 TLS 或 REALITY。",
     openPlay: "打开 Play 商店",
     platformsEyebrow: "平台构建",
     platformsTitle: "Linux、macOS、Windows。",
@@ -419,7 +424,7 @@ export const zh: Dictionary = {
       {
         id: "android",
         title: "Android VPN 运行时",
-        body: "用 TUN、DNS 与出站切换构建应用感知 VPN 路由。当前 Play 商店应用 v0.2.52 内嵌 tcptun v0.2.5 — 请与 v0.2.5 服务端配对，不要与 CLI v0.4.2 混用。嵌入方可单独发布更新的 bridge。",
+        body: "用 TUN、DNS 与出站切换构建应用感知 VPN 路由。Android v0.5.0 内嵌 tcptun-go v0.5.0。VPN 配置需要 TLS 或 REALITY，且仅为 Full Tunnel。",
         cta: "Google Play",
       },
       {
@@ -452,7 +457,7 @@ export const zh: Dictionary = {
     eyebrow: "生成",
     heading: "在浏览器里生成配对配置。",
     lead:
-      "生成 v0.4.2 native 服务端/客户端配对：自动模式使用 raw + REALITY、carrier.mode=auto 与 mux，可选可恢复 TCP 流，或通过 carrier.mode=quic 强制 QUIC。密钥留在本地。",
+      "生成 v0.5.0 native 服务端/客户端配对：自动模式使用 raw + REALITY、carrier.mode=auto 与 mux，可选可恢复 TCP 流，或通过 carrier.mode=quic 强制 QUIC。密钥留在本地。",
     protocol: "协议",
     autoReality: "同一地址上的自动 TCP+QUIC（carrier.mode=auto）",
     resume: "在载体替换时恢复符合条件的 TCP 流",
@@ -460,12 +465,12 @@ export const zh: Dictionary = {
     emptyLead: "创建 server.json、client.json 和 client.uri。JSON 对应 tcptun config native；URI 对应 tcptun uri export。",
     bullets: [
       "生成 X25519 密钥对和 short id",
-      "创建 native token（v0.4.2 仅 native）",
+      "创建 native token（v0.5.0 仅 native）",
       "native 默认使用自动 TCP/QUIC 载体（carrier.mode=auto）配合 REALITY",
       "可恢复 TCP 流会在两端写入匹配的有界设置",
       "强制 QUIC 会写出 carrier.mode=quic 并启用 mux",
     ],
-    nativeHint: "v0.4.2 唯一的隧道协议",
+    nativeHint: "v0.5.0 唯一的隧道协议",
     chipPair: "服务端 + 客户端",
     protocolAria: "隧道协议",
     serverAddress: "服务端地址",
@@ -520,7 +525,7 @@ export const zh: Dictionary = {
     loadSample: "载入示例",
     notesQr: [
       "新二维码使用更紧凑的 T3 Base45 配置",
-      "native URI 使用 carrier_mode / carrier_udp_mode（v0.4.2）；可恢复 mux 仍需分享完整 JSON",
+      "native URI 使用 carrier_mode / carrier_udp_mode（v0.5.0）；可恢复 mux 仍需分享完整 JSON",
       "上传识别接受 T3、旧版 T2 和普通 URI",
       "每条 URI 对应一张 512 × 512 PNG",
       "识别与生成都在浏览器内完成",
@@ -584,7 +589,7 @@ export const zh: Dictionary = {
     firewallTcp: "在公网端口放行 TCP（REALITY over raw）。",
     autoTitle: "native + raw + reality",
     autoStack: "mux + carrier.mode=auto · QUIC 优先 · TCP 回退",
-    autoHint: "推荐用于 v0.4.2 的 tcptun 互连",
+    autoHint: "推荐用于 v0.5.0 的 tcptun 互连",
     quicTitle: "native + raw + reality",
     quicStack: "carrier.mode=quic · 强制 QUIC · 无 TCP 回退",
     quicHint: "只要专用 QUIC 池时使用",
@@ -734,7 +739,7 @@ export const zh: Dictionary = {
     nativeSecurity: "REALITY 或 TLS，carrier.mode 为 auto/tcp/quic",
     nativeMux: "auto 与 QUIC 载体需要启用 mux",
     nativeDescription:
-      "v0.4.2 唯一的隧道协议。raw + mux + reality 或 tls，配合 carrier.mode=auto，会在同一地址绑定 TCP 和 UDP；出站 carrier.prefer 选择 adaptive、quic 或 tcp。可恢复流能在载体替换时保留符合条件的 TCP 流。",
+      "v0.5.0 唯一的隧道协议。raw + mux + reality 或 tls，配合 carrier.mode=auto，会在同一地址绑定 TCP 和 UDP；出站 carrier.prefer 选择 adaptive、quic 或 tcp。可恢复流能在载体替换时保留符合条件的 TCP 流。",
     native: {
       introEyebrow: "native 协议",
       introTitle: "native 如何工作，以及如何端到端运行。",
@@ -773,7 +778,7 @@ export const zh: Dictionary = {
         { title: "认证", body: "服务端入站 users[].id 必须等于客户端出站 token。请生成足够长的随机 token；生产环境不要复用 change-me 这类示例值。" },
         { title: "地址", body: "address 始终是 host:port 字符串数组。多个出站地址是同一逻辑服务的候选入口，会竞速握手；它们不是负载均衡（负载均衡请用 balance）。" },
         { title: "传输", body: "raw 是默认且吞吐最好的选择。需要路径式前置时可用 ws / h2 / h3；QUIC 模式要求 raw。" },
-        { title: "安全（v0.4.2）", body: "native + raw + mux + security.type=reality 或 tls + carrier.mode=auto 时，入站在同一地址绑定 TCP 和 UDP。出站 carrier.prefer 选择 adaptive/quic/tcp。carrier.mode=tcp|quic 强制单一载体。" },
+        { title: "安全（v0.5.0）", body: "native + raw + mux + security.type=reality 或 tls + carrier.mode=auto 时，入站在同一地址绑定 TCP 和 UDP。出站 carrier.prefer 选择 adaptive/quic/tcp。carrier.mode=tcp|quic 强制单一载体。" },
         { title: "Mux 与 resume", body: "mux.enabled 启用多路复用和双载体。可选 mux.resume 保留符合条件的 TCP 流。carrier.mode 独立于 mux 池参数选择 auto/tcp/quic。" },
       ],
       tutorial: [
@@ -938,8 +943,8 @@ export const zh: Dictionary = {
         a: "用 balance 出站按权重和 affinity_ttl 组合成员。单个出站上的多个地址只是同一服务的候选入口竞速，不是负载均衡。可嵌入 Runtime 与 Android bridge 也支持对已声明出站的 start/stop、探测和原子切换。",
       },
       {
-        q: "Android 应用是否对应 CLI v0.4.2？",
-        a: "不对应。当前 Google Play 列表（tcptun client v0.2.52）内嵌 tcptun v0.2.5。请将该应用与 v0.2.5 服务端配对。不要与 CLI v0.4.2 混用：Play 应用不是 Native-only 的 v0.4.x，CLI 也不是 v0.2.52 内的运行时。",
+        q: "Android 应用是否对应 CLI v0.5.0？",
+        a: "此版本对应。Android 客户端 v0.5.0 内嵌 tcptun-go v0.5.0（Bridge API 3）。请将两端保持在 v0.5.0。Android VPN 配置需要 TLS 或 REALITY，且仅为 Full Tunnel；Reverse Subnet / P2P 是 CLI/服务端能力，应用未暴露。",
       },
     ],
   },
@@ -986,6 +991,6 @@ export const zh: Dictionary = {
     androidEyebrow: "Android 客户端",
     androidTitle: "tcptun-kotlin 隐私边界",
     androidLead:
-      "以下补充披露适用于 tcptun-kotlin Android 应用（Google Play，包名 {packageId}，应用 v{appVersion}）。该列表内嵌 tcptun v{runtimeVersion}，不是当前 CLI v{cliVersion}。应用是你所选端点的客户端，不是由运营方提供的 VPN 服务。",
+      "以下披露适用于 tcptun-kotlin Android 应用（Google Play，包名 {packageId}，应用 v{appVersion}）。应用内嵌 tcptun-go 运行时 v{runtimeVersion}，与 CLI v{cliVersion} 一致。它是你所选端点的客户端，不是由运营方提供的 VPN 服务。",
   },
 };
