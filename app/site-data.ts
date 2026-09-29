@@ -1539,6 +1539,75 @@ export const routeSplitExample = `{
   "dns": {}
 }`;
 
+/** Application-identity rules. CLI flows have no identity, so both rules miss. */
+export const appRouteExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "local",
+      "type": "mixed",
+      "address": ["127.0.0.1:1080"],
+      "network": ["tcp", "udp"]
+    }
+  ],
+  "outbounds": [
+    { "tag": "direct", "type": "direct" },
+    { "tag": "block", "type": "blackhole" }
+  ],
+  "route": {
+    "default_outbound": "direct",
+    "rules": [
+      {
+        "app": {
+          "ids": ["com.example.reader"],
+          "platforms": ["android"],
+          "attributes": { "profile": ["work"] }
+        },
+        "outbound": "direct"
+      },
+      {
+        "app": { "id_prefixes": ["com.example.game."] },
+        "outbound": "block"
+      }
+    ]
+  },
+  "dns": {}
+}`;
+
+/** Native inbound route_mode=rules with a principal matcher. */
+export const principalRouteExample = `{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "tag": "remote-access",
+      "type": "native",
+      "address": ["0.0.0.0:9443"],
+      "network": ["tcp", "udp"],
+      "users": [{ "principal": "alice", "id": "change-me" }],
+      "transport": { "type": "raw" },
+      "mux": { "enabled": true },
+      "route_mode": "rules"
+    }
+  ],
+  "outbounds": [
+    { "tag": "direct", "type": "direct", "network": ["tcp", "udp"] },
+    { "tag": "deny", "type": "blackhole" }
+  ],
+  "route": {
+    "default_outbound": "deny",
+    "rules": [
+      {
+        "inbound": ["remote-access"],
+        "principals": ["alice"],
+        "network": ["tcp", "udp"],
+        "ip_cidrs": ["192.168.50.0/24", "fd12:3456:789a::/64"],
+        "outbound": "direct"
+      }
+    ]
+  },
+  "dns": {}
+}`;
+
 export const nativeReverseUdpServerExample = `{
   "log": { "level": "info" },
   "inbounds": [
@@ -1963,9 +2032,10 @@ export const protocolUseCases = [
     summary: "Block ad suffixes, send RFC1918 prefixes direct, default everything else through native REALITY with carrier.mode=auto.",
     when: "You need domain/IP based routing without a second client process.",
     steps: [
-      "Keep proxy, direct, and optional blackhole outbounds.",
-      "Order rules carefully; first match wins.",
-      "Validate with config check before starting.",
+      "Declare proxy, direct, and blackhole outbounds. default_outbound is required.",
+      "Put specific rules first. The first match wins.",
+      "Use domain_suffixes, domains, domain_regexes, ips, ip_cidrs, or ip_ranges. Values in one list are alternatives.",
+      "Run tcptun config check before starting.",
     ],
     commands: [
       "tcptun config check --config client-route-split.json",

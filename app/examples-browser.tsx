@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import CopyButton from "./copy-button";
+import LocalizedLink from "./localized-link";
 import {
   applyExampleSecrets,
   generateExampleSecrets,
@@ -226,6 +227,11 @@ export default function ExamplesBrowser() {
                 <a className="chip-link" href="/config/">
                   {t.examples.configRef}
                 </a>
+                {activeCase.id === "route-split" ? (
+                  <LocalizedLink className="chip-link" href="/config/#route">
+                    {t.examples.routeRef}
+                  </LocalizedLink>
+                ) : null}
                 {activeCase.protocol === "native" ? (
                   <a className="chip-link" href="/protocols/native/">
                     {t.nav.nativeProtocol}

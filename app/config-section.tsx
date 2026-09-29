@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import CopyButton from "./copy-button";
+import LocalizedLink from "./localized-link";
 import { useMessages } from "./locale-context";
 import {
+  appRouteExample,
   configModelNotes,
   nativeClientExample,
   nativeConfigHighlights,
@@ -22,12 +24,20 @@ import {
   nativeServerExample,
   nativeWorkflowCommands,
   protocolComparison,
+  principalRouteExample,
   protocolOutboundSnippets,
   realityCommands,
   realityFieldGroups,
   realityRules,
   reversePublishNotes,
+  routeSplitExample,
 } from "./site-data";
+
+const routeExampleCode = {
+  split: routeSplitExample,
+  app: appRouteExample,
+  principal: principalRouteExample,
+} as const;
 
 const nativeExampleTabs = [
   {
@@ -192,6 +202,9 @@ export default function ConfigSection() {
           <p>{t.config.lead}</p>
         </div>
         <div className="chip-row">
+          <a className="chip-link" href="#route">
+            {t.config.route.chip}
+          </a>
           <a className="chip-link" href="#config-native">
             native
           </a>
@@ -305,6 +318,65 @@ export default function ConfigSection() {
             <p>{item.body}</p>
           </article>
         ))}
+      </div>
+
+      <div className="mux-panel" id="route">
+        <div className="section-subheading">
+          <p className="eyebrow">{t.config.route.eyebrow}</p>
+          <h3>{t.config.route.title}</h3>
+          <p>{t.config.route.lead}</p>
+        </div>
+        <div className="highlight-grid">
+          {t.config.route.notes.map((item) => (
+            <article key={item.title}>
+              <h4>{item.title}</h4>
+              <p>{item.body}</p>
+            </article>
+          ))}
+        </div>
+        <div className="field-group-grid" style={{ marginTop: 16 }}>
+          {t.config.route.groups.map((group) => (
+            <article className="field-group-card" key={group.name}>
+              <h4>{group.name}</h4>
+              <dl>
+                {group.fields.map((field) => (
+                  <div key={field.key}>
+                    <dt>
+                      <code>{field.key}</code>
+                    </dt>
+                    <dd>{field.detail}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          ))}
+        </div>
+        <div className="section-subheading" style={{ marginTop: 28 }}>
+          <h3>{t.config.route.examplesHeading}</h3>
+          <p>{t.config.route.examplesLead}</p>
+          <p>
+            <LocalizedLink className="chip-link" href="/examples/#route-split">
+              {t.config.route.splitLink}
+            </LocalizedLink>
+          </p>
+        </div>
+        {t.config.route.examples.map((example) => {
+          const code = routeExampleCode[example.id as keyof typeof routeExampleCode];
+          return (
+            <div className="mux-snippet" key={example.id} style={{ marginTop: 16 }}>
+              <div className="mux-snippet-heading">
+                <span>
+                  {example.label} · <code>{example.hint}</code>
+                </span>
+                <CopyButton value={code} className="copy-button-ghost" />
+              </div>
+              <p>{example.note}</p>
+              <pre>
+                <code>{code}</code>
+              </pre>
+            </div>
+          );
+        })}
       </div>
 
       {/* ---------- Native ---------- */}

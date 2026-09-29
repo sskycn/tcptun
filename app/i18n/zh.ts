@@ -328,7 +328,7 @@ export const zh: Dictionary = {
         title: "概念",
         links: [
           { href: "/architecture/", label: "架构", body: "FileConfig → RuntimeConfig → 服务。" },
-          { href: "/config/", label: "配置", body: "拓扑字段、carrier.mode、resume、反向发布。" },
+          { href: "/config/", label: "配置", body: "拓扑字段、路由规则、carrier.mode、resume、反向发布。" },
           { href: "/faq/", label: "常见问题", body: "常见运维问题。" },
         ],
       },
@@ -339,6 +339,7 @@ export const zh: Dictionary = {
           { href: "/protocols/", label: "协议", body: "Native 隧道；mixed/socks5 本地跳。" },
           { href: "/examples/", label: "示例", body: "可复制的拓扑。" },
           { href: "/config/#resumable", label: "可恢复流", body: "mux.resume 范围与边界。" },
+          { href: "/config/#route", label: "路由规则", body: "匹配项、顺序、blackhole、DNS 与 principal。" },
           { href: "/config/#reverse", label: "反向发布", body: "NAT 侧 TCP/UDP 暴露。" },
         ],
       },
@@ -376,6 +377,7 @@ export const zh: Dictionary = {
     realityAuto: "carrier.mode=auto",
     generatePair: "生成配对",
     configRef: "配置参考",
+    routeRef: "路由规则",
     catalogEyebrow: "目录",
     catalogTitle: "浏览全部可运行配置。",
     catalogLead:
@@ -661,7 +663,7 @@ export const zh: Dictionary = {
     ],
     properties: [
       { title: "失败即关闭", body: "无效配置绝不会部分启动。校验失败时 DNS fake-IP 与路由拒绝不安全回退。" },
-      { title: "确定性路由", body: "规则与 default_outbound 已编译；balance 与 chain 跳经过环检查且有限。" },
+      { title: "确定性路由", body: "规则保持文件顺序，先匹配先生效。inbound、network、principals、app 与目的地条件组是 AND；同一列表内的值是 OR。default_outbound 必填。balance 成员与 via 链会做环检查。" },
       { title: "资源边界", body: "mux 池、resume 缓冲和数据包路径使用显式预算，内存行为可预期。" },
       { title: "可观测运行时", body: "日志级别、bridge 身份与运行时统计面向运维与嵌入者。" },
     ],
@@ -700,7 +702,7 @@ export const zh: Dictionary = {
       { title: "net.Listener", body: "可复用的传输会话可以暴露为 listener。" },
       { title: "endpoint.Dialer", body: "通过编译后的端点策略进行 TCP 与 UDP 拨号。" },
       { title: "PacketDevice / TUN", body: "平台数据包设备进入同一套编译路由器。" },
-      { title: "路由引擎", body: "在出站图上做应用感知的路由选择。" },
+      { title: "路由引擎", body: "按 FileConfig 规则顺序选择出站，包括嵌入方提供的应用身份。" },
     ],
     audiences: [
       "构建网络代理的 Go 开发者",
@@ -807,6 +809,159 @@ export const zh: Dictionary = {
     defaultSecurity: "默认安全",
     mux: "Mux",
     bestFor: "适合",
+    route: {
+      chip: "路由",
+      eyebrow: "FileConfig route",
+      title: "路由规则",
+      lead: "route.default_outbound 必填。rules 按声明顺序执行，第一条命中的规则选定其 outbound。mixed、socks5 与平台 TUN 的每条流都走这套路由器。native 入站在 route_mode 设为 rules 之前，把已接受的流送到默认出站。",
+      examplesHeading: "可运行的 route 对象",
+      examplesLead: "这些对象在 v0.5.0 上可以通过 tcptun config check。分流示例仍需真实的 REALITY 公钥；示例目录会在浏览器里填入。",
+      splitLink: "打开路由分流示例",
+      notes: [
+        {
+          title: "先匹配先生效",
+          body: "规则保持文件中的顺序。命中后停止继续查找。一条只写了 outbound 的规则会匹配剩余的全部流，并挡住后面的规则。",
+        },
+        {
+          title: "条件组合",
+          body: "inbound、network、principals、app 与目的地条件组用 AND 组合。同一数组内的值是 OR。domains、domain_regexes、domain_suffixes、ips、ip_cidrs 与 ip_ranges 组成同一个目的地条件组：任一命中即可。空的条件组不增加约束。",
+        },
+        {
+          title: "规则在哪里生效",
+          body: "mixed、socks5 与平台 TUN 始终使用编译后的路由器。native 入站省略 route_mode 或设为 default 时，每条已接受的流都走 default_outbound。route_mode 为 rules 时，按每条 TCP flow 和每个固定目标 UDP association 选择。应用身份由嵌入方提供，不会写入 native、mux 或 UDP 帧。带 app 的规则在缺少该身份时不匹配。",
+        },
+        {
+          title: "blackhole",
+          body: "type 为 blackhole 的出站拒绝 TCP，并丢弃 UDP。该流不会继续转到 direct 或其他出站。",
+        },
+        {
+          title: "DNS 与路由器",
+          body: "dns.outbound 把拦截到的 DNS 固定到一个同时支持 TCP 与 UDP 的出站，并绕过路由规则。该出站不可用时，DNS 失败即关闭。启用 dns.fake_ip.enabled 后，A 与 AAAA 使用配置的 fake-IP 范围（省略时为 198.18.0.0/15 与 fc00::/18），之后发往这些地址的流会在路由选择前还原成域名。其他 DNS 报文仍走配置的路由。dns.strategy 为 prefer_ipv4、prefer_ipv6、ipv4_only 或 ipv6_only。TUN 上 TCP 或 UDP 53 端口的 DNS 进入同一路由器，除非被固定到 dns.outbound。",
+        },
+        {
+          title: "JSON 契约",
+          body: "未知字段会被拒绝。匹配项就是本页列出的这些数组。geosite: 与 geoip: 前缀会被拒绝。一条 URI 只携带一个隧道端点；路由规则和 via 链留在 JSON 里。via 把该出站的拨号串起来，并会做环检查。Android 应用使用 Full Tunnel，不编辑这些规则。",
+        },
+      ],
+      groups: [
+        {
+          name: "route",
+          fields: [
+            {
+              key: "default_outbound",
+              detail: "必填的出站标签。未命中的流量使用它。标签必须存在。",
+            },
+            {
+              key: "rules",
+              detail: "有序规则数组。空数组表示每条流都走 default_outbound。",
+            },
+            {
+              key: "rules[].outbound",
+              detail: "规则命中时选定的出站标签，必填。",
+            },
+          ],
+        },
+        {
+          name: "匹配项",
+          fields: [
+            {
+              key: "inbound",
+              detail: "入站标签，OR。留空匹配每个入站。每个标签都必须存在。",
+            },
+            {
+              key: "network",
+              detail: "tcp 与/或 udp，OR。留空则不按网络过滤。",
+            },
+            {
+              key: "domains",
+              detail: "精确主机名，OR。比较前会把主机名转成小写，并去掉末尾一个点。",
+            },
+            {
+              key: "domain_suffixes",
+              detail: "在同一主机名上做 OR。example.com 匹配 example.com，以及以 .example.com 结尾的主机名。",
+            },
+            {
+              key: "domain_regexes",
+              detail: "Go 正则表达式，OR，作用在同一规范化主机名上。",
+            },
+            {
+              key: "ips",
+              detail: "精确 IP 地址，OR。比较前会把 IPv4-mapped IPv6 还原成 IPv4。",
+            },
+            {
+              key: "ip_cidrs",
+              detail: "CIDR 前缀，OR。支持 IPv4 与 IPv6。",
+            },
+            {
+              key: "ip_ranges",
+              detail: "闭区间 start-end，OR。两端必须是同一地址族，且 start 不晚于 end。示例：192.168.1.10-192.168.1.20。",
+            },
+          ],
+        },
+        {
+          name: "app",
+          fields: [
+            {
+              key: "app",
+              detail: "仅当嵌入方提供身份时匹配。缺少身份则跳过该规则。ids、id_prefixes、platforms、attributes 至少要有一项。",
+            },
+            {
+              key: "app.ids",
+              detail: "精确 ID，OR，区分大小写。Android 集成通常使用包名。",
+            },
+            {
+              key: "app.id_prefixes",
+              detail: "ID 前缀，OR，区分大小写。",
+            },
+            {
+              key: "app.platforms",
+              detail: "平台名，OR，比较时不区分大小写。示例：android。",
+            },
+            {
+              key: "app.attributes",
+              detail: "键到值列表的映射。键会做大小写归一。每个键必须命中其中一个值。ids、前缀、平台与每个属性键用 AND 组合。",
+            },
+          ],
+        },
+        {
+          name: "Principal",
+          fields: [
+            {
+              key: "users[].principal",
+              detail: "native 入站用户上的名字。仅 ASCII 字母、数字、'.'、'_'、'-' 或 '@'，最多 128 字节。它与 users[].id 分开。",
+            },
+            {
+              key: "route_mode",
+              detail: "写在 native 入站上：省略或 default 保持 default_outbound。rules 让该入站使用编译后的路由器。",
+            },
+            {
+              key: "principals",
+              detail: "这些名字的 OR 列表。规则必须把 inbound 指到 route_mode 为 rules 的 native 入站，且每个名字都存在于这些用户上。",
+            },
+          ],
+        },
+      ],
+      examples: [
+        {
+          id: "split",
+          label: "客户端分流",
+          hint: "client-route-split.json",
+          note: "ads.example 走 blackhole，RFC1918 前缀与 internal.example 走 direct，其余流走 native 出站。运行 config check 前请换上真实的 REALITY 公钥。",
+        },
+        {
+          id: "app",
+          label: "应用身份",
+          hint: "client-route-app.json",
+          note: "普通 CLI 流没有应用身份，所以两条规则都不会命中，流量走 direct。嵌入方在 Android 上返回 com.example.reader 且属性 profile=work 时选择 direct。以 com.example.game. 开头的 ID 选择 block。",
+        },
+        {
+          id: "principal",
+          label: "native 入站上的 principal",
+          hint: "server-route-principal.json",
+          note: "remote-access 使用 route_mode rules。已认证用户 alice 可以通过 direct 打开这两个前缀上的 TCP/UDP。其余已接受的流走 deny。这里只展示路由字段，并不导出家庭局域网。",
+        },
+      ],
+    },
   },
   security: {
     title: "安全与信任",
@@ -941,6 +1096,10 @@ export const zh: Dictionary = {
       {
         q: "如何在出站之间负载均衡和切换？",
         a: "用 balance 出站按权重和 affinity_ttl 组合成员。单个出站上的多个地址只是同一服务的候选入口竞速，不是负载均衡。可嵌入 Runtime 与 Android bridge 也支持对已声明出站的 start/stop、探测和原子切换。",
+      },
+      {
+        q: "路由规则如何匹配？",
+        a: "route.default_outbound 必填。rules 按顺序测试，先匹配先生效。inbound、network、principals、app 与目的地条件组用 AND 组合；同一列表内的值是 OR。domains、域名后缀、域名正则、IP、CIDR 与范围组成同一个目的地条件组，任一命中即可。geosite: 与 geoip: 前缀会被拒绝。mixed、socks5 与 TUN 始终使用这套路由器。native 入站在 route_mode 为 rules 时使用它。详见配置页的路由规则。",
       },
       {
         q: "Android 应用是否对应 CLI v0.5.0？",

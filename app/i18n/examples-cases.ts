@@ -115,9 +115,10 @@ const en: Record<string, ExampleCopy> = {
     summary: "Block ad suffixes, send RFC1918 prefixes direct, default everything else through native REALITY with carrier.mode=auto.",
     when: "You need domain/IP based routing without a second client process.",
     steps: [
-      "Keep proxy, direct, and optional blackhole outbounds.",
-      "Order rules carefully; first match wins.",
-      "Validate with config check before starting.",
+      "Declare proxy, direct, and blackhole outbounds. default_outbound is required.",
+      "Put specific rules first. The first match wins.",
+      "Use domain_suffixes, domains, domain_regexes, ips, ip_cidrs, or ip_ranges. Values in one list are alternatives.",
+      "Run tcptun config check before starting.",
     ],
   },
   "native-chain": {
@@ -250,9 +251,10 @@ const zh: Record<string, ExampleCopy> = {
     summary: "广告后缀走 blackhole，RFC1918 前缀走 direct，其余默认走 native REALITY 且 carrier.mode=auto。",
     when: "需要按域名/IP 分流，但不想再跑第二个客户端进程。",
     steps: [
-      "保留 proxy、direct，以及可选的 blackhole 出站。",
-      "仔细排列规则顺序；先匹配先生效。",
-      "启动前先 config check。",
+      "声明 proxy、direct 与 blackhole 出站。default_outbound 必填。",
+      "更具体的规则放前面。先匹配先生效。",
+      "使用 domain_suffixes、domains、domain_regexes、ips、ip_cidrs 或 ip_ranges。同一列表里的值是并列候选。",
+      "启动前先运行 tcptun config check。",
     ],
   },
   "native-chain": {

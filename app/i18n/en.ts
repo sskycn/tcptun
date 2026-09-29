@@ -336,7 +336,7 @@ export const en = {
         title: "Concepts",
         links: [
           { href: "/architecture/", label: "Architecture", body: "FileConfig → RuntimeConfig → serve." },
-          { href: "/config/", label: "Configuration", body: "Topology fields, carrier.mode, resume, reverse publish." },
+          { href: "/config/", label: "Configuration", body: "Topology fields, route rules, carrier.mode, resume, reverse publish." },
           { href: "/faq/", label: "FAQ", body: "Common operational questions." },
         ],
       },
@@ -347,6 +347,7 @@ export const en = {
           { href: "/protocols/", label: "Protocols", body: "Native tunnels; mixed/socks5 local hops." },
           { href: "/examples/", label: "Examples", body: "Copy-ready topologies." },
           { href: "/config/#resumable", label: "Resumable streams", body: "mux.resume scope and bounds." },
+          { href: "/config/#route", label: "Route rules", body: "Matchers, order, blackhole, DNS, and principals." },
           { href: "/config/#reverse", label: "Reverse publish", body: "NAT-side TCP/UDP exposure." },
         ],
       },
@@ -384,6 +385,7 @@ export const en = {
     realityAuto: "carrier.mode=auto",
     generatePair: "Generate pair",
     configRef: "Config reference",
+    routeRef: "Route rules",
     catalogEyebrow: "Catalog",
     catalogTitle: "Browse every worked config.",
     catalogLead:
@@ -672,7 +674,7 @@ export const en = {
     ],
     properties: [
       { title: "Fail closed", body: "Invalid config never partially starts. DNS fake-IP and routing refuse unsafe fallbacks when validation fails." },
-      { title: "Deterministic routing", body: "Rules and default_outbound are compiled; balance and chain hops are cycle-checked and finite." },
+      { title: "Deterministic routing", body: "Rules stay in file order and the first match wins. inbound, network, principals, app, and the destination group are AND; values inside one list are OR. default_outbound is required. balance members and via chains are cycle-checked." },
       { title: "Resource bounds", body: "Mux pools, resume buffers, and packet paths use explicit budgets so memory behavior stays predictable." },
       { title: "Observable runtime", body: "Log levels, bridge identity, and runtime statistics surface for operators and embedders." },
     ],
@@ -711,7 +713,7 @@ export const en = {
       { title: "net.Listener", body: "Reusable transport sessions can be exposed as listeners." },
       { title: "endpoint.Dialer", body: "TCP and UDP dialing through compiled endpoint policies." },
       { title: "PacketDevice / TUN", body: "Platform packet devices enter the same compiled router." },
-      { title: "Routing engine", body: "Application-aware route selection over the outbound graph." },
+      { title: "Routing engine", body: "Ordered FileConfig rules over the outbound graph, including application identity supplied by the embedder." },
     ],
     audiences: [
       "Go developers building network agents",
@@ -819,6 +821,159 @@ export const en = {
     defaultSecurity: "Default security",
     mux: "Mux",
     bestFor: "Best for",
+    route: {
+      chip: "Routing",
+      eyebrow: "FileConfig route",
+      title: "Route rules",
+      lead: "route.default_outbound is required. rules run in declaration order and the first match selects its outbound. mixed, socks5, and platform TUN use this router for every flow. A native inbound sends accepted flows to the default outbound until route_mode is rules.",
+      examplesHeading: "Worked route objects",
+      examplesLead: "These objects pass tcptun config check on v0.5.0. The split example still needs a real REALITY public key; the examples catalog fills one in the browser.",
+      splitLink: "Open the route-split example",
+      notes: [
+        {
+          title: "First match",
+          body: "Rules keep file order. A match stops the search. A rule whose only field is outbound matches every remaining flow and hides later rules.",
+        },
+        {
+          title: "Conditions",
+          body: "inbound, network, principals, app, and the destination group combine with AND. Values inside one array are OR. domains, domain_regexes, domain_suffixes, ips, ip_cidrs, and ip_ranges are one destination group: any hit matches. An empty group adds no constraint.",
+        },
+        {
+          title: "Where rules run",
+          body: "mixed, socks5, and platform TUN always use the compiled router. On a native inbound, omit route_mode or set default to keep default_outbound for every accepted flow. route_mode rules selects per TCP flow and per fixed-destination UDP association. The embedder supplies application identity; it is not added to native, mux, or UDP frames. A rule with app does not match when that identity is missing.",
+        },
+        {
+          title: "blackhole",
+          body: "An outbound with type blackhole rejects TCP and discards UDP. The flow does not continue to direct or another outbound.",
+        },
+        {
+          title: "DNS and the router",
+          body: "dns.outbound pins intercepted DNS to one outbound that supports TCP and UDP, bypassing route rules. If that outbound is unavailable, DNS fails closed. With dns.fake_ip.enabled, A and AAAA answers use the configured fake-IP ranges (198.18.0.0/15 and fc00::/18 when omitted) and later flows to those addresses are restored to the domain before route selection. Other DNS messages follow the configured route. dns.strategy is prefer_ipv4, prefer_ipv6, ipv4_only, or ipv6_only. TUN DNS on TCP or UDP port 53 enters this same router unless it is pinned.",
+        },
+        {
+          title: "JSON contract",
+          body: "Unknown fields are rejected. Matchers are the lists on this page. geosite: and geoip: prefixes are rejected. A URI carries one tunnel endpoint; route rules and via chains stay in JSON. via chains the dial of that outbound and is cycle-checked. The Android app uses Full Tunnel and does not edit these rules.",
+        },
+      ],
+      groups: [
+        {
+          name: "route",
+          fields: [
+            {
+              key: "default_outbound",
+              detail: "Required outbound tag. Unmatched traffic uses it. The tag must exist.",
+            },
+            {
+              key: "rules",
+              detail: "Ordered rule array. An empty array sends every flow to default_outbound.",
+            },
+            {
+              key: "rules[].outbound",
+              detail: "Required outbound tag selected when the rule matches.",
+            },
+          ],
+        },
+        {
+          name: "Matchers",
+          fields: [
+            {
+              key: "inbound",
+              detail: "Inbound tags, OR. Empty matches every inbound. Each tag must exist.",
+            },
+            {
+              key: "network",
+              detail: "tcp and/or udp, OR. Empty does not filter by network.",
+            },
+            {
+              key: "domains",
+              detail: "Exact host, OR. The host is lowercased and one trailing dot is removed before the compare.",
+            },
+            {
+              key: "domain_suffixes",
+              detail: "OR, on that same host. example.com matches example.com and any host ending in .example.com.",
+            },
+            {
+              key: "domain_regexes",
+              detail: "Go regular expressions, OR, against that same normalized host.",
+            },
+            {
+              key: "ips",
+              detail: "Exact IP addresses, OR. IPv4-mapped IPv6 is unmapped before compare.",
+            },
+            {
+              key: "ip_cidrs",
+              detail: "CIDR prefixes, OR. IPv4 and IPv6.",
+            },
+            {
+              key: "ip_ranges",
+              detail: "Inclusive start-end, OR. Both ends share one address family and start is not after end. Example: 192.168.1.10-192.168.1.20.",
+            },
+          ],
+        },
+        {
+          name: "app",
+          fields: [
+            {
+              key: "app",
+              detail: "Matches only when the embedder supplies identity. Missing identity skips the rule. At least one of ids, id_prefixes, platforms, or attributes is required.",
+            },
+            {
+              key: "app.ids",
+              detail: "Exact IDs, OR, case-sensitive. Android integrations normally use the package name.",
+            },
+            {
+              key: "app.id_prefixes",
+              detail: "ID prefixes, OR, case-sensitive.",
+            },
+            {
+              key: "app.platforms",
+              detail: "Platform names, OR, compared case-insensitively. Example: android.",
+            },
+            {
+              key: "app.attributes",
+              detail: "Map of key to values. Keys are case-normalized. Each key must match one of its values. ids, prefixes, platforms, and each attribute key combine with AND.",
+            },
+          ],
+        },
+        {
+          name: "Principals",
+          fields: [
+            {
+              key: "users[].principal",
+              detail: "Name on a native inbound user. ASCII letters, digits, '.', '_', '-', or '@', at most 128 bytes. It is separate from users[].id.",
+            },
+            {
+              key: "route_mode",
+              detail: "On a native inbound: omit or default to keep default_outbound. rules runs the compiled router for that inbound.",
+            },
+            {
+              key: "principals",
+              detail: "OR list of those names. The rule must set inbound to native inbounds whose route_mode is rules, and every name must exist on those users.",
+            },
+          ],
+        },
+      ],
+      examples: [
+        {
+          id: "split",
+          label: "Client split",
+          hint: "client-route-split.json",
+          note: "ads.example is blackholed, RFC1918 prefixes and internal.example go direct, and every other flow uses the native outbound. Replace the REALITY public key before config check.",
+        },
+        {
+          id: "app",
+          label: "Application identity",
+          hint: "client-route-app.json",
+          note: "Ordinary CLI flows have no application identity, so both rules miss and traffic uses direct. An embedder that returns com.example.reader on Android with attribute profile=work selects direct. IDs that start with com.example.game. select block.",
+        },
+        {
+          id: "principal",
+          label: "Principal on a native inbound",
+          hint: "server-route-principal.json",
+          note: "remote-access uses route_mode rules. Authenticated user alice may open TCP/UDP to the two prefixes through direct. Every other accepted flow uses deny. This shows the route fields; it does not export a home LAN.",
+        },
+      ],
+    },
   },
   security: {
     title: "Security & trust",
@@ -954,6 +1109,10 @@ export const en = {
       {
         q: "How do I load-balance and switch among outbounds?",
         a: "Use a balance outbound to group members with weights and affinity_ttl. Multiple addresses on one outbound only race as candidate entry points; they are not load balancing. The embeddable Runtime and Android bridge also support start/stop, probing, and atomic switches of declared outbounds.",
+      },
+      {
+        q: "How do route rules match?",
+        a: "route.default_outbound is required. rules are tested in order and the first match wins. inbound, network, principals, app, and the destination group combine with AND; values in one list are OR. domains, domain suffixes, domain regexes, IPs, CIDRs, and ranges are one destination group, so any hit matches. geosite: and geoip: prefixes are rejected. mixed, socks5, and TUN always use this router. A native inbound uses it when route_mode is rules. See Configuration → Route rules.",
       },
       {
         q: "Does the Android app match CLI v0.5.0?",
